@@ -23,6 +23,11 @@ type ServiceHandler interface {
 	Start(baseGrpc.ServiceRegistrar)
 }
 
+type Server interface {
+	Serve(ctx context.Context)
+	Close() error
+}
+
 func NewGrpcCommand(commands []ServiceHandler, mw MiddlewareList, command app.BaseCommand, addr net.Addr) *grpcCommand {
 	return &grpcCommand{
 		commands:    commands,
@@ -37,6 +42,7 @@ type grpcCommand struct {
 	commands    []ServiceHandler
 	middlewares []baseGrpc.UnaryServerInterceptor
 	addr        net.Addr
+	connection  Server
 }
 
 func (c *grpcCommand) Setup(server *baseGrpc.Server) {
@@ -48,8 +54,8 @@ func (c *grpcCommand) Setup(server *baseGrpc.Server) {
 func (c *grpcCommand) Run(ctx context.Context) {
 	c.Usage()
 
-	server := grpc.NewServer(c, c.middlewares, c.addr)
-	server.Serve(ctx)
+	c.connection = grpc.NewServer(c, c.middlewares, c.addr)
+	c.connection.Serve(ctx)
 }
 
 func (c *grpcCommand) Usage() {
@@ -75,4 +81,11 @@ func (c *grpcCommand) Usage() {
 		}
 		c.addr = host.NewListener("tcp", dest, port)
 	}
+}
+
+func (c *grpcCommand) Close() error {
+	if c.connection != nil {
+		_ = c.connection.Close()
+	}
+	return nil
 }

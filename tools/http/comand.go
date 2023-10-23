@@ -20,6 +20,7 @@ type HttpCommand interface {
 
 type Server interface {
 	Serve(ctx context.Context)
+	Close() error
 }
 
 func NewHttpCommand(router http.Router, command app.BaseCommand, addr net.Addr) *httpCommand {
@@ -34,13 +35,14 @@ type httpCommand struct {
 	router http.Router
 	addr   net.Addr
 	app.BaseCommand
+	connection Server
 }
 
 func (c *httpCommand) Run(ctx context.Context) {
 	c.Usage()
 
-	server := http.NewServer(c.router, c.addr)
-	server.Serve(ctx)
+	c.connection = http.NewServer(c.router, c.addr)
+	c.connection.Serve(ctx)
 }
 
 func (c *httpCommand) Usage() {
@@ -66,4 +68,11 @@ func (c *httpCommand) Usage() {
 		}
 		c.addr = host.NewListener("tcp", dest, port)
 	}
+}
+
+func (c *httpCommand) Close() error {
+	if c.connection != nil {
+		_ = c.connection.Close()
+	}
+	return nil
 }
