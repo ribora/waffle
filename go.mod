@@ -9,7 +9,7 @@ require (
 	github.com/pressly/goose/v3 v3.15.1
 	github.com/sirupsen/logrus v1.9.3
 	gitlab.com/gorib/di v0.0.0-20231018091226-a62eed2906bc
-	gitlab.com/gorib/server v0.0.0-20231017202724-05f5e0a4ae7e
+	gitlab.com/gorib/server v0.0.0-20231023212011-2ce95ca1642a
 	gitlab.com/gorib/session v0.0.0-20231016141858-5c6a00e5239f
 	gitlab.com/gorib/try v0.0.0-20231015095723-28e5c3531383
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
