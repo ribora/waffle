@@ -2,9 +2,10 @@ package app
 
 import (
 	"fmt"
-	"io"
 	"os"
+	"os/signal"
 	"sort"
+	"syscall"
 
 	"github.com/fatih/color"
 	"github.com/pborman/getopt/v2"
@@ -16,6 +17,7 @@ import (
 type Configure interface{}
 
 type App interface {
+	RunUntilStop()
 	Run()
 	Stop()
 }
@@ -34,7 +36,12 @@ type app struct {
 	closer   func()
 }
 
-func (a *app) Run() {
+func (a app) RunUntilStop() {
+	go a.Watch()
+	a.Run()
+}
+
+func (a app) Run() {
 	opts := getopt.New()
 	var help bool
 	opts.FlagLong(&help, "help", 'h', "Display this help message")
@@ -65,13 +72,20 @@ func (a *app) Run() {
 	}
 }
 
-func (a *app) Stop() {
+func (a app) Stop() {
 	if a.closer != nil {
 		a.closer()
 	}
 }
 
-func (a *app) usage(printer func(w io.Writer)) {
+func (a app) Watch() {
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	<-sig
+	a.Stop()
+}
+
+func (a app) usage(printer func(w io.Writer)) {
 	printer(os.Stderr)
 	_, _ = fmt.Fprintf(os.Stderr, "Available commands:\n")
 	var names []string
