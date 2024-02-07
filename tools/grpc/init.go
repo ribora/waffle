@@ -17,10 +17,6 @@ var (
 )
 
 func InitGrpc() {
-	di.Wire[MiddlewareList](NewMiddlewareList, di.Defaults(map[int]any{
-		0: di.Tags[Middleware](MiddlewareTag),
-	}))
-
 	di.Wire[net.Addr](host.NewListener, di.For[GrpcCommand](), di.Fallback(), di.Defaults(map[int]any{
 		0: "",
 		1: "",

@@ -19,6 +19,10 @@ type GrpcCommand interface {
 	app.Command
 }
 
+type Middleware interface {
+	Run() baseGrpc.UnaryServerInterceptor
+}
+
 type ServiceHandler interface {
 	Start(baseGrpc.ServiceRegistrar)
 }
@@ -28,10 +32,14 @@ type Server interface {
 	Close() error
 }
 
-func NewGrpcCommand(commands []ServiceHandler, mw MiddlewareList, command app.BaseCommand, addr net.Addr) *grpcCommand {
+func NewGrpcCommand(commands []ServiceHandler, middlewares []Middleware, command app.BaseCommand, addr net.Addr) *grpcCommand {
+	mw := make([]baseGrpc.UnaryServerInterceptor, 0, len(middlewares))
+	for _, middleware := range middlewares {
+		mw = append(mw, middleware.Run())
+	}
 	return &grpcCommand{
 		commands:    commands,
-		middlewares: mw.Mw(),
+		middlewares: mw,
 		addr:        addr,
 		BaseCommand: command,
 	}
