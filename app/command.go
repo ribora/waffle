@@ -38,8 +38,7 @@ func (l *CommandList) Add(command Command) {
 }
 
 func (l *CommandList) Get(command string) Command {
-	details, _ := (*l)[command]
-	return details
+	return (*l)[command]
 }
 
 func (l *CommandList) List() <-chan Command {

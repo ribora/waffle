@@ -52,7 +52,7 @@ func (c *httpCommand) Usage() {
 	getopt.Parse()
 	if help {
 		getopt.SetParameters("")
-		_, _ = fmt.Fprintf(os.Stderr, "%s\n", c.Description())
+		_, _ = os.Stderr.WriteString(c.Description())
 		getopt.PrintUsage(os.Stderr)
 		os.Exit(2)
 	}

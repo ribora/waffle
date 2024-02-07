@@ -33,7 +33,6 @@ func Init(commands []Command) *app {
 
 type app struct {
 	commands CommandList
-	config   Configure
 	closer   func()
 }
 
