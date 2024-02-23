@@ -23,12 +23,14 @@ type App interface {
 	Stop()
 }
 
-func Init(commands []Command) *app {
+func Init(commands []Command) (*app, error) {
 	var cmd CommandList
 	for _, command := range commands {
-		cmd.Add(command)
+		if err := cmd.Add(command); err != nil {
+			return nil, err
+		}
 	}
-	return &app{commands: cmd}
+	return &app{commands: cmd}, nil
 }
 
 type app struct {
@@ -60,7 +62,7 @@ func (a app) Run() {
 		ctx := NewContextWithCommand(cmd.Name(), opts.Args())
 		os.Args = opts.Args()
 		try.Catch(func() {
-			cmd.Run(ctx)
+			try.ThrowError(cmd.Run(ctx))
 		}, func(throwable error) {
 			logrus.WithContext(ctx).Error(throwable)
 			os.Exit(1)

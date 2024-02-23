@@ -19,7 +19,7 @@ type HttpCommand interface {
 }
 
 type Server interface {
-	Serve(ctx context.Context)
+	Serve(ctx context.Context) error
 	Close() error
 }
 
@@ -38,14 +38,17 @@ type httpCommand struct {
 	connection Server
 }
 
-func (c *httpCommand) Run(ctx context.Context) {
-	c.Usage()
+func (c *httpCommand) Run(ctx context.Context) error {
+	err := c.Usage()
+	if err != nil {
+		return err
+	}
 
 	c.connection = http.NewServer(c.router, c.addr)
-	c.connection.Serve(ctx)
+	return c.connection.Serve(ctx)
 }
 
-func (c *httpCommand) Usage() {
+func (c *httpCommand) Usage() error {
 	var help bool
 	getopt.FlagLong(&help, "help", 'h', "Display this help message")
 	listen := getopt.StringLong("listen", 'l', "", "Listen for incoming connections on [host:port]", "host:port")
@@ -59,15 +62,20 @@ func (c *httpCommand) Usage() {
 	if *listen != "" {
 		parts := strings.Split(*listen, ":")
 		if len(parts) > 2 {
-			panic(fmt.Errorf("Unsupported host format, expected host:port"))
+			return fmt.Errorf("Unsupported host format, expected host:port")
 		}
 		dest := parts[0]
 		port := "80"
 		if len(parts) == 2 {
 			port = parts[1]
 		}
-		c.addr = host.NewListener("tcp", dest, port)
+		var err error
+		c.addr, err = host.NewListener("tcp", dest, port)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func (c *httpCommand) Close() error {

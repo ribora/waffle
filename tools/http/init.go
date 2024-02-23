@@ -4,7 +4,6 @@ import (
 	"net"
 
 	"gitlab.com/gorib/di"
-	"gitlab.com/gorib/server/host"
 	"gitlab.com/gorib/waffle/app"
 )
 
@@ -19,11 +18,7 @@ func InitHttp() {
 		0: di.Tags[Middleware](MiddlewareTag),
 	}))
 
-	di.Wire[net.Addr](host.NewListener, di.For[HttpCommand](), di.Fallback(), di.Defaults(map[int]any{
-		0: "",
-		1: "",
-		2: "",
-	}))
+	di.Wire[net.Addr](func() net.Addr { panic("http listener is not set") }, di.Fallback())
 
 	di.Wire[app.BaseCommand](func() app.BaseCommand { return app.NewCommand("http", "Start web server") }, di.For[HttpCommand]())
 	di.Wire[HttpCommand](NewHttpCommand, di.Fallback(), di.Tag(app.CommandTag))

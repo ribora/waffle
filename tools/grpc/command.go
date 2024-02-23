@@ -28,7 +28,7 @@ type ServiceHandler interface {
 }
 
 type Server interface {
-	Serve(ctx context.Context)
+	Serve(ctx context.Context) error
 	Close() error
 }
 
@@ -59,14 +59,17 @@ func (c *grpcCommand) Setup(server *baseGrpc.Server) {
 	}
 }
 
-func (c *grpcCommand) Run(ctx context.Context) {
-	c.Usage()
+func (c *grpcCommand) Run(ctx context.Context) error {
+	err := c.Usage()
+	if err != nil {
+		return err
+	}
 
 	c.connection = grpc.NewServer(c, c.middlewares, c.addr)
-	c.connection.Serve(ctx)
+	return c.connection.Serve(ctx)
 }
 
-func (c *grpcCommand) Usage() {
+func (c *grpcCommand) Usage() error {
 	var help bool
 	getopt.FlagLong(&help, "help", 'h', "Display this help message")
 	listen := getopt.StringLong("listen", 'l', "", "Listen for incoming connections on [host:port]", "host:port")
@@ -80,15 +83,20 @@ func (c *grpcCommand) Usage() {
 	if *listen != "" {
 		parts := strings.Split(*listen, ":")
 		if len(parts) > 2 {
-			panic(fmt.Errorf("Unsupported host format, expected host:port"))
+			return fmt.Errorf("Unsupported host format, expected host:port")
 		}
 		dest := parts[0]
 		port := "80"
 		if len(parts) == 2 {
 			port = parts[1]
 		}
-		c.addr = host.NewListener("tcp", dest, port)
+		var err error
+		c.addr, err = host.NewListener("tcp", dest, port)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func (c *grpcCommand) Close() error {

@@ -20,7 +20,7 @@ type ScribusCommand interface {
 }
 
 type BusConsumer interface {
-	Start(connection rabbit.Topic, commands map[string]rabbit.Handler)
+	Start(connection rabbit.Topic, commands map[string]rabbit.Handler) error
 }
 
 func NewScribusCommand(
@@ -52,17 +52,21 @@ type scribusCommand struct {
 	commands   map[string]rabbit.Handler
 }
 
-func (c *scribusCommand) Run(context.Context) {
-	c.Usage()
+func (c *scribusCommand) Run(context.Context) error {
+	if err := c.Usage(); err != nil {
+		return err
+	}
 
 	logrus.Tracef("The consumer has started")
 
 	for {
-		c.consumer.Start(c.connection, c.commands)
+		if err := c.consumer.Start(c.connection, c.commands); err != nil {
+			return err
+		}
 		timer := time.NewTimer(5 * time.Second)
 		select {
 		case <-c.stop:
-			return
+			return nil
 		case <-timer.C:
 		}
 	}
@@ -73,7 +77,7 @@ func (c *scribusCommand) Close() error {
 	return nil
 }
 
-func (c *scribusCommand) Usage() {
+func (c *scribusCommand) Usage() error {
 	var help bool
 	getopt.FlagLong(&help, "help", 'h', "Display this help message")
 	timeout := getopt.IntLong("timeout", 't', 0, "Reconnect to RabbitMQ every [n] seconds", "n")
@@ -89,10 +93,11 @@ func (c *scribusCommand) Usage() {
 		c.consumer = rabbit.NewBusConsumer(time.Duration(*timeout) * time.Second)
 	}
 	if len(getopt.Args()) > 3 {
-		panic(fmt.Errorf("Unexpected connection parameters count"))
+		return fmt.Errorf("unexpected connection parameters count")
 	}
 	if len(getopt.Args()) > 0 {
 		queue := strings.Split(getopt.Args()[2], ":")
 		c.connection = rabbit.NewTopic(getopt.Args()[0], getopt.Args()[1], queue[0], queue[1])
 	}
+	return nil
 }

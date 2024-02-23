@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -14,27 +15,28 @@ import (
 type BaseCommand interface {
 	Name() string
 	Description() string
-	Usage()
+	Usage() error
 }
 
 type Command interface {
 	BaseCommand
-	Run(ctx context.Context)
+	Run(ctx context.Context) error
 }
 
 type CommandList map[string]Command
 
-func (l *CommandList) Add(command Command) {
+func (l *CommandList) Add(command Command) error {
 	if command.Name() == "" {
-		panic(fmt.Errorf("empty command name"))
+		return errors.New("empty command name")
 	}
 	if *l == nil {
 		*l = make(CommandList)
 	}
 	if _, ok := (*l)[command.Name()]; ok {
-		panic(fmt.Errorf("command '%s' has been already registered", command.Name()))
+		return fmt.Errorf("command '%s' has been already registered", command.Name())
 	}
 	(*l)[command.Name()] = command
+	return nil
 }
 
 func (l *CommandList) Get(command string) Command {
@@ -76,7 +78,7 @@ func (b *baseCommand) Description() string {
 	return b.description
 }
 
-func (b *baseCommand) Usage() {
+func (b *baseCommand) Usage() error {
 	var help bool
 	getopt.FlagLong(&help, "help", 'h', "Display this help message")
 	getopt.Parse()
@@ -86,4 +88,5 @@ func (b *baseCommand) Usage() {
 		getopt.PrintUsage(os.Stderr)
 		os.Exit(2)
 	}
+	return nil
 }

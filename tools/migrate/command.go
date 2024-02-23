@@ -11,7 +11,6 @@ import (
 	"github.com/pressly/goose/v3"
 
 	"gitlab.com/gorib/storage/sql"
-	"gitlab.com/gorib/try"
 	"gitlab.com/gorib/waffle/app"
 )
 
@@ -33,7 +32,7 @@ type migrateCommand struct {
 	migrations fs.FS
 }
 
-func (c *migrateCommand) Run(context.Context) {
+func (c *migrateCommand) Run(context.Context) error {
 	var help bool
 	getopt.FlagLong(&help, "help", 'h', "Display this help message")
 	connection := getopt.StringLong("connection", 'c', "", "Database connection string specified for database type", "driver://user:pass@host:port")
@@ -61,13 +60,16 @@ func (c *migrateCommand) Run(context.Context) {
 	if *connection != "" {
 		dsn := strings.Split(*connection, "://")
 		if dsn[0] == "" {
-			panic(fmt.Errorf("Invalid database connection string format"))
+			return fmt.Errorf("invalid database connection string format")
 		}
 		c.connection = sql.NewDb(dsn[0], *connection)
 	}
 
 	goose.SetBaseFS(c.migrations)
-	try.ThrowError(goose.SetDialect(c.connection.Connect().DriverName()))
+	err := goose.SetDialect(c.connection.Connect().DriverName())
+	if err != nil {
+		return err
+	}
 	goose.SetTableName("migrations")
-	try.ThrowError(goose.Run(args[0], c.connection.Connect().DB, "migrations", args[1:]...))
+	return goose.Run(args[0], c.connection.Connect().DB, "migrations", args[1:]...)
 }
