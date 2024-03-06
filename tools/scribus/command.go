@@ -9,8 +9,7 @@ import (
 
 	"github.com/pborman/getopt/v2"
 
-	"github.com/sirupsen/logrus"
-
+	"gitlab.com/gorib/pry"
 	"gitlab.com/gorib/server/rabbit"
 	"gitlab.com/gorib/waffle/app"
 )
@@ -28,6 +27,7 @@ func NewScribusCommand(
 	command app.BaseCommand,
 	consumer BusConsumer,
 	connection rabbit.Topic,
+	logger pry.Logger,
 ) *scribusCommand {
 	cmd := make(map[string]rabbit.Handler)
 	for _, command := range commands {
@@ -41,6 +41,7 @@ func NewScribusCommand(
 		stop:        make(chan struct{}, 1),
 		connection:  connection,
 		BaseCommand: command,
+		logger:      logger,
 	}
 }
 
@@ -50,6 +51,7 @@ type scribusCommand struct {
 	connection rabbit.Topic
 	stop       chan struct{}
 	commands   map[string]rabbit.Handler
+	logger     pry.Logger
 }
 
 func (c *scribusCommand) Run(context.Context) error {
@@ -57,7 +59,7 @@ func (c *scribusCommand) Run(context.Context) error {
 		return err
 	}
 
-	logrus.Tracef("The consumer has started")
+	c.logger.Trace("The consumer has started")
 
 	for {
 		if err := c.consumer.Start(c.connection, c.commands); err != nil {

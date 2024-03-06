@@ -66,7 +66,7 @@ func (c *migrateCommand) Run(context.Context) error {
 	}
 
 	goose.SetBaseFS(c.migrations)
-	err := goose.SetDialect(c.connection.Connect().DriverName())
+	err := goose.SetDialect(c.connection.Connect().BeginTxx(context.Background(), nil).DriverName())
 	if err != nil {
 		return err
 	}

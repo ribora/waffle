@@ -10,8 +10,8 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/pborman/getopt/v2"
-	"github.com/sirupsen/logrus"
 
+	"gitlab.com/gorib/pry"
 	"gitlab.com/gorib/try"
 )
 
@@ -23,19 +23,20 @@ type App interface {
 	Stop()
 }
 
-func Init(commands []Command) (*app, error) {
+func Init(commands []Command, logger pry.Logger) (*app, error) {
 	var cmd CommandList
 	for _, command := range commands {
 		if err := cmd.Add(command); err != nil {
 			return nil, err
 		}
 	}
-	return &app{commands: cmd}, nil
+	return &app{commands: cmd, logger: logger}, nil
 }
 
 type app struct {
 	commands CommandList
 	closer   func()
+	logger   pry.Logger
 }
 
 func (a app) RunUntilStop() {
@@ -64,7 +65,7 @@ func (a app) Run() {
 		try.Catch(func() {
 			try.ThrowError(cmd.Run(ctx))
 		}, func(throwable error) {
-			logrus.WithContext(ctx).Error(throwable)
+			a.logger.Error(throwable, pry.Ctx(ctx))
 			os.Exit(1)
 		})
 	} else {
