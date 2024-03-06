@@ -2,6 +2,7 @@ package app
 
 import (
 	"gitlab.com/gorib/di"
+	"gitlab.com/gorib/pry"
 	"gitlab.com/gorib/try"
 )
 
@@ -13,7 +14,9 @@ var (
 
 func New() App {
 	di.Wire[Configure](func() {}, di.Fallback())
-	di.Wire[App](func(commands []Command, cfg Configure) App { return try.Throw(Init(commands)) }, di.Fallback(), di.Defaults(map[int]any{
+	di.Wire[App](func(commands []Command, cfg Configure, logger pry.Logger) App {
+		return try.Throw(Init(commands, logger))
+	}, di.Fallback(), di.Defaults(map[int]any{
 		0: di.Tags[Command](CommandTag),
 	}))
 	application, closer := di.NewWithCloser[App]()

@@ -10,6 +10,7 @@ import (
 	"github.com/pborman/getopt/v2"
 	baseGrpc "google.golang.org/grpc"
 
+	"gitlab.com/gorib/pry"
 	"gitlab.com/gorib/server/grpc"
 	"gitlab.com/gorib/server/host"
 	"gitlab.com/gorib/waffle/app"
@@ -32,7 +33,7 @@ type Server interface {
 	Close() error
 }
 
-func NewGrpcCommand(commands []ServiceHandler, middlewares []Middleware, command app.BaseCommand, addr net.Addr) *grpcCommand {
+func NewGrpcCommand(commands []ServiceHandler, middlewares []Middleware, command app.BaseCommand, addr net.Addr, logger pry.Logger) *grpcCommand {
 	mw := make([]baseGrpc.UnaryServerInterceptor, 0, len(middlewares))
 	for _, middleware := range middlewares {
 		mw = append(mw, middleware.Run())
@@ -42,6 +43,7 @@ func NewGrpcCommand(commands []ServiceHandler, middlewares []Middleware, command
 		middlewares: mw,
 		addr:        addr,
 		BaseCommand: command,
+		logger:      logger,
 	}
 }
 
@@ -51,6 +53,7 @@ type grpcCommand struct {
 	middlewares []baseGrpc.UnaryServerInterceptor
 	addr        net.Addr
 	connection  Server
+	logger      pry.Logger
 }
 
 func (c *grpcCommand) Setup(server *baseGrpc.Server) {
@@ -65,7 +68,7 @@ func (c *grpcCommand) Run(ctx context.Context) error {
 		return err
 	}
 
-	c.connection = grpc.NewServer(c, c.middlewares, c.addr)
+	c.connection = grpc.NewServer(c, c.middlewares, c.addr, c.logger)
 	return c.connection.Serve(ctx)
 }
 
