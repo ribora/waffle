@@ -9,6 +9,7 @@ import (
 
 	"github.com/pborman/getopt/v2"
 
+	"gitlab.com/gorib/pry"
 	"gitlab.com/gorib/server/host"
 	"gitlab.com/gorib/server/http"
 	"gitlab.com/gorib/waffle/app"
@@ -23,11 +24,12 @@ type Server interface {
 	Close() error
 }
 
-func NewHttpCommand(router http.Router, command app.BaseCommand, addr net.Addr) *httpCommand {
+func NewHttpCommand(router http.Router, command app.BaseCommand, addr net.Addr, logger pry.Logger) *httpCommand {
 	return &httpCommand{
 		router:      router,
 		addr:        addr,
 		BaseCommand: command,
+		logger:      logger,
 	}
 }
 
@@ -36,6 +38,7 @@ type httpCommand struct {
 	addr   net.Addr
 	app.BaseCommand
 	connection Server
+	logger     pry.Logger
 }
 
 func (c *httpCommand) Run(ctx context.Context) error {
@@ -44,7 +47,7 @@ func (c *httpCommand) Run(ctx context.Context) error {
 		return err
 	}
 
-	c.connection = http.NewServer(c.router, c.addr)
+	c.connection = http.NewServer(c.router, c.addr, c.logger)
 	return c.connection.Serve(ctx)
 }
 

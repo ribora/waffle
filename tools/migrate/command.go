@@ -32,7 +32,7 @@ type migrateCommand struct {
 	migrations fs.FS
 }
 
-func (c *migrateCommand) Run(context.Context) error {
+func (c *migrateCommand) Run(ctx context.Context) error {
 	var help bool
 	getopt.FlagLong(&help, "help", 'h', "Display this help message")
 	connection := getopt.StringLong("connection", 'c', "", "Database connection string specified for database type", "driver://user:pass@host:port")
@@ -66,10 +66,14 @@ func (c *migrateCommand) Run(context.Context) error {
 	}
 
 	goose.SetBaseFS(c.migrations)
-	err := goose.SetDialect(c.connection.Connect().BeginTxx(context.Background(), nil).DriverName())
+	tx, err := c.connection.Connect().BeginTxx(context.Background(), nil)
+	if err != nil {
+		return err
+	}
+	err = goose.SetDialect(tx.DriverName())
 	if err != nil {
 		return err
 	}
 	goose.SetTableName("migrations")
-	return goose.Run(args[0], c.connection.Connect().DB, "migrations", args[1:]...)
+	return goose.RunContext(ctx, args[0], c.connection.Connect().Database(), "migrations", args[1:]...)
 }

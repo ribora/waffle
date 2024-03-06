@@ -92,7 +92,7 @@ func (c *scribusCommand) Usage() error {
 	}
 
 	if *timeout != 0 {
-		c.consumer = rabbit.NewBusConsumer(time.Duration(*timeout) * time.Second)
+		c.consumer = rabbit.NewBusConsumer(time.Duration(*timeout)*time.Second, c.logger)
 	}
 	if len(getopt.Args()) > 3 {
 		return fmt.Errorf("unexpected connection parameters count")
