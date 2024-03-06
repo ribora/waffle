@@ -173,12 +173,12 @@ github.com/ydb-platform/ydb-go-sdk/v3 v3.55.1 h1:Ebo6J5AMXgJ3A438ECYotA0aK7ETqjQ
 github.com/ydb-platform/ydb-go-sdk/v3 v3.55.1/go.mod h1:udNPW8eupyH/EZocecFmaSNJacKKYjzQa7cVgX5U2nc=
 gitlab.com/gorib/criteria v0.0.0-20240306202228-afafa368eb6c h1:W+uIngINp4y0AmhUg0lajldY9AMFqq/6h0v6zyB6YCE=
 gitlab.com/gorib/criteria v0.0.0-20240306202228-afafa368eb6c/go.mod h1:bIk/dyU8D7UU/Fk9XIvdWI/T7qc1xTeZnyYaC9EHU8g=
-gitlab.com/gorib/di v0.0.0-20240306203242-2e47e89b3184 h1:q79HBaKQTH2wQ+fzOqYlD/xdpmLaHz34A5CNh5bG2d4=
-gitlab.com/gorib/di v0.0.0-20240306203242-2e47e89b3184/go.mod h1:Y7oseO6Vr99724D0FoQcOnvGn7ccaxOMtJMYrWaDvOI=
+gitlab.com/gorib/di v0.0.0-20240306210353-c276404a5f30 h1:EKzO5WVxOeWSMWLbuBMb+OdkZ84wHJ88SkOaBTfzrMI=
+gitlab.com/gorib/di v0.0.0-20240306210353-c276404a5f30/go.mod h1:XRkfZMvC1KLYta8zQsljsDQcwd2IJyZhQAGBum7GqZo=
 gitlab.com/gorib/parser v0.0.0-20240306202426-9962397d9aeb h1:VumMUHlKNvZk5XmcLyilWUG1QMIPiNe5y2bSvpHFCWc=
 gitlab.com/gorib/parser v0.0.0-20240306202426-9962397d9aeb/go.mod h1:KUCp9asY+UX0/xbkDpa5+tDPE1rVcmzdiTswpUft+/U=
-gitlab.com/gorib/pry v0.0.0-20240306210237-d5aba0c12c31 h1:r/pYdyY1JGranclStKMBGtrETsYtx90I832lI2moQt4=
-gitlab.com/gorib/pry v0.0.0-20240306210237-d5aba0c12c31/go.mod h1:Ygp/6g4kzMR7u0JpxjgdBUk6IMbsOLKt7I+ZRij5dcM=
+gitlab.com/gorib/pry v0.0.0-20240306212641-b08750e43cae h1:uF41DXkhu4a/dUqdrEVfmlWwta3snL3cQx1fP/TDwdk=
+gitlab.com/gorib/pry v0.0.0-20240306212641-b08750e43cae/go.mod h1:Ygp/6g4kzMR7u0JpxjgdBUk6IMbsOLKt7I+ZRij5dcM=
 gitlab.com/gorib/ptr v0.0.0-20240306203242-3e8c6e295364 h1:CnnhuKQcVCzbsGsf2rU8JuiyZhnG/I0+YOXzkjRvoi0=
 gitlab.com/gorib/ptr v0.0.0-20240306203242-3e8c6e295364/go.mod h1:P6xv0bdeePlBMv0XQv9NymGElpHb6+MM7UPIsKOfeok=
 gitlab.com/gorib/server v0.0.0-20240306210353-0a9252bc8de2 h1:AVEsDSYXx/FceV8EVUosq/Th9KuYW9ZCkEFsii1MiYM=
