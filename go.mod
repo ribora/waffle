@@ -8,10 +8,10 @@ require (
 	github.com/pborman/getopt/v2 v2.1.0
 	github.com/pressly/goose/v3 v3.19.2
 	gitlab.com/gorib/di v0.0.0-20240306211241-2ddafbc2911b
-	gitlab.com/gorib/pry v0.0.0-20240316160229-a0b76262208e
+	gitlab.com/gorib/pry v0.0.0-20240319100548-80a28f8f034c
 	gitlab.com/gorib/server v0.0.0-20240316161121-57fcec0e4467
 	gitlab.com/gorib/session v0.0.0-20240306203242-257a6f15f304
-	gitlab.com/gorib/storage v0.0.0-20240310093007-242c926ec18b
+	gitlab.com/gorib/storage v0.0.0-20240319100513-9dadbf2f454d
 	gitlab.com/gorib/try v0.0.0-20240306203242-85915227e4b5
 	golang.org/x/exp v0.0.0-20240314144324-c7f7c6466f7f
 	google.golang.org/grpc v1.62.1
