@@ -11,7 +11,7 @@ require (
 	gitlab.com/gorib/pry v0.0.0-20240319100548-80a28f8f034c
 	gitlab.com/gorib/server v0.0.0-20240316161121-57fcec0e4467
 	gitlab.com/gorib/session v0.0.0-20240306203242-257a6f15f304
-	gitlab.com/gorib/storage v0.0.0-20240319100513-9dadbf2f454d
+	gitlab.com/gorib/storage v0.0.0-20240321054340-e21190fed963
 	gitlab.com/gorib/try v0.0.0-20240306203242-85915227e4b5
 	golang.org/x/exp v0.0.0-20240314144324-c7f7c6466f7f
 	google.golang.org/grpc v1.62.1
