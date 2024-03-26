@@ -189,6 +189,8 @@ gitlab.com/gorib/ptr v0.0.0-20240306203242-3e8c6e295364 h1:CnnhuKQcVCzbsGsf2rU8J
 gitlab.com/gorib/ptr v0.0.0-20240306203242-3e8c6e295364/go.mod h1:P6xv0bdeePlBMv0XQv9NymGElpHb6+MM7UPIsKOfeok=
 gitlab.com/gorib/server v0.0.0-20240316161121-57fcec0e4467 h1:LlRGQnj5/yRjjSFlsy8IxC/R0IFLcSdlBT9RCTeFekI=
 gitlab.com/gorib/server v0.0.0-20240316161121-57fcec0e4467/go.mod h1:a707HxdKuz0ROry3htDKbkGUnQOg88hyvB7fv4BIUyU=
+gitlab.com/gorib/server v0.0.0-20240326200854-d2202885d32b h1:L7ImpbqBZ0h6aN9NmrHn8e6TNnEF6ALutw20Tb0Svo8=
+gitlab.com/gorib/server v0.0.0-20240326200854-d2202885d32b/go.mod h1:Aa5rk5yJSnv032H7YmrMa6EUPw+ok1ZPiBPDs/x6EVs=
 gitlab.com/gorib/session v0.0.0-20240306203242-257a6f15f304 h1:XcDoAl93UcEmyrm+/vm0XAGLXZPR7XP1BCHefz51FX4=
 gitlab.com/gorib/session v0.0.0-20240306203242-257a6f15f304/go.mod h1:Rq9q+oHJHUzU0jxrITCfWV7UMLsNRDmaLQuz9vmHuRo=
 gitlab.com/gorib/storage v0.0.0-20240310093007-242c926ec18b h1:hduZ0NcBZQTJyMZY9IvqxkEIrHxK0n0t835+nrRhmkA=
