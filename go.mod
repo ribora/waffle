@@ -8,7 +8,7 @@ require (
 	github.com/pborman/getopt/v2 v2.1.0
 	github.com/pressly/goose/v3 v3.19.2
 	gitlab.com/gorib/di v0.0.0-20240329031159-2fffccee9c8e
-	gitlab.com/gorib/pry v0.0.0-20240319100548-80a28f8f034c
+	gitlab.com/gorib/pry v0.0.0-20240329180638-54eb374d9ebd
 	gitlab.com/gorib/server v0.0.0-20240329003322-67fdcf130499
 	gitlab.com/gorib/session v0.0.0-20240306203242-257a6f15f304
 	gitlab.com/gorib/storage v0.0.0-20240321054340-e21190fed963

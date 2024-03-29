@@ -189,6 +189,8 @@ gitlab.com/gorib/pry v0.0.0-20240316160229-a0b76262208e h1:KTxyDc+Q2U7b3a+f5b4Qt
 gitlab.com/gorib/pry v0.0.0-20240316160229-a0b76262208e/go.mod h1:T3MNU+g/Er88PQZGB5HKDayV2+y5GenlfJNznZipKNY=
 gitlab.com/gorib/pry v0.0.0-20240319100548-80a28f8f034c h1:4pQ1CzleqlJRf17hKopshzvPTpdAKX7QUDwaAaLwQ1Q=
 gitlab.com/gorib/pry v0.0.0-20240319100548-80a28f8f034c/go.mod h1:wvJdGgOI/Q6hTqf0M+8JskRlhyjLI/pHcrKD6LrlCpM=
+gitlab.com/gorib/pry v0.0.0-20240329180638-54eb374d9ebd h1:4PTni8vczPf/c9Ne8ksGJHLGnkpRtjrcwS0DzYxVwr0=
+gitlab.com/gorib/pry v0.0.0-20240329180638-54eb374d9ebd/go.mod h1:wvJdGgOI/Q6hTqf0M+8JskRlhyjLI/pHcrKD6LrlCpM=
 gitlab.com/gorib/ptr v0.0.0-20240306203242-3e8c6e295364 h1:CnnhuKQcVCzbsGsf2rU8JuiyZhnG/I0+YOXzkjRvoi0=
 gitlab.com/gorib/ptr v0.0.0-20240306203242-3e8c6e295364/go.mod h1:P6xv0bdeePlBMv0XQv9NymGElpHb6+MM7UPIsKOfeok=
 gitlab.com/gorib/server v0.0.0-20240316161121-57fcec0e4467 h1:LlRGQnj5/yRjjSFlsy8IxC/R0IFLcSdlBT9RCTeFekI=
