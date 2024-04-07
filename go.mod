@@ -8,9 +8,9 @@ require (
 	github.com/pborman/getopt/v2 v2.1.0
 	github.com/pressly/goose/v3 v3.19.2
 	gitlab.com/gorib/di v0.0.0-20240329031159-2fffccee9c8e
-	gitlab.com/gorib/pry v0.0.0-20240329180638-54eb374d9ebd
-	gitlab.com/gorib/server v0.0.0-20240329003322-67fdcf130499
-	gitlab.com/gorib/session v0.0.0-20240306203242-257a6f15f304
+	gitlab.com/gorib/pry v0.0.0-20240407123617-9e6ec781edce
+	gitlab.com/gorib/server v0.0.0-20240407123720-d9a80b47fedc
+	gitlab.com/gorib/session v0.0.0-20240407123045-0c7ebec6b653
 	gitlab.com/gorib/storage v0.0.0-20240329183011-1d15b7fa366c
 	gitlab.com/gorib/try v0.0.0-20240306203242-85915227e4b5
 	golang.org/x/exp v0.0.0-20240314144324-c7f7c6466f7f
@@ -19,7 +19,6 @@ require (
 
 require (
 	github.com/andybalholm/brotli v1.1.0 // indirect
-	github.com/gofrs/uuid v4.4.0+incompatible // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/jmoiron/sqlx v1.3.5 // indirect
