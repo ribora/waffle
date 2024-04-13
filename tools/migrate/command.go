@@ -66,11 +66,7 @@ func (c *migrateCommand) Run(ctx context.Context) error {
 	}
 
 	goose.SetBaseFS(c.migrations)
-	conn, err := c.connection.Connect()
-	if err != nil {
-		return err
-	}
-	tx, err := conn.BeginTxx(context.Background(), nil)
+	tx, err := c.connection.Connect().BeginTxx(context.Background(), nil)
 	if err != nil {
 		return err
 	}
@@ -79,5 +75,5 @@ func (c *migrateCommand) Run(ctx context.Context) error {
 		return err
 	}
 	goose.SetTableName("migrations")
-	return goose.RunContext(ctx, args[0], conn.Database(), "migrations", args[1:]...)
+	return goose.RunContext(ctx, args[0], c.connection.Connect().Database(), "migrations", args[1:]...)
 }
