@@ -9,7 +9,7 @@ require (
 	github.com/pressly/goose/v3 v3.19.2
 	gitlab.com/gorib/di v0.0.0-20240329031159-2fffccee9c8e
 	gitlab.com/gorib/pry v0.0.0-20240407123617-9e6ec781edce
-	gitlab.com/gorib/server v0.0.0-20240407123720-d9a80b47fedc
+	gitlab.com/gorib/server v0.0.0-20240413093356-d3d185ca7d2b
 	gitlab.com/gorib/session v0.0.0-20240407123045-0c7ebec6b653
 	gitlab.com/gorib/storage v0.0.0-20240329183011-1d15b7fa366c
 	gitlab.com/gorib/try v0.0.0-20240306203242-85915227e4b5
@@ -34,6 +34,7 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.52.0 // indirect
 	github.com/valyala/tcplisten v1.0.0 // indirect
+	gitlab.com/gorib/client v0.0.0-20240408130107-ab95543db1e0 // indirect
 	gitlab.com/gorib/criteria v0.0.0-20240306202228-afafa368eb6c // indirect
 	gitlab.com/gorib/parser v0.0.0-20240306202426-9962397d9aeb // indirect
 	gitlab.com/gorib/ptr v0.0.0-20240306203242-3e8c6e295364 // indirect

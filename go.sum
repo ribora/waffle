@@ -173,6 +173,10 @@ github.com/ydb-platform/ydb-go-genproto v0.0.0-20240126124512-dbb0e1720dbf h1:ck
 github.com/ydb-platform/ydb-go-genproto v0.0.0-20240126124512-dbb0e1720dbf/go.mod h1:Er+FePu1dNUieD+XTMDduGpQuCPssK5Q4BjF+IIXJ3I=
 github.com/ydb-platform/ydb-go-sdk/v3 v3.55.1 h1:Ebo6J5AMXgJ3A438ECYotA0aK7ETqjQx9WoZvVxzKBE=
 github.com/ydb-platform/ydb-go-sdk/v3 v3.55.1/go.mod h1:udNPW8eupyH/EZocecFmaSNJacKKYjzQa7cVgX5U2nc=
+gitlab.com/gorib/client v0.0.0-20240408125932-947bf913b7ff h1:6jTDxICMUXrB5J5NKRmE882JbQcU70+y864MNOxIQvs=
+gitlab.com/gorib/client v0.0.0-20240408125932-947bf913b7ff/go.mod h1:JqLWS6qkjVgXxgJ3GDQ4zq/MXPJnl5Ykbn3zlb3tkhM=
+gitlab.com/gorib/client v0.0.0-20240408130107-ab95543db1e0 h1:zFjVaIDZfFNZQO47Wusc6A/kAhTOOcxf1cnArDlB+TY=
+gitlab.com/gorib/client v0.0.0-20240408130107-ab95543db1e0/go.mod h1:JqLWS6qkjVgXxgJ3GDQ4zq/MXPJnl5Ykbn3zlb3tkhM=
 gitlab.com/gorib/criteria v0.0.0-20240306202228-afafa368eb6c h1:W+uIngINp4y0AmhUg0lajldY9AMFqq/6h0v6zyB6YCE=
 gitlab.com/gorib/criteria v0.0.0-20240306202228-afafa368eb6c/go.mod h1:bIk/dyU8D7UU/Fk9XIvdWI/T7qc1xTeZnyYaC9EHU8g=
 gitlab.com/gorib/di v0.0.0-20240329031159-2fffccee9c8e h1:JxL8wHEV7ggtoRXvmqjC0WR9QvMBBQBb2iqp3mw+s/U=
@@ -185,6 +189,8 @@ gitlab.com/gorib/ptr v0.0.0-20240306203242-3e8c6e295364 h1:CnnhuKQcVCzbsGsf2rU8J
 gitlab.com/gorib/ptr v0.0.0-20240306203242-3e8c6e295364/go.mod h1:P6xv0bdeePlBMv0XQv9NymGElpHb6+MM7UPIsKOfeok=
 gitlab.com/gorib/server v0.0.0-20240407123720-d9a80b47fedc h1:B0itz6kO/yoI4kRzXxDIfrVJI5hoqi0bdG1hUJDOmaY=
 gitlab.com/gorib/server v0.0.0-20240407123720-d9a80b47fedc/go.mod h1:mjijTrZfZOxMNfWZZxIHHTqY5XHNtEFlUbnSOV/WQc0=
+gitlab.com/gorib/server v0.0.0-20240413093356-d3d185ca7d2b h1:y4cY7Hbb6+dgZd1eoSJorDhkTdXqvsufaUkzVAzdA3M=
+gitlab.com/gorib/server v0.0.0-20240413093356-d3d185ca7d2b/go.mod h1:mjijTrZfZOxMNfWZZxIHHTqY5XHNtEFlUbnSOV/WQc0=
 gitlab.com/gorib/session v0.0.0-20240407123045-0c7ebec6b653 h1:SycQKkCTIoqeKy9jVMYFJflDr+pN5Fk/9OmjSrMGRss=
 gitlab.com/gorib/session v0.0.0-20240407123045-0c7ebec6b653/go.mod h1:cWx2sy2oeMgllJhzMRvv8TkJnUpqK1gvmUmXQjWJfXA=
 gitlab.com/gorib/storage v0.0.0-20240329183011-1d15b7fa366c h1:dL7SfDh72niDhXUEH/acu99PtDVH8xxeCKr/kBdL3D4=
