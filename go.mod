@@ -9,7 +9,7 @@ require (
 	github.com/pressly/goose/v3 v3.20.0
 	gitlab.com/gorib/di v0.0.0-20240518070527-468e37b632f0
 	gitlab.com/gorib/pry v0.0.0-20240407123617-9e6ec781edce
-	gitlab.com/gorib/server v0.0.0-20240518070527-9141b6e7aa58
+	gitlab.com/gorib/server v0.0.0-20240531092011-61d2f1aea864
 	gitlab.com/gorib/session v0.0.0-20240407123045-0c7ebec6b653
 	gitlab.com/gorib/storage v0.0.0-20240518070805-e280d99ede59
 	gitlab.com/gorib/try v0.0.0-20240316161432-4f44d463b7d2
