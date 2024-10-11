@@ -1,6 +1,6 @@
 module gitlab.com/gorib/waffle
 
-go 1.21.0
+go 1.23.0
 
 require (
 	github.com/fatih/color v1.17.0
@@ -11,7 +11,7 @@ require (
 	gitlab.com/gorib/pry v0.0.0-20240607074437-b9505e380b1d
 	gitlab.com/gorib/server v0.0.0-20240607075303-4a02b9693596
 	gitlab.com/gorib/session v0.0.0-20240407123045-0c7ebec6b653
-	gitlab.com/gorib/storage v0.0.0-20240607075303-09befe85c261
+	gitlab.com/gorib/storage v0.0.0-20241011094558-8d156e00c3d3
 	gitlab.com/gorib/try v0.0.0-20240607074156-f6d9bdbed0b4
 	golang.org/x/exp v0.0.0-20240604190554-fc45aab8b7f8
 	google.golang.org/grpc v1.64.0
