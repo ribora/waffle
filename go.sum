@@ -89,6 +89,8 @@ gitlab.com/gorib/storage v0.0.0-20241011111732-286428b4373a h1:PYqCwZ1cMdXOmA8Vx
 gitlab.com/gorib/storage v0.0.0-20241011111732-286428b4373a/go.mod h1:H8OkQ2D2N07HH5eLFiqVNSQRgARsnxpDR4D27vadaDY=
 gitlab.com/gorib/storage v0.0.0-20241011122136-3a2791d77560 h1:BHl2MIgyNxLJemwO2r4cY4/jCT6+O/xzdXz28Tg/nDk=
 gitlab.com/gorib/storage v0.0.0-20241011122136-3a2791d77560/go.mod h1:H8OkQ2D2N07HH5eLFiqVNSQRgARsnxpDR4D27vadaDY=
+gitlab.com/gorib/storage v0.0.0-20241012181414-70a4862cf72b h1:Z7Z2cs0YmlktMPM09MlOwD49ncKXOnjA1n8cpxkRlhM=
+gitlab.com/gorib/storage v0.0.0-20241012181414-70a4862cf72b/go.mod h1:H8OkQ2D2N07HH5eLFiqVNSQRgARsnxpDR4D27vadaDY=
 gitlab.com/gorib/try v0.0.0-20240607074156-f6d9bdbed0b4 h1:vORookNxN63/qY065GI08suvSXwWv4G+bOzcuTDm11M=
 gitlab.com/gorib/try v0.0.0-20240607074156-f6d9bdbed0b4/go.mod h1:6xdxKdVGcjayPZvUWVZQzmvdtNJ2O8LkPpMlFzrBORg=
 go.uber.org/goleak v1.3.0 h1:2K3zAYmnTNqV73imy9J1T3WC+gmCePx2hEGkimedGto=
