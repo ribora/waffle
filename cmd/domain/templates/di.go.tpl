@@ -1,6 +1,6 @@
-func Init{{ .TitleDomain }}() {
-    di.Wire[{{ .TitleDomain }}Repository](New{{ .TitleDomain }}Repository)
-    di.Define(New{{ .TitleDomain }}Management,
+func Init{{ title .Domain }}() {
+    di.Wire[{{ title .Domain }}Repository](New{{ title .Domain }}Repository)
+    di.Define(New{{ title .Domain }}Management,
         di.Alias[](),
     )
 }

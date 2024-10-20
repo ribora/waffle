@@ -5,5 +5,5 @@ import (
 )
 
 var (
-	Err{{ .TitleDomain }}NotFound = errors.New("{{ .Domain }} is not found")
+	Err{{ title .Domain }}NotFound = errors.New("{{ .Domain }} is not found")
 )

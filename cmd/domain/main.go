@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"embed"
 	"errors"
 	"fmt"
@@ -9,9 +10,6 @@ import (
 	"strings"
 	"text/template"
 	"time"
-
-	"github.com/dustin/go-humanize/english"
-	"golang.org/x/mod/modfile"
 )
 
 //go:embed templates/*
@@ -46,15 +44,22 @@ func findProjectName() (string, error) {
 		}
 		for _, entity := range entities {
 			if entity.Name() == "go.mod" {
-				data, err := os.ReadFile(filepath.Join(cwd, entity.Name()))
+				goMod, err := os.OpenFile(filepath.Join(cwd, "go.mod"), os.O_RDONLY, os.ModePerm)
 				if err != nil {
+					return "", fmt.Errorf("failed to open go.mod file: %w", err)
+				}
+				defer goMod.Close()
+
+				sc := bufio.NewScanner(goMod)
+				for sc.Scan() {
+					line := sc.Text()
+					if pkg, found := strings.CutPrefix(line, "module "); found {
+						return pkg, nil
+					}
+				}
+				if err := sc.Err(); err != nil {
 					return "", fmt.Errorf("failed to read go.mod file: %w", err)
 				}
-				goMod, err := modfile.Parse(filepath.Join(cwd, "go.mod"), data, nil)
-				if err != nil {
-					return "", fmt.Errorf("failed to parse go.mod: %w", err)
-				}
-				return goMod.Module.Mod.Path, nil
 			}
 		}
 		if cwd == "/" {
@@ -66,10 +71,15 @@ func findProjectName() (string, error) {
 
 func generate(domain, projectName string) error {
 	params := map[string]string{
-		"Domain":        domain,
-		"TitleDomain":   strings.ToUpper(domain[:1]) + domain[1:],
-		"PluralsDomain": english.PluralWord(2, domain, ""),
-		"Project":       projectName,
+		"Domain":  domain,
+		"Project": projectName,
+	}
+
+	funcs := template.FuncMap{
+		"plural": Plural,
+		"title": func(word string) string {
+			return strings.ToUpper(word[:1]) + word[1:]
+		},
 	}
 
 	path := filepath.Join("internal", "domain", domain)
@@ -83,7 +93,7 @@ func generate(domain, projectName string) error {
 	}
 
 	for source, target := range sources {
-		if err := write(source, target, params); err != nil {
+		if err := write(source, target, params, funcs); err != nil {
 			return err
 		}
 	}
@@ -91,15 +101,15 @@ func generate(domain, projectName string) error {
 	return nil
 }
 
-func write(source, target string, params any) error {
-	tpl, err := template.ParseFS(tpls, source)
+func write(source, target string, params any, funcs template.FuncMap) error {
+	tpl, err := template.New(filepath.Base(source)).Funcs(funcs).ParseFS(tpls, source)
 	if err != nil {
 		return fmt.Errorf("failed to parse template %s: %w", source, err)
 	}
 	if _, err = os.Stat(target); !errors.Is(err, os.ErrNotExist) {
 		return nil
 	}
-	err = os.MkdirAll(filepath.Dir(target), 0755)
+	err = os.MkdirAll(filepath.Dir(target), os.ModePerm)
 	if err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", filepath.Dir(target), err)
 	}

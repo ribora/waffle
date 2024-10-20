@@ -4,7 +4,7 @@ import (
     "time"
 )
 
-type {{ .TitleDomain }} struct {
+type {{ title .Domain }} struct {
     Id        int
     CreatedAt time.Time
     UpdatedAt *time.Time
