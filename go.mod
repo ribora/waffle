@@ -3,6 +3,7 @@ module gitlab.com/gorib/waffle
 go 1.23.0
 
 require (
+	github.com/dustin/go-humanize v1.0.1
 	github.com/fatih/color v1.17.0
 	github.com/gofiber/fiber/v2 v2.52.4
 	github.com/pborman/getopt/v2 v2.1.0
@@ -14,6 +15,7 @@ require (
 	gitlab.com/gorib/storage v0.0.0-20241017093237-eb479aee3dc0
 	gitlab.com/gorib/try v0.0.0-20240607074156-f6d9bdbed0b4
 	golang.org/x/exp v0.0.0-20240604190554-fc45aab8b7f8
+	golang.org/x/mod v0.21.0
 	google.golang.org/grpc v1.64.0
 )
 
