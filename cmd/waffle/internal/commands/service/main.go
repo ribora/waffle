@@ -44,6 +44,7 @@ func (c *cmd) Run(ctx context.Context, _ ...string) error {
 		filepath.Join("templates", "gitlab-ci.yml.tpl"):                          filepath.Join(".gitlab-ci.yml"),
 		filepath.Join("templates", "golangci.yml.tpl"):                           filepath.Join(".golangci.yml"),
 		filepath.Join("templates", "Makefile.tpl"):                               filepath.Join("Makefile"),
+		filepath.Join("templates", "env.tpl"):                                    filepath.Join(".env"),
 	}
 
 	return c.Write(sources, params)
