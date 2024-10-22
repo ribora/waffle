@@ -1,5 +1,5 @@
 // copy from github.com/dustin/go-humanize
-package main
+package plural
 
 import (
 	"strings"

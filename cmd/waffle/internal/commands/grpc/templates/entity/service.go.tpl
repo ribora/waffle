@@ -1,0 +1,20 @@
+package {{ .Domain }}
+
+import (
+	"google.golang.org/grpc"
+)
+
+type {{ title .Domain }}Management interface {
+}
+
+func New{{ title .Domain }}Service({{ .Domain }}Management {{ title .Domain }}Management) *{{ .Domain }}Service {
+	return &{{ .Domain }}Service{ {{- .Domain }}Management: {{ .Domain }}Management}
+}
+
+type {{ .Domain }}Service struct {
+	{{ .Domain }}Management {{ title .Domain }}Management
+}
+
+func (s *{{ .Domain }}Service) Start(server grpc.ServiceRegistrar) {
+	Register{{ title .Domain }}ServiceServer(server, s)
+}

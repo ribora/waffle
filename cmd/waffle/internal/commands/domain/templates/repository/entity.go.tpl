@@ -1,12 +1,9 @@
-//go:generate go run gitlab.com/gorib/storage/sql/cmd/store $GOFILE
-
 package repository
 
 import (
 	"context"
 	db "database/sql"
 	"errors"
-	"time"
 
 	"gitlab.trgdev.com/gotrg/white-label/modules/gotlib/lib/list"
 
@@ -24,13 +21,6 @@ const (
 
 func New{{ title .Domain }}Repository(repo storage.Repository) *{{ .Domain }}Repository {
 	return &{{ .Domain }}Repository{Repository: repo}
-}
-
-// sql.store *model.{{ title .Domain }}
-type stored{{ title .Domain }} struct {
-	Id        int        `db:"id" store:",readonly"`
-	CreatedAt time.Time  `db:"created_at" store:",readonly"`
-	UpdatedAt *time.Time `db:"updated_at" store:",readonly"`
 }
 
 type {{ .Domain }}Repository struct {
