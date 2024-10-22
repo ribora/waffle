@@ -7,8 +7,6 @@ import (
 	"os"
 	"slices"
 
-	"golang.org/x/exp/maps"
-
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/domain"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/grpc"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/service"
@@ -40,7 +38,10 @@ func (c *commands) Get(cmd string) Command {
 
 func (c *commands) All() iter.Seq2[string, Command] {
 	return func(yield func(string, Command) bool) {
-		codes := maps.Keys(c.cmds)
+		var codes []string
+		for code, _ := range c.cmds {
+			codes = append(codes, code)
+		}
 		slices.Sort(codes)
 		for _, code := range codes {
 			if !yield(code, c.cmds[code]) {
