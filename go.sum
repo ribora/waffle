@@ -87,6 +87,8 @@ gitlab.com/gorib/storage v0.0.0-20241017093237-eb479aee3dc0 h1:hdSpcGbkD9hBoA0J/
 gitlab.com/gorib/storage v0.0.0-20241017093237-eb479aee3dc0/go.mod h1:H8OkQ2D2N07HH5eLFiqVNSQRgARsnxpDR4D27vadaDY=
 gitlab.com/gorib/storage v0.0.0-20241028163628-9eb6f48e8c66 h1:SjgOndSewEbujdYAHouItuq9xTpQCX7f5u55dcrIJ3Q=
 gitlab.com/gorib/storage v0.0.0-20241028163628-9eb6f48e8c66/go.mod h1:H8OkQ2D2N07HH5eLFiqVNSQRgARsnxpDR4D27vadaDY=
+gitlab.com/gorib/storage v0.0.0-20241028181902-b3e9a537b0e3 h1:8OGDfZhlU5nS0E24x/i5bd0broW6ELf+jB29twFhwN0=
+gitlab.com/gorib/storage v0.0.0-20241028181902-b3e9a537b0e3/go.mod h1:H8OkQ2D2N07HH5eLFiqVNSQRgARsnxpDR4D27vadaDY=
 gitlab.com/gorib/try v0.0.0-20240607074156-f6d9bdbed0b4 h1:vORookNxN63/qY065GI08suvSXwWv4G+bOzcuTDm11M=
 gitlab.com/gorib/try v0.0.0-20240607074156-f6d9bdbed0b4/go.mod h1:6xdxKdVGcjayPZvUWVZQzmvdtNJ2O8LkPpMlFzrBORg=
 go.uber.org/goleak v1.3.0 h1:2K3zAYmnTNqV73imy9J1T3WC+gmCePx2hEGkimedGto=
