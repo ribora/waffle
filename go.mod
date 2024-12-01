@@ -9,10 +9,10 @@ require (
 	github.com/pressly/goose/v3 v3.20.0
 	gitlab.com/gorib/di v0.0.0-20240607075303-42278b42eafd
 	gitlab.com/gorib/pry v0.0.0-20241130212353-252fa4f20b1a
-	gitlab.com/gorib/server v0.0.0-20240607075303-4a02b9693596
+	gitlab.com/gorib/server v0.0.0-20241130234612-16822c742512
 	gitlab.com/gorib/session v0.0.0-20240407123045-0c7ebec6b653
-	gitlab.com/gorib/storage v0.0.0-20241118113909-6985a8522ada
-	gitlab.com/gorib/try v0.0.0-20240607074156-f6d9bdbed0b4
+	gitlab.com/gorib/storage v0.0.0-20241130212625-e974e6cdcedb
+	gitlab.com/gorib/try v0.0.0-20241130212003-93c780845bd9
 	golang.org/x/exp v0.0.0-20240604190554-fc45aab8b7f8
 	google.golang.org/grpc v1.64.0
 )
@@ -34,7 +34,7 @@ require (
 	github.com/valyala/fasthttp v1.54.0 // indirect
 	github.com/valyala/tcplisten v1.0.0 // indirect
 	gitlab.com/gorib/criteria v0.0.0-20240316161432-f87bc77683f0 // indirect
-	gitlab.com/gorib/parser v0.0.0-20240316161432-1feb46e3b87f // indirect
+	gitlab.com/gorib/parser v0.0.0-20241130211901-a41d2af760f6 // indirect
 	gitlab.com/gorib/ptr v0.0.0-20240316161432-b9dc3d78b03d // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/net v0.26.0 // indirect
