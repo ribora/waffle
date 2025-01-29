@@ -94,6 +94,8 @@ gitlab.com/gorib/session v0.0.0-20240407123045-0c7ebec6b653 h1:SycQKkCTIoqeKy9jV
 gitlab.com/gorib/session v0.0.0-20240407123045-0c7ebec6b653/go.mod h1:cWx2sy2oeMgllJhzMRvv8TkJnUpqK1gvmUmXQjWJfXA=
 gitlab.com/gorib/storage v0.0.0-20250126135553-9eff722bb26e h1:Xvchap9xwFTx3DDO+D6lZVo6EHdvMle5Iw36smwEMM4=
 gitlab.com/gorib/storage v0.0.0-20250126135553-9eff722bb26e/go.mod h1:H8OkQ2D2N07HH5eLFiqVNSQRgARsnxpDR4D27vadaDY=
+gitlab.com/gorib/storage v0.0.0-20250129065649-cb204bacbbd9 h1:/HuCJr+JFAdvyp0qi/I/ddkQVYRZMWrGOPfvLVArnj8=
+gitlab.com/gorib/storage v0.0.0-20250129065649-cb204bacbbd9/go.mod h1:H8OkQ2D2N07HH5eLFiqVNSQRgARsnxpDR4D27vadaDY=
 gitlab.com/gorib/try v0.0.0-20241130212003-93c780845bd9 h1:5FMzDF8ynyyHigMhsANCUQNwTiI7RDimdvAS+XA0UwM=
 gitlab.com/gorib/try v0.0.0-20241130212003-93c780845bd9/go.mod h1:6xdxKdVGcjayPZvUWVZQzmvdtNJ2O8LkPpMlFzrBORg=
 go.opentelemetry.io/otel v1.32.0 h1:WnBN+Xjcteh0zdk01SVqV55d/m62NJLJdIyb4y/WO5U=
