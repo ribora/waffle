@@ -92,12 +92,8 @@ gitlab.com/gorib/server v0.0.0-20250126133609-52566e230a2d h1:pHYIjyag37yhxehyZA
 gitlab.com/gorib/server v0.0.0-20250126133609-52566e230a2d/go.mod h1:5LADBpQNFLh0gICT5/qOq1RvME0b0a/bCmxnIm1a0Zo=
 gitlab.com/gorib/session v0.0.0-20240407123045-0c7ebec6b653 h1:SycQKkCTIoqeKy9jVMYFJflDr+pN5Fk/9OmjSrMGRss=
 gitlab.com/gorib/session v0.0.0-20240407123045-0c7ebec6b653/go.mod h1:cWx2sy2oeMgllJhzMRvv8TkJnUpqK1gvmUmXQjWJfXA=
-gitlab.com/gorib/storage v0.0.0-20250126135553-9eff722bb26e h1:Xvchap9xwFTx3DDO+D6lZVo6EHdvMle5Iw36smwEMM4=
-gitlab.com/gorib/storage v0.0.0-20250126135553-9eff722bb26e/go.mod h1:H8OkQ2D2N07HH5eLFiqVNSQRgARsnxpDR4D27vadaDY=
-gitlab.com/gorib/storage v0.0.0-20250129065649-cb204bacbbd9 h1:/HuCJr+JFAdvyp0qi/I/ddkQVYRZMWrGOPfvLVArnj8=
-gitlab.com/gorib/storage v0.0.0-20250129065649-cb204bacbbd9/go.mod h1:H8OkQ2D2N07HH5eLFiqVNSQRgARsnxpDR4D27vadaDY=
-gitlab.com/gorib/storage v0.0.0-20250129070319-4276d20ed859 h1:eGxQXiVmj5CnCTjGxmSJFUJfl+x6L6IWk8QGjhjPZCw=
-gitlab.com/gorib/storage v0.0.0-20250129070319-4276d20ed859/go.mod h1:H8OkQ2D2N07HH5eLFiqVNSQRgARsnxpDR4D27vadaDY=
+gitlab.com/gorib/storage v0.0.0-20250129102201-cce514c00841 h1:y8e9pHuMcE3RmWMbhZiiWCp27SWJFnhClje1sYt5+oA=
+gitlab.com/gorib/storage v0.0.0-20250129102201-cce514c00841/go.mod h1:H8OkQ2D2N07HH5eLFiqVNSQRgARsnxpDR4D27vadaDY=
 gitlab.com/gorib/try v0.0.0-20241130212003-93c780845bd9 h1:5FMzDF8ynyyHigMhsANCUQNwTiI7RDimdvAS+XA0UwM=
 gitlab.com/gorib/try v0.0.0-20241130212003-93c780845bd9/go.mod h1:6xdxKdVGcjayPZvUWVZQzmvdtNJ2O8LkPpMlFzrBORg=
 go.opentelemetry.io/otel v1.32.0 h1:WnBN+Xjcteh0zdk01SVqV55d/m62NJLJdIyb4y/WO5U=
