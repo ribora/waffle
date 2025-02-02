@@ -26,30 +26,29 @@ import (
 )
 
 func InitDi() {
-	di.Wire[pry.Logger](func() (pry.Logger, error) {
+	di.MustWire[pry.Logger](func() (pry.Logger, error) {
 		environment := fmt.Sprintf("%s_%s", env.NeedValue[string]("GITLAB_ENVIRONMENT_NAME"), env.NeedValue[string]("ENVIRONMENT"))
-		return pry.New(
-			env.Value("LOGLEVEL", "info"),
-			pry.ToChannels(try.Throw(channels.Sentry(env.Value("SENTRY_DSN", ""), environment))),
-		)
+		sentry, err := channels.Sentry(env.Value("SENTRY_DSN", ""), environment)
+		if err != nil {
+			return nil, err
+		}
+		return pry.New(env.Value("LOGLEVEL", "info"), pry.ToChannels(sentry))
 	})
 
-	di.Wire[sql.Db](sql.NewDb, di.Defaults(map[int]any{
+	di.MustWire[sql.Db](sql.NewDb, di.Defaults(map[int]any{
 		0: env.NeedValue[string]("DATABASE_DRIVER"),
 		1: fmt.Sprintf("%s?dbname=%s&sslmode=disable", env.NeedValue[string]("DATABASE_DSN"), env.NeedValue[string]("DATABASE_NAME")),
 		2: env.Value("DATABASE_TIMEOUT", time.Second),
 	}))
-	di.Wire[storage.Repository](sql.NewRepository)
+	di.MustWire[storage.Repository](sql.NewRepository)
 
-
-	di.Wire[net.Addr](host.NewListener, di.For[grpcCommand.GrpcCommand](), di.Defaults(map[int]any{
+	di.MustWire[net.Addr](host.NewListener, di.For[grpcCommand.GrpcCommand](), di.Defaults(map[int]any{
 		0: "tcp",
 		1: env.Value("DAEMON_HOST", "0.0.0.0"),
 		2: env.Value("DAEMON_PORT", "8009"),
 	}))
-	di.Wire[healthProto.HealthServiceServer](health.NewHealthServiceServer, di.Tag(grpcCommand.ServiceTag))
+	di.MustWire[healthProto.HealthServiceServer](health.NewHealthServiceServer, di.Tag(grpcCommand.ServiceTag))
 	grpcCommand.InitGrpc()
-
-	di.Wire[fs.FS](migrateCommand.NewMigrations, di.For[migrate.MigrateCommand]())
+	di.MustWire[fs.FS](migrateCommand.NewMigrations, di.For[migrate.MigrateCommand]())
 	migrate.InitMigrate()
 }
