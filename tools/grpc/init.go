@@ -1,6 +1,7 @@
 package grpc
 
 import (
+	"errors"
 	"net"
 
 	"gitlab.com/gorib/di"
@@ -16,10 +17,10 @@ var (
 )
 
 func InitGrpc() {
-	di.Wire[net.Addr](func() net.Addr { panic("grpc listener is not set") }, di.Fallback())
+	di.MustWire[net.Addr](func() (net.Addr, error) { return nil, errors.New("grpc listener is not set") }, di.Fallback())
 
-	di.Wire[app.BaseCommand](func() app.BaseCommand { return app.NewCommand("grpc", "Start grpc server") }, di.For[GrpcCommand]())
-	di.Wire[GrpcCommand](NewGrpcCommand, di.Tag(app.CommandTag), di.Fallback(), di.Defaults(map[int]any{
+	di.MustWire[app.BaseCommand](func() app.BaseCommand { return app.NewCommand("grpc", "Start grpc server") }, di.For[GrpcCommand]())
+	di.MustWire[GrpcCommand](NewGrpcCommand, di.Tag(app.CommandTag), di.Fallback(), di.Defaults(map[int]any{
 		0: di.Tags[ServiceHandler](ServiceTag),
 		1: di.Tags[Middleware](MiddlewareTag),
 	}))

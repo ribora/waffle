@@ -1,6 +1,7 @@
 package http
 
 import (
+	"errors"
 	"net"
 
 	"gitlab.com/gorib/di"
@@ -14,12 +15,12 @@ var (
 )
 
 func InitHttp() {
-	di.Wire[MiddlewareList](NewMiddlewareList, di.Defaults(map[int]any{
+	di.MustWire[MiddlewareList](NewMiddlewareList, di.Defaults(map[int]any{
 		0: di.Tags[Middleware](MiddlewareTag),
 	}))
 
-	di.Wire[net.Addr](func() net.Addr { panic("http listener is not set") }, di.Fallback())
+	di.MustWire[net.Addr](func() (net.Addr, error) { return nil, errors.New("http listener is not set") }, di.Fallback())
 
-	di.Wire[app.BaseCommand](func() app.BaseCommand { return app.NewCommand("http", "Start web server") }, di.For[HttpCommand]())
-	di.Wire[HttpCommand](NewHttpCommand, di.Fallback(), di.Tag(app.CommandTag))
+	di.MustWire[app.BaseCommand](func() app.BaseCommand { return app.NewCommand("http", "Start web server") }, di.For[HttpCommand]())
+	di.MustWire[HttpCommand](NewHttpCommand, di.Fallback(), di.Tag(app.CommandTag))
 }

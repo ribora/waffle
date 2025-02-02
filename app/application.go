@@ -20,7 +20,12 @@ type Configure interface{}
 type App interface {
 	RunUntilStop()
 	Run()
-	Stop()
+	Stop() error
+}
+
+type HasCloser interface {
+	SetCloser(func() error)
+	Closer() func() error
 }
 
 func Init(commands []Command, logger pry.Logger) (*app, error) {
@@ -35,16 +40,16 @@ func Init(commands []Command, logger pry.Logger) (*app, error) {
 
 type app struct {
 	commands CommandList
-	closer   func()
+	closer   func() error
 	logger   pry.Logger
 }
 
-func (a app) RunUntilStop() {
+func (a *app) RunUntilStop() {
 	go a.Watch()
 	a.Run()
 }
 
-func (a app) Run() {
+func (a *app) Run() {
 	opts := getopt.New()
 	var help bool
 	opts.FlagLong(&help, "help", 'h', "Display this help message")
@@ -62,12 +67,16 @@ func (a app) Run() {
 	if cmd := a.commands.Get(command); cmd != nil {
 		ctx := NewContextWithCommand(cmd.Name(), opts.Args())
 		os.Args = opts.Args()
+		var err error
 		try.Catch(func() {
-			try.ThrowError(cmd.Run(ctx))
+			err = cmd.Run(ctx)
 		}, func(throwable error) {
-			a.logger.Error(throwable, pry.Ctx(ctx))
-			os.Exit(1)
+			err = throwable
 		})
+		if err != nil {
+			a.logger.Error(err, pry.Ctx(ctx))
+			os.Exit(1)
+		}
 	} else {
 		color.Red("Unknown command '%s'.\n", command)
 		a.usage(opts.PrintUsage)
@@ -75,20 +84,31 @@ func (a app) Run() {
 	}
 }
 
-func (a app) Stop() {
+func (a *app) Stop() error {
 	if a.closer != nil {
-		a.closer()
+		return a.closer()
 	}
+	return nil
 }
 
-func (a app) Watch() {
+func (a *app) Watch() {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	<-sig
-	a.Stop()
+	if err := a.Stop(); err != nil {
+		panic(err)
+	}
 }
 
-func (a app) usage(printer func(w io.Writer)) {
+func (a *app) SetCloser(closer func() error) {
+	a.closer = closer
+}
+
+func (a *app) Closer() func() error {
+	return a.closer
+}
+
+func (a *app) usage(printer func(w io.Writer)) {
 	printer(os.Stderr)
 	_, _ = fmt.Fprintf(os.Stderr, "Available commands:\n")
 	var names []string
