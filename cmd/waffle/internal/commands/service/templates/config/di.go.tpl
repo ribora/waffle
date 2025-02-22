@@ -40,7 +40,6 @@ func InitDi() {
 		1: fmt.Sprintf("%s?dbname=%s&sslmode=disable", env.NeedValue[string]("DATABASE_DSN"), env.NeedValue[string]("DATABASE_NAME")),
 		2: env.Value("DATABASE_TIMEOUT", time.Second),
 	}))
-	di.MustWire[storage.Repository](sql.NewRepository)
 
 	di.MustWire[net.Addr](host.NewListener, di.For[grpcCommand.GrpcCommand](), di.Defaults(map[int]any{
 		0: "tcp",

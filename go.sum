@@ -86,6 +86,10 @@ gitlab.com/gorib/di v0.0.0-20240607075303-42278b42eafd h1:uz58+j0g6qbOvVw7UHf3/9
 gitlab.com/gorib/di v0.0.0-20240607075303-42278b42eafd/go.mod h1:V7ZpsNDILAH/zS/U9nm1DnKpp83azOnkFhD1epdKFTI=
 gitlab.com/gorib/di v0.0.0-20250202080140-6f396b7d8e05 h1:BTvRqVMpESbsNkahZxbVvNpsCtsTERstDDQrINOg26g=
 gitlab.com/gorib/di v0.0.0-20250202080140-6f396b7d8e05/go.mod h1:kJN0Hp5cUt6mLDNxtpXpV5FsRn3U9ZKD54E+kVD+6oc=
+gitlab.com/gorib/di v0.0.0-20250222143924-64590661832a h1:E+h77PSlMQpqTyxKodqGFbCZybmAfP/zokMt3NCmx5E=
+gitlab.com/gorib/di v0.0.0-20250222143924-64590661832a/go.mod h1:kJN0Hp5cUt6mLDNxtpXpV5FsRn3U9ZKD54E+kVD+6oc=
+gitlab.com/gorib/di v0.0.0-20250222144021-24e027229c59 h1:VhYUB679hJmuWy5QHhAwzTiCJ3dFntwWrcpb2dfhOj0=
+gitlab.com/gorib/di v0.0.0-20250222144021-24e027229c59/go.mod h1:kJN0Hp5cUt6mLDNxtpXpV5FsRn3U9ZKD54E+kVD+6oc=
 gitlab.com/gorib/parser v0.0.0-20250202074625-800f9618d165 h1:1jB+OIt2vpBXp8HgI0yNdXoEDoj9rFQZhEuV2lx+lbA=
 gitlab.com/gorib/parser v0.0.0-20250202074625-800f9618d165/go.mod h1:zYc8jGuGmao5b0gI7VBqtnMJIDbNF8sT0DpKmO3l1nk=
 gitlab.com/gorib/pry v0.0.0-20250202074625-42fb34198918 h1:FK1wTzw3J4htvTk7YQyJmZThO+HW4VrQm6r6298SJjE=

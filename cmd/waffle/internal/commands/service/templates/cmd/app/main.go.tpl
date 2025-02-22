@@ -8,5 +8,10 @@ import (
 
 func main() {
 	config.Init()
-	app.New().RunUntilStop()
+	application, err := app.New()
+	if err != nil {
+		fmt.Printf("Failed to create an application: %v\n", err)
+		os.Exit(1)
+	}
+	application.RunUntilStop()
 }

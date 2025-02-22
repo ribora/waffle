@@ -7,7 +7,7 @@ require (
 	github.com/gofiber/fiber/v2 v2.52.6
 	github.com/pborman/getopt/v2 v2.1.0
 	github.com/pressly/goose/v3 v3.24.1
-	gitlab.com/gorib/di v0.0.0-20250202080140-6f396b7d8e05
+	gitlab.com/gorib/di v0.0.0-20250222144021-24e027229c59
 	gitlab.com/gorib/pry v0.0.0-20250202075821-2a81f315ace9
 	gitlab.com/gorib/server v0.0.0-20250202080140-16b70ff4e4a9
 	gitlab.com/gorib/session v0.0.0-20240407123045-0c7ebec6b653
