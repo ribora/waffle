@@ -39,7 +39,7 @@ func (c *commands) Get(cmd string) Command {
 func (c *commands) All() iter.Seq2[string, Command] {
 	return func(yield func(string, Command) bool) {
 		var codes []string
-		for code, _ := range c.cmds {
+		for code := range c.cmds {
 			codes = append(codes, code)
 		}
 		slices.Sort(codes)
