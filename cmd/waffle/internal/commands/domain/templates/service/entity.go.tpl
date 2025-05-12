@@ -12,7 +12,7 @@ type {{ title .Domain }}Repository interface {
 	Get(ctx context.Context, {{ .Domain }}Id int) (*model.{{ title .Domain }}, error)
 	Save(ctx context.Context, {{ .Domain }} *model.{{ title .Domain }}) (*model.{{ title .Domain }}, error)
 	List(ctx context.Context, expr criteria.Expression, sort []string, page int, count int) ([]*model.{{ title .Domain }}, error)
-	Count(ctx context.Context, query criteria.Expression) int, error
+	Count(ctx context.Context, query criteria.Expression) (int, error)
 }
 
 func New{{ title .Domain }}Management(
@@ -40,9 +40,9 @@ func (m *{{ .Domain }}Management) ListPaged(ctx context.Context, expr criteria.E
 	if err != nil {
 		return nil, 0, err
 	}
-	count, err := m.{{ .Domain }}Repository.Count(ctx, expr)
+	total, err := m.{{ .Domain }}Repository.Count(ctx, expr)
 	if err != nil {
 		return nil, 0, err
 	}
-	return items, count, nil
+	return items, total, nil
 }

@@ -19,16 +19,14 @@ import (
 	"gitlab.com/gorib/env"
 	"gitlab.com/gorib/pry"
 	"gitlab.com/gorib/pry/channels"
-	"gitlab.com/gorib/storage"
 	"gitlab.com/gorib/storage/sql"
-	"gitlab.com/gorib/try"
 	"gitlab.com/gorib/waffle/tools/migrate"
 )
 
 func InitDi() {
 	di.MustWire[pry.Logger](func() (pry.Logger, error) {
 		environment := fmt.Sprintf("%s_%s", env.NeedValue[string]("GITLAB_ENVIRONMENT_NAME"), env.NeedValue[string]("ENVIRONMENT"))
-		sentry, err := channels.Sentry(env.Value("SENTRY_DSN", ""), environment)
+		sentry, err := channels.Sentry("error", channels.WithSentryConnection(env.Value("SENTRY_DSN", ""), environment))
 		if err != nil {
 			return nil, err
 		}

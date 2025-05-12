@@ -1,6 +1,9 @@
 package main
 
 import (
+	"fmt"
+	"os"
+
 	"{{ .Project }}/config"
 
 	"gitlab.com/gorib/waffle/app"
