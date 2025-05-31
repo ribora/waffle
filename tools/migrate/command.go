@@ -18,7 +18,7 @@ type MigrateCommand interface {
 	app.Command
 }
 
-func NewMigrateCommand(command app.BaseCommand, connection sql.Db, migrations fs.FS) *migrateCommand {
+func NewMigrateCommand(migrations []fs.FS, command app.BaseCommand, connection sql.Db) *migrateCommand {
 	return &migrateCommand{
 		BaseCommand: command,
 		connection:  connection,
@@ -29,7 +29,7 @@ func NewMigrateCommand(command app.BaseCommand, connection sql.Db, migrations fs
 type migrateCommand struct {
 	app.BaseCommand
 	connection sql.Db
-	migrations fs.FS
+	migrations []fs.FS
 }
 
 func (c *migrateCommand) Run(ctx context.Context) error {
@@ -65,19 +65,25 @@ func (c *migrateCommand) Run(ctx context.Context) error {
 		c.connection = sql.NewDb(dsn[0], *connection)
 	}
 
-	goose.SetBaseFS(c.migrations)
 	conn, err := c.connection.Connect()
 	if err != nil {
 		return err
 	}
-	tx, err := conn.BeginTxx(context.Background(), nil)
-	if err != nil {
-		return err
+	for _, migration := range c.migrations {
+		goose.SetBaseFS(migration)
+		tx, err := conn.BeginTxx(context.Background(), nil)
+		if err != nil {
+			return err
+		}
+		err = goose.SetDialect(tx.DriverName())
+		if err != nil {
+			return err
+		}
+		goose.SetTableName("migrations")
+		err = goose.RunWithOptionsContext(ctx, args[0], conn.Database(), "migrations", args[1:], goose.WithAllowMissing())
+		if err != nil {
+			return err
+		}
 	}
-	err = goose.SetDialect(tx.DriverName())
-	if err != nil {
-		return err
-	}
-	goose.SetTableName("migrations")
-	return goose.RunContext(ctx, args[0], conn.Database(), "migrations", args[1:]...)
+	return nil
 }
