@@ -11,7 +11,6 @@ import (
 	"gitlab.com/gorib/criteria"
 	"gitlab.com/gorib/storage"
 	"gitlab.com/gorib/storage/sql"
-	"gitlab.com/gorib/try"
 
 	"{{ .Project }}/internal/domain/{{ .Domain }}/model"
 )
