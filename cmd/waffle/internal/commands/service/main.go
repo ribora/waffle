@@ -42,7 +42,6 @@ func (c *cmd) Run(ctx context.Context, _ ...string) error {
 		filepath.Join("templates", "tools", "migrate", "migrations", "keep.tpl"): filepath.Join("tools", "migrate", "migrations", ".keep"),
 		filepath.Join("templates", "gitignore.tpl"):                              filepath.Join(".gitignore"),
 		filepath.Join("templates", "gitlab-ci.yml.tpl"):                          filepath.Join(".gitlab-ci.yml"),
-		filepath.Join("templates", "golangci.yml.tpl"):                           filepath.Join(".golangci.yml"),
 		filepath.Join("templates", "Makefile.tpl"):                               filepath.Join("Makefile"),
 		filepath.Join("templates", "env.tpl"):                                    filepath.Join(".env"),
 	}
