@@ -10,10 +10,12 @@ import (
 
 type serviceTag struct{}
 type middlewareTag struct{}
+type streamMiddlewareTag struct{}
 
 var (
-	ServiceTag    = serviceTag{}
-	MiddlewareTag = middlewareTag{}
+	ServiceTag          = serviceTag{}
+	MiddlewareTag       = middlewareTag{}
+	StreamMiddlewareTag = streamMiddlewareTag{}
 )
 
 func InitGrpc() {
@@ -23,5 +25,6 @@ func InitGrpc() {
 	di.MustWire[GrpcCommand](NewGrpcCommand, di.Tag(app.CommandTag), di.Fallback(), di.Defaults(map[int]any{
 		0: di.Tags[ServiceHandler](ServiceTag),
 		1: di.Tags[Middleware](MiddlewareTag),
+		2: di.Tags[StreamMiddleware](StreamMiddlewareTag),
 	}))
 }

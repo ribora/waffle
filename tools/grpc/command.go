@@ -24,6 +24,10 @@ type Middleware interface {
 	Run() baseGrpc.UnaryServerInterceptor
 }
 
+type StreamMiddleware interface {
+	Run() baseGrpc.StreamServerInterceptor
+}
+
 type ServiceHandler interface {
 	Start(baseGrpc.ServiceRegistrar)
 }
@@ -33,14 +37,19 @@ type Server interface {
 	Close() error
 }
 
-func NewGrpcCommand(commands []ServiceHandler, middlewares []Middleware, command app.BaseCommand, addr net.Addr, logger pry.Logger) *grpcCommand {
+func NewGrpcCommand(commands []ServiceHandler, middlewares []Middleware, streamMiddlewares []StreamMiddleware, command app.BaseCommand, addr net.Addr, logger pry.Logger) *grpcCommand {
 	mw := make([]baseGrpc.UnaryServerInterceptor, 0, len(middlewares))
 	for _, middleware := range middlewares {
 		mw = append(mw, middleware.Run())
 	}
+	streamMw := make([]baseGrpc.StreamServerInterceptor, 0, len(middlewares))
+	for _, middleware := range streamMiddlewares {
+		streamMw = append(streamMw, middleware.Run())
+	}
 	return &grpcCommand{
 		commands:    commands,
 		middlewares: mw,
+		streamMw:    streamMw,
 		addr:        addr,
 		BaseCommand: command,
 		logger:      logger,
@@ -51,6 +60,7 @@ type grpcCommand struct {
 	app.BaseCommand
 	commands    []ServiceHandler
 	middlewares []baseGrpc.UnaryServerInterceptor
+	streamMw    []baseGrpc.StreamServerInterceptor
 	addr        net.Addr
 	connection  Server
 	logger      pry.Logger
@@ -68,7 +78,7 @@ func (c *grpcCommand) Run(ctx context.Context) error {
 		return err
 	}
 
-	c.connection = grpc.NewServer(c, c.middlewares, c.addr, c.logger)
+	c.connection = grpc.NewServer(c, c.middlewares, c.streamMw, c.addr, c.logger)
 	return c.connection.Serve(ctx)
 }
 
