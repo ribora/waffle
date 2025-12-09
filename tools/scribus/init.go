@@ -3,8 +3,8 @@ package scribus
 import (
 	"time"
 
+	rabbit "gitlab.com/gorib/amqp"
 	"gitlab.com/gorib/di"
-	"gitlab.com/gorib/server/rabbit"
 	"gitlab.com/gorib/waffle/app"
 )
 
@@ -15,18 +15,26 @@ var (
 )
 
 func InitScribus() {
-	di.MustWire[BusConsumer](rabbit.NewBusConsumer, di.Fallback(), di.Defaults(map[int]any{
-		0: 30 * time.Second,
+	initCommand()
+	di.MustWire[ScribusCommand](NewScribusCommand, di.Tag(app.CommandTag), di.Fallback(), di.Defaults(map[int]any{
+		0: di.Tags[SingleHandler](CommandTag),
 	}))
-	di.MustWire[rabbit.Topic](rabbit.NewTopic, di.Fallback(), di.Defaults(map[int]any{
+}
+
+func InitBatchScribus() {
+	initCommand()
+	di.MustWire[ScribusCommand](NewBatchScribusCommand, di.Tag(app.CommandTag), di.Fallback())
+}
+
+func initCommand() {
+	di.MustWire[Consumer](rabbit.NewConsumer, di.Fallback(), di.Defaults(map[int]any{
 		0: "",
 		1: "",
 		2: "",
 		3: "",
+		4: 1,
+		5: 5 * time.Second,
 	}))
 
 	di.MustWire[app.BaseCommand](func() app.BaseCommand { return app.NewCommand("scribus", "Start RabbitMq consumer") }, di.For[ScribusCommand]())
-	di.MustWire[ScribusCommand](NewScribusCommand, di.Tag(app.CommandTag), di.Fallback(), di.Defaults(map[int]any{
-		0: di.Tags[rabbit.Handler](CommandTag),
-	}))
 }

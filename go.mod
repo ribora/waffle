@@ -1,12 +1,13 @@
 module gitlab.com/gorib/waffle
 
-go 1.23.0
+go 1.25.0
 
 require (
 	github.com/fatih/color v1.18.0
 	github.com/gofiber/fiber/v2 v2.52.6
 	github.com/pborman/getopt/v2 v2.1.0
 	github.com/pressly/goose/v3 v3.24.1
+	gitlab.com/gorib/amqp v0.0.0-20251209180446-af612821a174
 	gitlab.com/gorib/di v0.0.0-20250224143814-d96e28d77cfd
 	gitlab.com/gorib/pry v0.0.0-20250224143323-d269032b7208
 	gitlab.com/gorib/server v0.0.0-20250224144501-1a385c4c1e37
@@ -28,7 +29,7 @@ require (
 	github.com/mfridman/interpolate v0.0.2 // indirect
 	github.com/rabbitmq/amqp091-go v1.10.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/rs/zerolog v1.33.0 // indirect
+	github.com/rs/zerolog v1.34.0 // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.59.0 // indirect
