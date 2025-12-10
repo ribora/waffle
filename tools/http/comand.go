@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/pborman/getopt/v2"
 
+	http "gitlab.com/gorib/http/server"
 	"gitlab.com/gorib/pry"
-	"gitlab.com/gorib/server/host"
-	"gitlab.com/gorib/server/http"
 	"gitlab.com/gorib/waffle/app"
 )
 
@@ -68,15 +68,18 @@ func (c *httpCommand) Usage() error {
 			return fmt.Errorf("Unsupported host format, expected host:port")
 		}
 		dest := parts[0]
-		port := "80"
-		if len(parts) == 2 {
-			port = parts[1]
-		}
+		var port uint64 = 80
 		var err error
-		c.addr, err = host.NewListener("tcp", dest, port)
-		if err != nil {
-			return err
+		if len(parts) == 2 {
+			port, err = strconv.ParseUint(parts[1], 10, 16)
+			if err != nil {
+				return err
+			}
+			if port == 0 {
+				return fmt.Errorf("Invalid port number")
+			}
 		}
+		c.addr, err = net.ResolveTCPAddr("tcp", net.JoinHostPort(dest, strconv.Itoa(int(port))))
 	}
 	return nil
 }

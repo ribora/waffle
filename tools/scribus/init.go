@@ -3,7 +3,7 @@ package scribus
 import (
 	"time"
 
-	rabbit "gitlab.com/gorib/amqp"
+	"gitlab.com/gorib/amqp"
 	"gitlab.com/gorib/di"
 	"gitlab.com/gorib/waffle/app"
 )
@@ -17,7 +17,7 @@ var (
 func InitScribus() {
 	initCommand()
 	di.MustWire[ScribusCommand](NewScribusCommand, di.Tag(app.CommandTag), di.Fallback(), di.Defaults(map[int]any{
-		0: di.Tags[SingleHandler](CommandTag),
+		0: di.Tags[Handler](CommandTag),
 	}))
 }
 
@@ -27,7 +27,7 @@ func InitBatchScribus() {
 }
 
 func initCommand() {
-	di.MustWire[Consumer](rabbit.NewConsumer, di.Fallback(), di.Defaults(map[int]any{
+	di.MustWire[Consumer](amqp.NewConsumer, di.Fallback(), di.Defaults(map[int]any{
 		0: "",
 		1: "",
 		2: "",

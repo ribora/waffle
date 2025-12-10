@@ -30,7 +30,7 @@ type Consumer interface {
 	Consume(ctx context.Context) error
 }
 
-type SingleHandler interface {
+type Handler interface {
 	Run(ctx context.Context, payload []byte) error
 	Keys() []string
 }
@@ -40,7 +40,7 @@ type BatchHandler interface {
 }
 
 func NewScribusCommand(
-	commands []SingleHandler,
+	commands []Handler,
 	command app.BaseCommand,
 	consumer Consumer,
 	logger pry.Logger,
@@ -48,7 +48,7 @@ func NewScribusCommand(
 	if len(commands) == 0 {
 		return nil, errors.New("handlers list is empty")
 	}
-	cmd := make(map[string]SingleHandler)
+	cmd := make(map[string]Handler)
 	for _, c := range commands {
 		for _, key := range c.Keys() {
 			cmd[key] = c
@@ -96,7 +96,7 @@ func NewBatchScribusCommand(
 type scribusCommand struct {
 	app.BaseCommand
 	consumer Consumer
-	commands map[string]SingleHandler
+	commands map[string]Handler
 	logger   pry.Logger
 }
 
