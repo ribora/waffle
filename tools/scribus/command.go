@@ -57,6 +57,7 @@ func NewScribusCommand(
 	err := consumer.SetHandler(func(ctx context.Context, keys []string, documents [][]byte) error {
 		for idx, key := range keys {
 			if handler, found := cmd[key]; found {
+				logger.Trace(fmt.Sprintf("%s %s", keys[idx], string(documents[idx])))
 				err := handler.Run(ctx, documents[idx])
 				if err != nil {
 					return err
