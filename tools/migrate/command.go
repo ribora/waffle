@@ -32,7 +32,7 @@ type migrateCommand struct {
 	migrations []fs.FS
 }
 
-func (c *migrateCommand) Run(ctx context.Context) error {
+func (c *migrateCommand) Run(ctx context.Context) (err error) {
 	var help bool
 	getopt.FlagLong(&help, "help", 'h', "Display this help message")
 	connection := getopt.StringLong("connection", 'c', "", "Database connection string specified for database type", "driver://user:pass@host:port")
@@ -62,25 +62,23 @@ func (c *migrateCommand) Run(ctx context.Context) error {
 		if dsn[0] == "" {
 			return fmt.Errorf("invalid database connection string format")
 		}
-		c.connection = sql.NewDb(dsn[0], *connection)
+		c.connection, err = sql.NewDb(dsn[0], *connection)
+		if err != nil {
+			return err
+		}
 	}
 
-	conn, err := c.connection.Connect()
+	db, err := c.connection.DbSql()
 	if err != nil {
 		return err
 	}
+	if err = db.Ping(); err != nil {
+		return fmt.Errorf("cannot connect to db: %w", err)
+	}
 	for _, migration := range c.migrations {
 		goose.SetBaseFS(migration)
-		tx, err := conn.BeginTxx(context.Background(), nil)
-		if err != nil {
-			return err
-		}
-		err = goose.SetDialect(tx.DriverName())
-		if err != nil {
-			return err
-		}
 		goose.SetTableName("migrations")
-		err = goose.RunWithOptionsContext(ctx, args[0], conn.Database(), "migrations", args[1:], goose.WithAllowMissing())
+		err = goose.RunWithOptionsContext(ctx, args[0], db, "migrations", args[1:], goose.WithAllowMissing())
 		if err != nil {
 			return err
 		}
