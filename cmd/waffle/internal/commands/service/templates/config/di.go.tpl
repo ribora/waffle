@@ -4,16 +4,10 @@ import (
 	"fmt"
 	"io/fs"
 	"net"
+	"strconv"
 	"time"
 
-	_ "github.com/lib/pq"
-
-	"gitlab.trgdev.com/gotrg/white-label/modules/health"
-	healthProto "gitlab.trgdev.com/gotrg/white-label/modules/health/proto"
-
-	"gitlab.com/gorib/server/host"
 	grpcCommand "gitlab.com/gorib/waffle/tools/grpc"
-	migrateCommand "{{ .Project }}/tools/migrate"
 
 	"gitlab.com/gorib/di"
 	"gitlab.com/gorib/env"
@@ -39,13 +33,13 @@ func InitDi() {
 		2: env.Value("DATABASE_TIMEOUT", time.Second),
 	}))
 
-	di.MustWire[net.Addr](host.NewListener, di.For[grpcCommand.GrpcCommand](), di.Defaults(map[int]any{
+	di.MustWire[net.Addr](net.ResolveTCPAddr, di.For[grpcCommand.GrpcCommand](), di.Defaults(map[int]any{
 		0: "tcp",
-		1: env.Value("DAEMON_HOST", "0.0.0.0"),
-		2: env.Value("DAEMON_PORT", "8009"),
+		1: net.JoinHostPort(
+			env.NeedValue[string]("DAEMON_HOST"),
+			strconv.FormatUint(uint64(env.NeedValue[uint16]("DAEMON_PORT")), 10),
+		),
 	}))
-	di.MustWire[healthProto.HealthServiceServer](health.NewHealthServiceServer, di.Tag(grpcCommand.ServiceTag))
-	grpcCommand.InitGrpc()
-	di.MustWire[fs.FS](migrateCommand.NewMigrations, di.For[migrate.MigrateCommand]())
+
 	migrate.InitMigrate()
 }

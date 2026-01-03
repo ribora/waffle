@@ -5,10 +5,8 @@ import (
 	"embed"
 	"fmt"
 	"path/filepath"
-	"time"
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/plural"
 )
 
 //go:embed templates/*
@@ -37,15 +35,14 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 		"Project": projectName,
 	}
 
-	path := filepath.Join("internal", "domain", domain)
+	path := filepath.Join("domain", domain)
 	sources := map[string]string{
-		filepath.Join("templates", "model", "entity.go.tpl"):      filepath.Join(path, "model", domain+".go"),
-		filepath.Join("templates", "model", "errors.go.tpl"):      filepath.Join(path, "model", "errors.go"),
-		filepath.Join("templates", "repository", "entity.go.tpl"): filepath.Join(path, "repository", domain+".go"),
-		filepath.Join("templates", "repository", "stored.go.tpl"): filepath.Join(path, "repository", "stored_"+domain+".go"),
-		filepath.Join("templates", "service", "entity.go.tpl"):    filepath.Join(path, "service", domain+".go"),
-		filepath.Join("templates", "migration.sql.tpl"):           filepath.Join("tools", "migrate", "migrations", fmt.Sprintf("%s_create_%s_table.sql", time.Now().Format("20060102150405"), plural.Plural(domain))),
-		filepath.Join("templates", "di.go.tpl"):                   filepath.Join("config", "di_domain_"+domain+".go"),
+		filepath.Join("templates", "model", "entity.go.tpl"):               filepath.Join(path, "model", domain+".go"),
+		filepath.Join("templates", "model", "errors.go.tpl"):               filepath.Join(path, "model", "errors.go"),
+		filepath.Join("templates", "adapter", "postgres", "entity.go.tpl"): filepath.Join(path, "adapter", "postgres", domain+".go"),
+		filepath.Join("templates", "adapter", "postgres", "stored.go.tpl"): filepath.Join(path, "adapter", "postgres", "stored_"+domain+".go"),
+		filepath.Join("templates", "service", "entity.go.tpl"):             filepath.Join(path, "service", domain+".go"),
+		filepath.Join("templates", "di.go.tpl"):                            filepath.Join("config", "di_"+domain+"_domain.go"),
 	}
 
 	return c.Write(sources, params)

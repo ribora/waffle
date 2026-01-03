@@ -5,7 +5,7 @@ import (
 
 	"gitlab.com/gorib/criteria"
 
-	"{{ .Project }}/internal/domain/{{ .Domain }}/model"
+	"{{ .Project }}/domain/{{ .Domain }}/model"
 )
 
 type {{ title .Domain }}Repository interface {

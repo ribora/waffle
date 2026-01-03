@@ -1,6 +1,7 @@
 package {{ .Domain }}
 
 import (
+	proto "{{ .Project }}/api/{{ .Domain }}"
 	"google.golang.org/grpc"
 )
 
@@ -16,5 +17,5 @@ type {{ .Domain }}Service struct {
 }
 
 func (s *{{ .Domain }}Service) Start(server grpc.ServiceRegistrar) {
-	Register{{ title .Domain }}ServiceServer(server, s)
+	proto.Register{{ title .Domain }}ServiceServer(server, s)
 }

@@ -1,14 +1,13 @@
 //go:generate go run gitlab.com/gorib/storage/sql/cmd/store $GOFILE
 
-package repository
+package postgres
 
 import (
 	"time"
 
-	"{{ .Project }}/internal/domain/{{ .Domain }}/model"
+	"{{ .Project }}/domain/{{ .Domain }}/model"
 )
 
-// sql.store *model.{{ title .Domain }}
 type stored{{ title .Domain }} struct {
     _ *model.{{ title .Domain }}
 	Id        int        `db:"id" store:",readonly"`

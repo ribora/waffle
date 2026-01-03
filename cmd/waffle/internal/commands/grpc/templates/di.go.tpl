@@ -1,7 +1,14 @@
 package config
 
-func Init{{ title .Domain }}Grpc() {
-    err := di.Wire[{{ title .Domain }}ServiceServer](New{{ title .Domain }}Service, di.Tag(grpcCommand.ServiceTag))
+import (
+    proto "{{ .Project }}/api/{{ .Domain }}"
+    grpc{{ title .Domain }} "{{ .Project }}/domain/{{ .Domain }}/cmd/grpc/{{ .Domain }}"
 
-    di.Alias[{{ title .Domain }}Management](),
+    "gitlab.com/gorib/di"
+)
+
+func Init{{ title .Domain }}Grpc() {
+    di.MustWire[proto.{{ title .Domain }}ServiceServer](grpc{{ title .Domain }}.New{{ title .Domain }}Service, di.Tag(grpcCommand.ServiceTag))
+
+    di.Alias[grpc{{ title .Domain }}.{{ title .Domain }}Management](),
 }

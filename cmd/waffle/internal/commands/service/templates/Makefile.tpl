@@ -9,7 +9,7 @@ audit:
 	@golangci-lint run
 
 bin/health:
-	@go build -ldflags "-s -w" -o bin/health gitlab.trgdev.com/gotrg/white-label/modules/health/client
+	@go build -ldflags "-s -w" -o bin/health gitlab.com/gorib/grpc/cmd/echo-client
 
 generate:
 	@go generate ./...

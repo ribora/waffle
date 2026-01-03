@@ -9,6 +9,7 @@ import (
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/domain"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/grpc"
+	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/migrate"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/service"
 )
 
@@ -56,6 +57,7 @@ func main() {
 	cmds.Add(service.New())
 	cmds.Add(domain.New())
 	cmds.Add(grpc.New())
+	cmds.Add(migrate.New())
 
 	if len(os.Args) < 2 {
 		usage(cmds)

@@ -13,7 +13,7 @@ import (
 var templates embed.FS
 
 func New() *cmd {
-	return &cmd{command.New("make:grpc", "Make grpc connector to the specified domain", templates, nil)}
+	return &cmd{command.New("make:domain:grpc", "Make grpc connector to the specified domain", templates, nil)}
 }
 
 type cmd struct {
@@ -37,10 +37,11 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 		"Service": service,
 	}
 
+	path := filepath.Join("domain", domain)
 	sources := map[string]string{
 		filepath.Join("templates", "api", "service", "pb", "entity", "service.proto.tpl"): filepath.Join("api", service, "pb", domain, "service.proto"),
-		filepath.Join("templates", "entity", "service.go.tpl"):                            filepath.Join("tools", "grpc", domain, "service.go"),
-		filepath.Join("templates", "di.go.tpl"):                                           filepath.Join("config", "di_grpc_"+domain+".go"),
+		filepath.Join("templates", "entity", "service.go.tpl"):                            filepath.Join(path, "cmd", "grpc", domain, "service.go"),
+		filepath.Join("templates", "di.go.tpl"):                                           filepath.Join("config", "di_"+domain+"_grpc.go"),
 	}
 
 	return c.Write(sources, params)
