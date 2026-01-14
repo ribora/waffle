@@ -124,6 +124,8 @@ gitlab.com/gorib/storage v0.0.0-20260113064824-25be8a073897 h1:0O3TPTtaBFFRpJaIH
 gitlab.com/gorib/storage v0.0.0-20260113064824-25be8a073897/go.mod h1:ZRQSyht9/vBXu2Ile/GzvhZMl1suVPn6Epu2msOxP5U=
 gitlab.com/gorib/storage v0.0.0-20260113215106-71eca7334ee1 h1:9398gW5F5Olr4hUQ+PjxzlnbpVkwEsz5fOHj5wXwQTk=
 gitlab.com/gorib/storage v0.0.0-20260113215106-71eca7334ee1/go.mod h1:ZRQSyht9/vBXu2Ile/GzvhZMl1suVPn6Epu2msOxP5U=
+gitlab.com/gorib/storage v0.0.0-20260114075855-3fb7b17ae938 h1:eq8GWG34k5Ye2iDuIistCxmXSk6m1Zi3/SeAfxYrcSo=
+gitlab.com/gorib/storage v0.0.0-20260114075855-3fb7b17ae938/go.mod h1:ZRQSyht9/vBXu2Ile/GzvhZMl1suVPn6Epu2msOxP5U=
 gitlab.com/gorib/try v0.0.0-20250224141908-512acf4daa35 h1:DWby0fdTmW1vOSIQ1nDsjJknRu3hZgcCm80lTMmQJGg=
 gitlab.com/gorib/try v0.0.0-20250224141908-512acf4daa35/go.mod h1:uZGgkI+oUcGCREmZ9q0IvlIPQCrDXSuSwCJflDUL5J4=
 go.opentelemetry.io/auto/sdk v1.2.1 h1:jXsnJ4Lmnqd11kwkBV2LgLoFMZKizbCi5fNZ/ipaZ64=
