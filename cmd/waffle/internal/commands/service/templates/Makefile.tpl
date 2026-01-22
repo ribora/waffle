@@ -1,15 +1,15 @@
-all: generate bin/health
-	@go mod tidy
-	@go test -cover ./...
+all: .tidy generate build
 	@[ -d cmd ] && go build -ldflags "-w" -o bin/ ./cmd/...
-	@go test -tags integration -c -o bin/test || true
 
 audit:
 	@which golangci-lint >/dev/null || (echo "Cannot run linters. Have you installed golangci-lint?" && false)
 	@golangci-lint run
 
-bin/health:
-	@go build -ldflags "-s -w" -o bin/health gitlab.com/gorib/grpc/cmd/echo-client
+.tidy:
+	@go mod tidy
 
 generate:
 	@go generate ./...
+
+build:
+	@[ -d cmd ] && go build -ldflags "-w" -o bin/ ./cmd/...

@@ -8,8 +8,6 @@ import (
 )
 
 func Init{{ title .Domain }}Domain() {
-    di.MustWire[service.{{ title .Domain }}Repository](postgres.New{{ title .Domain }}Repository)
-    di.MustDefine(service.New{{ title .Domain }}Management,
-        di.Alias[](),
-    )
+    di.Wire[service.{{ title .Domain }}Repository](postgres.New{{ title .Domain }}Repository)
+    {{ .Domain }}ManagementInstance := di.Define(service.New{{ title .Domain }}Management)
 }

@@ -1,4 +1,4 @@
-//go:generate go run gitlab.com/gorib/storage/sql/cmd/store $GOFILE
+//go:generate go tool store $GOFILE
 
 package postgres
 

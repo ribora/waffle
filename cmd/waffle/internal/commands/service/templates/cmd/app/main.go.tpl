@@ -5,13 +5,10 @@ import (
 	"os"
 
 	"{{ .Project }}/config"
-
-	"gitlab.com/gorib/waffle/app"
 )
 
 func main() {
-	config.Init()
-	application, err := app.New()
+	application, err := config.Init()
 	if err != nil {
 		fmt.Printf("Failed to create an application: %v\n", err)
 		os.Exit(1)

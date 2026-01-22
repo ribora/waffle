@@ -4,6 +4,7 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"os/exec"
 	"path/filepath"
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
@@ -39,10 +40,18 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 
 	path := filepath.Join("domain", domain)
 	sources := map[string]string{
-		filepath.Join("templates", "api", "service", "pb", "entity", "service.proto.tpl"): filepath.Join("api", service, "pb", domain, "service.proto"),
-		filepath.Join("templates", "entity", "service.go.tpl"):                            filepath.Join(path, "cmd", "grpc", domain, "service.go"),
-		filepath.Join("templates", "di.go.tpl"):                                           filepath.Join("config", "di_"+domain+"_grpc.go"),
+		filepath.Join("templates", "api", "service", "proto", "entity", "service.proto.tpl"): filepath.Join("api", service, "proto", domain, "service.proto"),
+		filepath.Join("templates", "entity", "service.go.tpl"):                               filepath.Join(path, "cmd", "grpc", domain, "service.go"),
+		filepath.Join("templates", "di.go.tpl"):                                              filepath.Join("config", "di", "di_"+domain+"_grpc.go"),
 	}
 
-	return c.Write(sources, params)
+	err = c.Write(sources, params)
+	if err != nil {
+		return err
+	}
+	info, err := exec.Command("make", ".tidy", "generate").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%v: %v", err, string(info))
+	}
+	return nil
 }

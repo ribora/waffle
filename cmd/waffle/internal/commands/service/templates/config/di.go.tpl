@@ -1,3 +1,4 @@
+//go:generate go tool diogen -output config/diogen/di_gen.go -pkg diogen $GOFILE
 package config
 
 import (
@@ -5,7 +6,6 @@ import (
 	"io/fs"
 	"net"
 	"strconv"
-	"time"
 
 	grpcCommand "gitlab.com/gorib/waffle/tools/grpc"
 
@@ -14,32 +14,48 @@ import (
 	"gitlab.com/gorib/pry"
 	"gitlab.com/gorib/pry/channels"
 	"gitlab.com/gorib/storage/sql"
+	"gitlab.com/gorib/waffle/app"
 	"gitlab.com/gorib/waffle/tools/migrate"
 )
 
 func InitDi() {
-	di.MustWire[pry.Logger](func() (pry.Logger, error) {
-		environment := fmt.Sprintf("%s_%s", env.NeedValue[string]("GITLAB_ENVIRONMENT_NAME"), env.NeedValue[string]("ENVIRONMENT"))
-		sentry, err := channels.Sentry("error", channels.WithSentryConnection(env.Value("SENTRY_DSN", ""), environment))
+	di.Wire[pry.Logger](func() (pry.Logger, error) {
+		dsn := env.Value("SENTRY_DSN", "")
+		environment := env.Value("ENVIRONMENT", "noenv")
+		serviceName := env.Value("SERVICE", "nocontour")
+		sentry, err := channels.Sentry("error", channels.WithSentryConnection(dsn, environment, channels.WithSentryService(serviceName)))
 		if err != nil {
 			return nil, err
 		}
 		return pry.New(env.Value("LOGLEVEL", "info"), pry.ToChannels(sentry))
 	})
 
-	di.MustWire[sql.Db](sql.NewDb, di.Defaults(map[int]any{
-		0: env.NeedValue[string]("DATABASE_DRIVER"),
-		1: fmt.Sprintf("%s?dbname=%s&sslmode=disable", env.NeedValue[string]("DATABASE_DSN"), env.NeedValue[string]("DATABASE_NAME")),
-		2: env.Value("DATABASE_TIMEOUT", time.Second),
+	di.Wire[sql.Db](sql.NewDb, di.Args(map[string]any{
+		"driver": env.NeedValue[string]("DATABASE_DRIVER"),
+		"dsn": fmt.Sprintf("%s?dbname=%s&sslmode=disable", env.NeedValue[string]("DATABASE_DSN"), env.NeedValue[string]("DATABASE_NAME")),
 	}))
 
-	di.MustWire[net.Addr](net.ResolveTCPAddr, di.For[grpcCommand.GrpcCommand](), di.Defaults(map[int]any{
-		0: "tcp",
-		1: net.JoinHostPort(
+	di.Wire[net.Addr](net.ResolveTCPAddr, di.For[grpcCommand.GrpcCommand](), di.Args(map[string]any{
+		"network": "tcp",
+		"address": net.JoinHostPort(
 			env.NeedValue[string]("DAEMON_HOST"),
 			strconv.FormatUint(uint64(env.NeedValue[uint16]("DAEMON_PORT")), 10),
 		),
 	}))
 
-	migrate.InitMigrate()
+	di.Wire[app.BaseCommand](func() app.BaseCommand { return app.NewCommand("grpc", "Start grpc server") }, di.For[grpcCommand.GrpcCommand]())
+	di.Wire[grpcCommand.GrpcCommand](grpcCommand.NewGrpcCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
+		"commands":          di.Tags[grpcCommand.ServiceHandler](grpcCommand.ServiceTag),
+		"middlewares":       di.Tags[grpcCommand.Middleware](grpcCommand.MiddlewareTag),
+		"streamMiddlewares": di.Tags[grpcCommand.StreamMiddleware](grpcCommand.StreamMiddlewareTag),
+	}))
+
+	di.Wire[app.BaseCommand](func() app.BaseCommand { return app.NewCommand("migrate", "Run migrations") }, di.For[migrate.MigrateCommand]())
+	di.Wire[migrate.MigrateCommand](migrate.NewMigrateCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
+		"migrations": di.Tags[fs.FS](migrate.MigrationsTag),
+	}))
+
+	di.Wire[app.App](app.Init, di.Args(map[string]any{
+		"commands": di.Tags[app.Command](app.CommandTag),
+	}))
 }

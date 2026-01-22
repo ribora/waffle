@@ -4,6 +4,7 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"os/exec"
 	"path/filepath"
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
@@ -42,8 +43,20 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 		filepath.Join("templates", "adapter", "postgres", "entity.go.tpl"): filepath.Join(path, "adapter", "postgres", domain+".go"),
 		filepath.Join("templates", "adapter", "postgres", "stored.go.tpl"): filepath.Join(path, "adapter", "postgres", "stored_"+domain+".go"),
 		filepath.Join("templates", "service", "entity.go.tpl"):             filepath.Join(path, "service", domain+".go"),
-		filepath.Join("templates", "di.go.tpl"):                            filepath.Join("config", "di_"+domain+"_domain.go"),
+		filepath.Join("templates", "di.go.tpl"):                            filepath.Join("config", "di", "di_"+domain+"_domain.go"),
 	}
 
-	return c.Write(sources, params)
+	err = c.Write(sources, params)
+	if err != nil {
+		return err
+	}
+	info, err := exec.Command("go", "get", "-tool", "gitlab.com/gorib/storage/sql/cmd/store@latest").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%v: %v", err, string(info))
+	}
+	info, err = exec.Command("make", ".tidy", "generate").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%v: %v", err, string(info))
+	}
+	return nil
 }
