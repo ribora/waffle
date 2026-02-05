@@ -10,6 +10,7 @@ import (
 
 	"github.com/pborman/getopt/v2"
 	baseGrpc "google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 
 	grpc "gitlab.com/gorib/grpc/server"
 	"gitlab.com/gorib/pry"
@@ -37,14 +38,34 @@ type Server interface {
 	Close() error
 }
 
+type ErrorMapper interface {
+	Errors() map[error]codes.Code
+}
+
+type StreamErrorMapper interface {
+	StreamErrors() map[error]codes.Code
+}
+
 func NewGrpcCommand(commands []ServiceHandler, middlewares []Middleware, streamMiddlewares []StreamMiddleware, command app.BaseCommand, addr net.Addr, logger pry.Logger) *grpcCommand {
 	mw := make([]baseGrpc.UnaryServerInterceptor, 0, len(middlewares))
+	errMapper := make(map[error]codes.Code)
 	for _, middleware := range middlewares {
 		mw = append(mw, middleware.Run())
+		if em, ok := any(mw).(ErrorMapper); ok {
+			for e, code := range em.Errors() {
+				errMapper[e] = code
+			}
+		}
 	}
+	errMapperStream := make(map[error]codes.Code)
 	streamMw := make([]baseGrpc.StreamServerInterceptor, 0, len(middlewares))
 	for _, middleware := range streamMiddlewares {
 		streamMw = append(streamMw, middleware.Run())
+		if em, ok := any(mw).(StreamErrorMapper); ok {
+			for e, code := range em.StreamErrors() {
+				errMapperStream[e] = code
+			}
+		}
 	}
 	return &grpcCommand{
 		commands:    commands,
@@ -58,12 +79,22 @@ func NewGrpcCommand(commands []ServiceHandler, middlewares []Middleware, streamM
 
 type grpcCommand struct {
 	app.BaseCommand
-	commands    []ServiceHandler
-	middlewares []baseGrpc.UnaryServerInterceptor
-	streamMw    []baseGrpc.StreamServerInterceptor
-	addr        net.Addr
-	connection  Server
-	logger      pry.Logger
+	commands        []ServiceHandler
+	middlewares     []baseGrpc.UnaryServerInterceptor
+	streamMw        []baseGrpc.StreamServerInterceptor
+	errMapper       map[error]codes.Code
+	errMapperStream map[error]codes.Code
+	addr            net.Addr
+	connection      Server
+	logger          pry.Logger
+}
+
+func (c *grpcCommand) Errors() map[error]codes.Code {
+	return c.errMapper
+}
+
+func (c *grpcCommand) StreamErrors() map[error]codes.Code {
+	return c.errMapperStream
 }
 
 func (c *grpcCommand) Setup(server *baseGrpc.Server) {
