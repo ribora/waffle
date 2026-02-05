@@ -106,6 +106,8 @@ gitlab.com/gorib/grpc v0.0.0-20260205084028-b4e2602e34b2 h1:wXtI+Xv7620yPQeJOlq6
 gitlab.com/gorib/grpc v0.0.0-20260205084028-b4e2602e34b2/go.mod h1:XCNEkR2KmuD3KtvLxWfGpfCedN4Vtu0PU0Y7bd2km0E=
 gitlab.com/gorib/grpc v0.0.0-20260205090330-5114fca152ab h1:yVIIKlAVIoQXkKysBELF/4u7glwT4l8oP7Kw4g/4b4w=
 gitlab.com/gorib/grpc v0.0.0-20260205090330-5114fca152ab/go.mod h1:XCNEkR2KmuD3KtvLxWfGpfCedN4Vtu0PU0Y7bd2km0E=
+gitlab.com/gorib/grpc v0.0.0-20260205092135-9ef73740f2e4 h1:EWU+oZCmusbCceUq9Kf+BNseAZ2rcEAUX6RmazU7LkA=
+gitlab.com/gorib/grpc v0.0.0-20260205092135-9ef73740f2e4/go.mod h1:XCNEkR2KmuD3KtvLxWfGpfCedN4Vtu0PU0Y7bd2km0E=
 gitlab.com/gorib/http v0.0.0-20260205072132-7391e3335a0f h1:PcsT8RIOUx9kvJbZoF5chq42/hfYNQuwLensadceiNw=
 gitlab.com/gorib/http v0.0.0-20260205072132-7391e3335a0f/go.mod h1:Ov87Y4QgJSGqOgqJmnlvUCdaku64IdJa9EXjM7F4ZsI=
 gitlab.com/gorib/http v0.0.0-20260205084028-e5b82e35d51f h1:kKrKuF2WILAAoUdbp3942dueC5VyjQI7ML9pURJgLtw=
