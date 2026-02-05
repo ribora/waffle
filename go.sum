@@ -114,6 +114,8 @@ gitlab.com/gorib/http v0.0.0-20260205084028-e5b82e35d51f h1:kKrKuF2WILAAoUdbp394
 gitlab.com/gorib/http v0.0.0-20260205084028-e5b82e35d51f/go.mod h1:6INCEpWmk+4iZyh+zPcMd/Rq0RdBRsqY6VM0nMJFOH8=
 gitlab.com/gorib/http v0.0.0-20260205085323-7e87c957bb4f h1:+w+7Wuhr54AxCSgZVYzTqNBAR8BsT160mR1fx00kjXA=
 gitlab.com/gorib/http v0.0.0-20260205085323-7e87c957bb4f/go.mod h1:6INCEpWmk+4iZyh+zPcMd/Rq0RdBRsqY6VM0nMJFOH8=
+gitlab.com/gorib/http v0.0.0-20260205092545-0f5f2dd6c55a h1:t0Ojdj0l9KOfNtJtPKW5jSl4M3CBsZgBn1AH4SuaWCE=
+gitlab.com/gorib/http v0.0.0-20260205092545-0f5f2dd6c55a/go.mod h1:6INCEpWmk+4iZyh+zPcMd/Rq0RdBRsqY6VM0nMJFOH8=
 gitlab.com/gorib/pry v0.0.0-20260205083916-dab009c69462 h1:YeuEXtIlOIiAd018oAAKMqwwuM0xh3BnM73w8NgqyZE=
 gitlab.com/gorib/pry v0.0.0-20260205083916-dab009c69462/go.mod h1:2ZhtNMyjoPKWCrZX5NLJlbMiJHBEUJg8Zuhgl1TcHpc=
 gitlab.com/gorib/session v0.0.0-20250224141908-df66ea5a990f h1:OlcLsiOC/SDcuH75HhcRkOvVD3FYi8nWD9ghvoZMAJw=
