@@ -51,7 +51,7 @@ func NewGrpcCommand(commands []ServiceHandler, middlewares []Middleware, streamM
 	errMapper := make(map[error]codes.Code)
 	for _, middleware := range middlewares {
 		mw = append(mw, middleware.Run())
-		if em, ok := any(mw).(ErrorMapper); ok {
+		if em, ok := any(middleware).(ErrorMapper); ok {
 			for e, code := range em.Errors() {
 				errMapper[e] = code
 			}
@@ -61,7 +61,7 @@ func NewGrpcCommand(commands []ServiceHandler, middlewares []Middleware, streamM
 	streamMw := make([]baseGrpc.StreamServerInterceptor, 0, len(middlewares))
 	for _, middleware := range streamMiddlewares {
 		streamMw = append(streamMw, middleware.Run())
-		if em, ok := any(mw).(StreamErrorMapper); ok {
+		if em, ok := any(middleware).(StreamErrorMapper); ok {
 			for e, code := range em.StreamErrors() {
 				errMapperStream[e] = code
 			}
