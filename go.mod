@@ -7,14 +7,14 @@ require (
 	github.com/gofiber/fiber/v2 v2.52.9
 	github.com/pborman/getopt/v2 v2.1.0
 	github.com/pressly/goose/v3 v3.24.1
-	gitlab.com/gorib/amqp v0.0.0-20251218160333-253e7ffb9b2f
+	gitlab.com/gorib/amqp v0.0.0-20260205071404-3761dde40da5
 	gitlab.com/gorib/di v1.2.4
-	gitlab.com/gorib/env v0.0.0-20250224143433-a5f927ccadea
-	gitlab.com/gorib/grpc v0.0.0-20251210090624-81442dda3c85
-	gitlab.com/gorib/http v0.0.0-20251210090907-04385c960e63
-	gitlab.com/gorib/pry v0.0.0-20250224143323-d269032b7208
+	gitlab.com/gorib/env v0.0.0-20260204211536-dd93c5cbf832
+	gitlab.com/gorib/grpc v0.0.0-20260205071704-795370115ffc
+	gitlab.com/gorib/http v0.0.0-20260205072132-7391e3335a0f
+	gitlab.com/gorib/pry v0.0.0-20260205070212-a44c72f5e240
 	gitlab.com/gorib/session v0.0.0-20250224141908-df66ea5a990f
-	gitlab.com/gorib/storage v0.0.0-20260117105358-c43f05b6e95a
+	gitlab.com/gorib/storage v0.0.0-20260205071857-9915c3c67d77
 	gitlab.com/gorib/try v0.0.0-20250224141908-512acf4daa35
 	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b
 	google.golang.org/grpc v1.77.0
@@ -41,12 +41,12 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rs/zerolog v1.34.0 // indirect
+	github.com/samber/lo v1.52.0 // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.68.0 // indirect
 	gitlab.com/gorib/criteria v0.0.0-20250224141747-7755bfaa022c // indirect
-	gitlab.com/gorib/parser v0.0.0-20250224144300-e9d1752a4158 // indirect
-	gitlab.com/gorib/ptr v0.0.0-20250224141908-ef6c4ced9eea // indirect
+	gitlab.com/gorib/failure v0.0.0-20260205065720-0f111943a8ea // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/sync v0.18.0 // indirect
