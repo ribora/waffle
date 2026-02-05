@@ -11,7 +11,7 @@ require (
 	gitlab.com/gorib/di v1.2.4
 	gitlab.com/gorib/env v0.0.0-20260204211536-dd93c5cbf832
 	gitlab.com/gorib/grpc v0.0.0-20260205084028-b4e2602e34b2
-	gitlab.com/gorib/http v0.0.0-20260205084028-e5b82e35d51f
+	gitlab.com/gorib/http v0.0.0-20260205085323-7e87c957bb4f
 	gitlab.com/gorib/pry v0.0.0-20260205083916-dab009c69462
 	gitlab.com/gorib/session v0.0.0-20250224141908-df66ea5a990f
 	gitlab.com/gorib/storage v0.0.0-20260205071857-9915c3c67d77
