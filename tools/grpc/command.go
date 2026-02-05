@@ -68,12 +68,14 @@ func NewGrpcCommand(commands []ServiceHandler, middlewares []Middleware, streamM
 		}
 	}
 	return &grpcCommand{
-		commands:    commands,
-		middlewares: mw,
-		streamMw:    streamMw,
-		addr:        addr,
-		BaseCommand: command,
-		logger:      logger,
+		commands:        commands,
+		middlewares:     mw,
+		streamMw:        streamMw,
+		errMapper:       errMapper,
+		errMapperStream: errMapperStream,
+		addr:            addr,
+		BaseCommand:     command,
+		logger:          logger,
 	}
 }
 
