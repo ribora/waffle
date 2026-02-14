@@ -7,12 +7,12 @@ require (
 	github.com/gofiber/fiber/v2 v2.52.9
 	github.com/pborman/getopt/v2 v2.1.0
 	github.com/pressly/goose/v3 v3.24.1
-	gitlab.com/gorib/amqp v0.0.0-20260205084028-011ac6bc4558
+	gitlab.com/gorib/amqp v0.0.0-20260214105905-a5bf067e4f8c
 	gitlab.com/gorib/di v1.2.4
 	gitlab.com/gorib/env v0.0.0-20260204211536-dd93c5cbf832
-	gitlab.com/gorib/grpc v0.0.0-20260205092135-9ef73740f2e4
-	gitlab.com/gorib/http v0.0.0-20260205092545-0f5f2dd6c55a
-	gitlab.com/gorib/pry v0.0.0-20260205083916-dab009c69462
+	gitlab.com/gorib/grpc v0.0.0-20260214105905-c1ff0f5f21c8
+	gitlab.com/gorib/http v0.0.0-20260214105905-a1059892904e
+	gitlab.com/gorib/pry v0.0.0-20260214105746-efb07cc0e491
 	gitlab.com/gorib/session v0.0.0-20250224141908-df66ea5a990f
 	gitlab.com/gorib/storage v0.0.0-20260205071857-9915c3c67d77
 	gitlab.com/gorib/try v0.0.0-20250224141908-512acf4daa35
@@ -46,7 +46,7 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.68.0 // indirect
 	gitlab.com/gorib/criteria v0.0.0-20250224141747-7755bfaa022c // indirect
-	gitlab.com/gorib/failure v0.0.0-20260205065720-0f111943a8ea // indirect
+	gitlab.com/gorib/failure v0.0.0-20260214082255-571331c3ea24 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/sync v0.18.0 // indirect
