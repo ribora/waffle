@@ -100,6 +100,8 @@ gitlab.com/gorib/failure v0.0.0-20260214082255-571331c3ea24 h1:e5r+C/nBMWeKNT1c8
 gitlab.com/gorib/failure v0.0.0-20260214082255-571331c3ea24/go.mod h1:G4h/bpjuzjrfUUXm+p3K8mixVhuvEyTJ3fx/Ayy9Ylc=
 gitlab.com/gorib/grpc v0.0.0-20260214105905-c1ff0f5f21c8 h1:bueJiv65KTnx3tQSQLB5MpnO9beJzITLrtI9DUvSsDA=
 gitlab.com/gorib/grpc v0.0.0-20260214105905-c1ff0f5f21c8/go.mod h1:zqkUvmPfTPnnvcYJ8B0jUnjECrf47NdbvTV/rtkDNw0=
+gitlab.com/gorib/grpc v0.0.0-20260219180610-3d1136144da5 h1:bf67Cb/tPkxeWuk3IX3+g+jSGBJscpaGNyi89mN5jUE=
+gitlab.com/gorib/grpc v0.0.0-20260219180610-3d1136144da5/go.mod h1:zqkUvmPfTPnnvcYJ8B0jUnjECrf47NdbvTV/rtkDNw0=
 gitlab.com/gorib/http v0.0.0-20260214105905-a1059892904e h1:hM6CivZpS3czD0e2X38DGAHKUCz2tJ1Bkw+VPKYU8I8=
 gitlab.com/gorib/http v0.0.0-20260214105905-a1059892904e/go.mod h1:mfigJLJysTLzLLYzkjfocUbyMSiSL9DFpmVQ9Tjfv+c=
 gitlab.com/gorib/pry v0.0.0-20260214105746-efb07cc0e491 h1:2bGYAAVzshDZH4s7IaY+Uu6gR3kEod+MREwQTzK52HQ=
