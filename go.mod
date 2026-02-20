@@ -10,7 +10,7 @@ require (
 	gitlab.com/gorib/amqp v0.0.0-20260214105905-a5bf067e4f8c
 	gitlab.com/gorib/di v1.2.4
 	gitlab.com/gorib/env v0.0.0-20260204211536-dd93c5cbf832
-	gitlab.com/gorib/grpc v0.0.0-20260220092922-51d5fa703877
+	gitlab.com/gorib/grpc v0.0.0-20260220095131-d21812397227
 	gitlab.com/gorib/http v0.0.0-20260214105905-a1059892904e
 	gitlab.com/gorib/pry v0.0.0-20260214105746-efb07cc0e491
 	gitlab.com/gorib/session v0.0.0-20250224141908-df66ea5a990f
