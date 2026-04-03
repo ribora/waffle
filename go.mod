@@ -7,14 +7,14 @@ require (
 	github.com/gofiber/fiber/v2 v2.52.9
 	github.com/pborman/getopt/v2 v2.1.0
 	github.com/pressly/goose/v3 v3.24.1
-	gitlab.com/gorib/amqp v0.0.0-20260214105905-a5bf067e4f8c
+	gitlab.com/gorib/amqp v0.0.0-20260403231608-7cdeba0abd08
 	gitlab.com/gorib/di v1.2.4
 	gitlab.com/gorib/env v0.0.0-20260204211536-dd93c5cbf832
-	gitlab.com/gorib/grpc v0.0.0-20260226212848-3b0471664e9b
-	gitlab.com/gorib/http v0.0.0-20260220185410-ede61b50fa66
-	gitlab.com/gorib/pry v0.0.0-20260214105746-efb07cc0e491
+	gitlab.com/gorib/grpc v0.0.0-20260403231608-acb7e86eb9ef
+	gitlab.com/gorib/http v0.0.0-20260403231608-91df8ec75166
+	gitlab.com/gorib/pry v0.0.0-20260403230952-51d443b4269d
 	gitlab.com/gorib/session v0.0.0-20250224141908-df66ea5a990f
-	gitlab.com/gorib/storage v0.0.0-20260205071857-9915c3c67d77
+	gitlab.com/gorib/storage v0.0.0-20260403230907-633936500cd6
 	gitlab.com/gorib/try v0.0.0-20250224141908-512acf4daa35
 	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b
 	google.golang.org/grpc v1.77.0
