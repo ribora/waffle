@@ -48,7 +48,7 @@ require (
 	github.com/valyala/fasthttp v1.68.0 // indirect
 	gitlab.com/gorib/criteria v0.0.0-20250224141747-7755bfaa022c // indirect
 	gitlab.com/gorib/failure v1.0.0 // indirect
-	gitlab.com/gorib/gorival v1.1.2 // indirect
+	gitlab.com/gorib/gorival v1.1.3 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/mod v0.29.0 // indirect
 	golang.org/x/net v0.47.0 // indirect
