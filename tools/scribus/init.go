@@ -18,12 +18,14 @@ var (
 func InitScribus() {
 	di.Wire[app.BaseCommand](func() app.BaseCommand { return app.NewCommand("scribus", "Start RabbitMq consumer") }, di.For[ScribusCommand]())
 	di.Wire[Consumer](amqp.NewConsumer, di.Args(map[string]any{
-		"dsn":           env.NeedValue[string]("RABBIT_DSN"),
-		"exchange":      env.NeedValue[string]("RABBIT_EXCHANGE"),
-		"queue":         env.NeedValue[string]("RABBIT_QUEUE"),
-		"routingKey":    "#",
-		"pageSize":      1,
-		"flushInterval": 5 * time.Second,
+		"dsn":        env.NeedValue[string]("RABBIT_DSN"),
+		"exchange":   env.NeedValue[string]("RABBIT_EXCHANGE"),
+		"queue":      env.NeedValue[string]("RABBIT_QUEUE"),
+		"routingKey": "#",
+		"opts": []amqp.ConsumerOptions{
+			amqp.WithConsumerPageSize(1),
+			amqp.WithConsumerFlushInterval(5 * time.Second),
+		},
 	}))
 
 	// Single handler
