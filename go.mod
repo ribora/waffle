@@ -7,7 +7,7 @@ require (
 	github.com/gofiber/fiber/v2 v2.52.9
 	github.com/pborman/getopt/v2 v2.1.0
 	github.com/pressly/goose/v3 v3.24.1
-	gitlab.com/gorib/amqp v1.0.0
+	gitlab.com/gorib/amqp v1.0.1
 	gitlab.com/gorib/di v1.3.1
 	gitlab.com/gorib/env v1.0.0
 	gitlab.com/gorib/grpc v1.0.0

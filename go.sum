@@ -92,6 +92,8 @@ github.com/xyproto/randomstring v1.0.5 h1:YtlWPoRdgMu3NZtP45drfy1GKoojuR7hmRcnhZ
 github.com/xyproto/randomstring v1.0.5/go.mod h1:rgmS5DeNXLivK7YprL0pY+lTuhNQW3iGxZ18UQApw/E=
 gitlab.com/gorib/amqp v1.0.0 h1:5ycyadazcNxG/0ZDQu7txo8kv7CykKodgmd3CciDvqM=
 gitlab.com/gorib/amqp v1.0.0/go.mod h1:uOGlrrp9WQNQptX90FTYmqLRiWt/YGRIgfq36Tux83k=
+gitlab.com/gorib/amqp v1.0.1 h1:/p1BkWPLC9swoG7p7XXyehSsPPA2JKPgFPGCc1H61Fs=
+gitlab.com/gorib/amqp v1.0.1/go.mod h1:uOGlrrp9WQNQptX90FTYmqLRiWt/YGRIgfq36Tux83k=
 gitlab.com/gorib/criteria v0.0.0-20250224141747-7755bfaa022c h1:Qm420y8EWcpOhnFXK9/S/6F88w1p0jlvvv3OJuD++n4=
 gitlab.com/gorib/criteria v0.0.0-20250224141747-7755bfaa022c/go.mod h1:z6oj5KnovZybNDhpXAksYT57vZOpJOkR6eqVwZpKgcI=
 gitlab.com/gorib/di v1.3.1 h1:petdLdjyVH3DEnnUbM6HazZCH4niP8XAKAxkcBO2wVo=
