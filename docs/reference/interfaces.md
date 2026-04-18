@@ -11,8 +11,8 @@ Complete listing of every exported interface in waffle.
 ```go
 type App interface {
     RunUntilStop()
-    Run() error
-    Stop()
+    Run()
+    Stop() error
 }
 ```
 
@@ -22,8 +22,8 @@ The top-level application object. Resolved from the DI container in `main.go`.
 
 ```go
 type HasCloser interface {
-    SetCloser(func())
-    Closer() func()
+    SetCloser(func() error)
+    Closer() func() error
 }
 ```
 
@@ -86,17 +86,6 @@ type MiddlewareList interface {
 ```
 
 A registry of named HTTP middlewares. Injected into the router constructor. `Get` panics if the name is not found.
-
-### Server
-
-```go
-type Server interface {
-    Serve(ctx context.Context) error
-    Close() error
-}
-```
-
-Implemented by the HTTP server from `gitlab.com/gorib/http/server`. Used internally by `httpCommand`.
 
 ---
 
@@ -162,17 +151,6 @@ type StreamErrorMapper interface {
 
 Same as `ErrorMapper` but for stream RPCs.
 
-### Server
-
-```go
-type Server interface {
-    Serve(ctx context.Context) error
-    Close() error
-}
-```
-
-Implemented by the gRPC server from `gitlab.com/gorib/grpc/server`. Used internally by `grpcCommand`.
-
 ---
 
 ## tools/migrate package
@@ -226,15 +204,15 @@ A batch-mode message handler. Receives a slice of messages flushed together. Pro
 
 ```go
 type Consumer interface {
-    SetHandler(handler func(ctx context.Context, key string, payload []byte) error)
-    SetDsn(dsn string)
-    SetExchange(exchange string)
-    SetQueue(queue string)
-    SetRoutingKey(key string)
-    SetPageSize(size int)
-    SetFlushInterval(d time.Duration)
-    SetReconnectInterval(d time.Duration)
-    Consume()
+    SetHandler(handler func(ctx context.Context, keys []string, documents [][]byte) error) error
+    SetDsn(dsn string) error
+    SetExchange(exchange string) error
+    SetQueue(queue string) error
+    SetRoutingKey(routingKey string) error
+    SetPageSize(pageSize uint16) error
+    SetFlushInterval(flushInterval time.Duration) error
+    SetReconnectInterval(interval time.Duration) error
+    Consume(ctx context.Context) error
 }
 ```
 

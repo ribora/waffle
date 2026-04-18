@@ -4,19 +4,18 @@ The HTTP tool wraps `gitlab.com/gorib/http` (Fiber) into a waffle `Command`. Cal
 
 ## Setup
 
-Copy the `InitHttp` registrations into your DI config:
+Add the following registrations inside `InitDi()` in `config/di/di.go`:
 
 ```go
-// config/di/di_http.go
-package di
-
 import (
     "gitlab.com/gorib/di"
     "gitlab.com/gorib/waffle/app"
     whttp "gitlab.com/gorib/waffle/tools/http"
 )
 
-func init() {
+func InitDi() {
+    // ... other registrations ...
+
     di.Wire[app.BaseCommand](
         func() app.BaseCommand { return app.NewCommand("http", "Start web server") },
         di.For[whttp.HttpCommand](),
@@ -37,7 +36,18 @@ Run `make generate`, then start the server:
 
 ## Listen address
 
-The default address is read from the `Router` configuration. Override it at runtime with the `--listen` / `-l` flag:
+`NewHttpCommand` requires a `net.Addr` argument. You must wire it explicitly in `InitDi()`:
+
+```go
+import "net"
+
+// Inside InitDi():
+di.Wire[net.Addr](func() (net.Addr, error) {
+    return net.ResolveTCPAddr("tcp", env.Value[string]("...", ":8080"))
+}, di.For[whttp.HttpCommand]())
+```
+
+Override the address at runtime with the `--listen` / `-l` flag (takes precedence over the wired value):
 
 ```sh
 ./app http --listen 0.0.0.0:8080
@@ -45,13 +55,13 @@ The default address is read from the `Router` configuration. Override it at runt
 
 ## Registering routes
 
-Implement `http.Router` (from `gitlab.com/gorib/http`) and provide it via DI. The scaffolded `api/<service>/init.go` is the conventional place to do this:
+Implement `server.Router` (from `gitlab.com/gorib/http/server`) and provide it via DI. The scaffolded `api/<service>/init.go` is the conventional place to do this:
 
 ```go
 package api
 
 import (
-    "gitlab.com/gorib/http"
+    "github.com/gofiber/fiber/v2"
     "mymodule/domain/user/cmd/http/user"
 )
 
@@ -63,7 +73,7 @@ func NewRouter(userHandler *user.UserHandler) *Router {
     return &Router{userHandler: userHandler}
 }
 
-func (r *Router) Register(app *fiber.App) {
+func (r *Router) Setup(app *fiber.App) {
     v1 := app.Group("/v1")
     v1.Get("/users/:id", r.userHandler.Get)
     v1.Post("/users", r.userHandler.Create)
@@ -110,10 +120,10 @@ func (m *AuthMiddleware) Run() fiber.Handler {
 
 ### Registering middleware
 
-Tag the middleware with `http.MiddlewareTag`:
+Tag the middleware with `whttp.MiddlewareTag` (where `whttp` aliases `gitlab.com/gorib/waffle/tools/http`):
 
 ```go
-di.Wire[http.Middleware](NewAuthMiddleware, di.Tag(http.MiddlewareTag))
+di.Wire[whttp.Middleware](NewAuthMiddleware, di.Tag(whttp.MiddlewareTag))
 ```
 
 ### Using middleware in routes
@@ -121,14 +131,14 @@ di.Wire[http.Middleware](NewAuthMiddleware, di.Tag(http.MiddlewareTag))
 `InitHttp()` wires a `MiddlewareList` into the DI container. Inject it wherever you register routes and look up middleware by name:
 
 ```go
-func NewRouter(middlewares http.MiddlewareList, userHandler *user.UserHandler) *Router {
+func NewRouter(middlewares whttp.MiddlewareList, userHandler *user.UserHandler) *Router {
     return &Router{
         middlewares: middlewares,
         userHandler: userHandler,
     }
 }
 
-func (r *Router) Register(app *fiber.App) {
+func (r *Router) Setup(app *fiber.App) {
     v1 := app.Group("/v1", r.middlewares.Get("auth"))
     v1.Get("/users/:id", r.userHandler.Get)
 }

@@ -4,9 +4,9 @@ The scribus tool wraps `gitlab.com/gorib/amqp` into a waffle `Command` for consu
 
 ## Setup
 
-Copy the scribus registrations into `InitDi()` in `config/di/di.go`. The consumer arguments are passed directly as map keys — there is no `amqp.ConsumerOptions` slice.
+Copy the scribus registrations into `InitDi()` in `config/di/di.go`.
 
-**Batch mode** (one `BatchHandler` processes all messages):
+**Single mode** (each routing key dispatched to a dedicated `Handler`):
 
 ```go
 import (
@@ -16,44 +16,34 @@ import (
     "gitlab.com/gorib/env"
     "gitlab.com/gorib/waffle/app"
     wscribus "gitlab.com/gorib/waffle/tools/scribus"
-    scribusCommand "mymodule/domain/notification/cmd/scribus"
 )
 
 // Inside InitDi():
-di.Wire[wscribus.BatchHandler](scribusCommand.NewNotificationAcceptedCommand)
 di.Wire[app.BaseCommand](
     func() app.BaseCommand { return app.NewCommand("scribus", "Start RabbitMq consumer") },
     di.For[wscribus.ScribusCommand](),
 )
 di.Wire[wscribus.Consumer](amqp.NewConsumer, di.Args(map[string]any{
-    "dsn":           env.NeedValue[string]("RABBIT_DSN"),
-    "exchange":      env.NeedValue[string]("RABBIT_EXCHANGE"),
-    "queue":         env.NeedValue[string]("RABBIT_QUEUE"),
-    "routingKey":    "#",
-    "pageSize":      uint16(1),
-    "flushInterval": time.Hour,
-}))
-di.Wire[wscribus.ScribusCommand](wscribus.NewBatchScribusCommand, di.Tag(app.CommandTag))
-```
-
-**Single mode** (each routing key dispatched to a dedicated `Handler`):
-
-```go
-di.Wire[app.BaseCommand](
-    func() app.BaseCommand { return app.NewCommand("scribus", "Start RabbitMq consumer") },
-    di.For[wscribus.ScribusCommand](),
-)
-di.Wire[wscribus.Consumer](amqp.NewConsumer, di.Args(map[string]any{
-    "dsn":           env.NeedValue[string]("RABBIT_DSN"),
-    "exchange":      env.NeedValue[string]("RABBIT_EXCHANGE"),
-    "queue":         env.NeedValue[string]("RABBIT_QUEUE"),
-    "routingKey":    "#",
-    "pageSize":      uint16(1),
-    "flushInterval": 5 * time.Second,
+    "dsn":        env.NeedValue[string]("RABBIT_DSN"),
+    "exchange":   env.NeedValue[string]("RABBIT_EXCHANGE"),
+    "queue":      env.NeedValue[string]("RABBIT_QUEUE"),
+    "routingKey": "#",
+    "opts": []amqp.ConsumerOptions{
+        amqp.WithConsumerPageSize(1),
+        amqp.WithConsumerFlushInterval(5 * time.Second),
+    },
 }))
 di.Wire[wscribus.ScribusCommand](wscribus.NewScribusCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
     "commands": di.Tags[wscribus.Handler](wscribus.CommandTag),
 }))
+```
+
+**Batch mode** (one `BatchHandler` processes all messages):
+
+```go
+// Replace the NewScribusCommand registration with:
+di.Wire[wscribus.BatchHandler](scribusCommand.NewNotificationAcceptedCommand)
+di.Wire[wscribus.ScribusCommand](wscribus.NewBatchScribusCommand, di.Tag(app.CommandTag))
 ```
 
 Run `make generate` after adding this.
@@ -74,22 +64,13 @@ Example:
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--flush-timeout` | `-t` | `5s` | How long to wait before flushing a partial batch |
-| `--page` | `-p` | `1` | Batch size (number of messages per flush) |
-| `--reconnect-timeout` | `-r` | — | How long to wait before reconnecting after a connection drop |
+| `--flush-timeout` | `-t` | `0` (use default) | Flush every [n] seconds |
+| `--page` | `-p` | `0` (use default) | Number of items for bulk processing |
+| `--reconnect-timeout` | `-r` | `0` (use default) | Reconnect every [n] seconds |
 
 ## Environment variables
 
-When environment variables are set, the consumer uses them as defaults (the CLI flags take precedence):
-
-| Variable | Description |
-|----------|-------------|
-| `RABBIT_DSN` | AMQP connection string |
-| `RABBIT_EXCHANGE` | Exchange name |
-| `RABBIT_QUEUE` | Queue name |
-| `RABBIT_DLX_EXCHANGE` | Dead-letter exchange name (default: `"errors"`) |
-
-See [reference/environment.md](../reference/environment.md) for the full list.
+Environment variables are not read automatically. They are wired explicitly in `InitDi()` via `env.NeedValue` / `env.Value` as shown in the Setup section above. Variable names are chosen by you. The CLI positional arguments take precedence at runtime.
 
 ## Single mode
 
@@ -172,19 +153,18 @@ func (h *EventBatchHandler) Run(ctx context.Context, keys []string, payloads [][
 
 Register exactly one `BatchHandler` without a tag:
 
+```go
+di.Wire[scribus.BatchHandler](NewEventBatchHandler)
+```
+
 ## How routing works
 
 On startup the scribus command:
 
-1. Parses `<queue>:<routing-key>` from the positional argument
-2. Registers the queue with the exchange using that routing key
-3. For each incoming message, reads the routing key from the AMQP delivery
-4. In single mode: looks up the handler by key and calls `Run`
-5. In batch mode: accumulates messages until `--page` is reached or `--flush-timeout` expires, then calls `BatchHandler.Run` with the batch
-
-## Dead-letter exchange
-
-Unacknowledged messages (where `Run` returns an error) are routed to the dead-letter exchange. The default DLX name is `"errors"`, configurable via `RABBIT_DLX_EXCHANGE`.
+1. Parses `<queue>:<routing-key>` from the positional argument (if provided)
+2. For each incoming message, reads the routing key from the AMQP delivery
+3. In single mode: looks up the handler by key and calls `Run`
+4. In batch mode: accumulates messages until `--page` is reached or `--flush-timeout` expires, then calls `BatchHandler.Run` with the batch
 
 ## DI tags
 
@@ -196,10 +176,8 @@ Unacknowledged messages (where `Run` returns an error) are routed to the dead-le
 
 ## Logging
 
-The scribus command logs every consumed message at trace level:
+The scribus command logs every consumed message at trace level in single mode:
 
 ```
-TRACE routing_key=order.created payload={"id":42,...}
+TRACE order.created {"id":42,...}
 ```
-
-Errors from `Run` or `BatchHandler.Run` are logged at error level with the full `failure.Error` context including stack trace.

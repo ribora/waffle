@@ -6,16 +6,7 @@ All environment variables are read using `gitlab.com/gorib/env`, which loads a `
 
 ## RabbitMQ (scribus tool)
 
-Read by `tools/scribus/init.go` when `InitScribus()` is called.
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `RABBIT_DSN` | Yes | — | AMQP connection string. Format: `amqp://user:pass@host:port/vhost` |
-| `RABBIT_EXCHANGE` | Yes | — | Exchange name to bind to |
-| `RABBIT_QUEUE` | Yes | — | Queue name to consume from |
-| `RABBIT_DLX_EXCHANGE` | No | `"errors"` | Dead-letter exchange name for unacknowledged messages |
-
-These values are used as startup defaults. The `--connection`, exchange, and queue positional arguments to the `scribus` command take precedence at runtime.
+Environment variables for the scribus consumer are wired explicitly in your `InitDi()`. Variable names are chosen by you — see [tools/scribus.md](../tools/scribus.md) for the wiring example.
 
 ### Example `.env`
 

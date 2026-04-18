@@ -30,7 +30,7 @@ waffle init:service
 You will be prompted for the service name. The command then:
 
 1. Scaffolds the full project layout
-2. Runs `go get gitlab.com/gorib/digen` to install the DI code generator
+2. Runs `go get gitlab.com/gorib/di/cmd/diogen` to install the DI code generator
 3. Runs `make .tidy generate` to tidy dependencies and generate the DI container
 
 ### Generated project layout

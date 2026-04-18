@@ -4,19 +4,18 @@ The gRPC tool wraps `gitlab.com/gorib/grpc/server` into a waffle `Command`. Call
 
 ## Setup
 
-Copy the `InitGrpc` registrations into your DI config:
+Add the following registrations inside `InitDi()` in `config/di/di.go`:
 
 ```go
-// config/di/di_grpc.go
-package di
-
 import (
     "gitlab.com/gorib/di"
     "gitlab.com/gorib/waffle/app"
     wgrpc "gitlab.com/gorib/waffle/tools/grpc"
 )
 
-func init() {
+func InitDi() {
+    // ... other registrations ...
+
     di.Wire[app.BaseCommand](
         func() app.BaseCommand { return app.NewCommand("grpc", "Start grpc server") },
         di.For[wgrpc.GrpcCommand](),
@@ -38,7 +37,18 @@ Run `make generate`, then start the server:
 
 ## Listen address
 
-Override the default address at runtime:
+`NewGrpcCommand` requires a `net.Addr` argument. You must wire it explicitly in `InitDi()`:
+
+```go
+import "net"
+
+// Inside InitDi():
+di.Wire[net.Addr](func() (net.Addr, error) {
+    return net.ResolveTCPAddr("tcp", env.Value[string]("...", ":50051"))
+}, di.For[wgrpc.GrpcCommand]())
+```
+
+Override the address at runtime with the `--listen` / `-l` flag (takes precedence over the wired value):
 
 ```sh
 ./app grpc --listen 0.0.0.0:50051
