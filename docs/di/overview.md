@@ -221,6 +221,20 @@ func (c *Container) Shutdown() func() { ... }
 
 The hand-written `config/diogen/di.go` calls `InitApp()` and exposes a clean `InitDi() (app.App, error)`.
 
+### Automatic resource cleanup
+
+`diogen` inspects every registered constructor at generation time. If the returned value implements `io.Closer`, it is automatically added to the shutdown list inside `InitApp()`. `Shutdown()` then calls `Close()` on all of them in **reverse initialization order** — so a database connection opened before a repository is closed after it.
+
+You do not need to register closers manually. Implementing `io.Closer` is enough:
+
+```go
+type Store struct { db *sql.DB }
+
+func (s *Store) Close() error { return s.db.Close() }
+```
+
+Anything that does **not** implement `io.Closer` is simply ignored during shutdown.
+
 ## Compile-time safety
 
 Because the container is generated Go code, any misconfiguration surfaces as a compile error:
