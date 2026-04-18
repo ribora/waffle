@@ -145,20 +145,38 @@ type ErrorMapper interface {
 }
 ```
 
-Implement it on your service handler:
+`ErrorMapper` is collected from **middleware** values, not from service handlers. The recommended pattern is a dedicated error handler registered under `grpcCommand.MiddlewareTag`.
+
+A middleware can implement `ErrorMapper` purely for error code mapping — `Run()` is required to satisfy the `Middleware` interface but can be a pass-through no-op:
 
 ```go
-import "google.golang.org/grpc/codes"
+func NewErrorHandler() *errorHandler { return &errorHandler{} }
 
-func (g *UserGrpc) Errors() map[error]codes.Code {
+type errorHandler struct{}
+
+func (m *errorHandler) Errors() map[error]codes.Code {
     return map[error]codes.Code{
         model.ErrUserNotFound: codes.NotFound,
         model.ErrUserConflict: codes.AlreadyExists,
     }
 }
+
+// Run satisfies the Middleware interface but does no interception itself.
+// The actual error mapping happens via Errors() above.
+func (m *errorHandler) Run() grpc.UnaryServerInterceptor {
+    return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+        return handler(ctx, req)
+    }
+}
 ```
 
-The gRPC tool collects all `Errors()` maps from all registered `ServiceHandler` values that implement `ErrorMapper`, merges them, and injects the combined map into the error-handling middleware.
+Register it as middleware:
+
+```go
+di.Define(NewErrorHandler, di.Tag(grpcCommand.MiddlewareTag))
+```
+
+The gRPC tool collects all `Errors()` maps from registered middlewares that implement `ErrorMapper`, merges them, and uses the combined map in the error-handling interceptor.
 
 ### StreamErrorMapper
 
@@ -168,7 +186,7 @@ type StreamErrorMapper interface {
 }
 ```
 
-Same pattern for stream RPCs.
+Same pattern for stream RPCs — implement on a middleware registered under `grpcCommand.StreamMiddlewareTag`.
 
 ## DI tags
 
