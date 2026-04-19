@@ -4,28 +4,24 @@ The migrate tool wraps [goose v3](https://github.com/pressly/goose) into a waffl
 
 ## Setup
 
-Copy the `InitMigrate` registrations into your DI config:
+Copy the migrate registrations into `InitDi()` in `config/di/di.go`:
 
 ```go
-// config/di/di_migrate.go
-package di
-
 import (
     "io/fs"
     "gitlab.com/gorib/di"
     "gitlab.com/gorib/waffle/app"
-    wmigrate "gitlab.com/gorib/waffle/tools/migrate"
+    "gitlab.com/gorib/waffle/tools/migrate"
 )
 
-func init() {
-    di.Wire[app.BaseCommand](
-        func() app.BaseCommand { return app.NewCommand("migrate", "Run migrations") },
-        di.For[wmigrate.MigrateCommand](),
-    )
-    di.Wire[wmigrate.MigrateCommand](wmigrate.NewMigrateCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
-        "migrations": di.Tags[fs.FS](wmigrate.MigrationsTag),
-    }))
-}
+// Inside InitDi():
+di.Wire[app.BaseCommand](
+    func() app.BaseCommand { return app.NewCommand("migrate", "Run migrations") },
+    di.For[migrate.MigrateCommand](),
+)
+di.Wire[migrate.MigrateCommand](migrate.NewMigrateCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
+    "migrations": di.Tags[fs.FS](migrate.MigrationsTag),
+}))
 ```
 
 Run `make generate`, then run migrations:
@@ -54,15 +50,21 @@ func NewMigrations() embed.FS {
 }
 ```
 
-Register with `di.Define`. Because no interface is specified, `diogen` uses the constructor's return type (`embed.FS`) as the field type and automatically prefixes the field name with the constructor's package alias to avoid collisions between domains (e.g. `userMigrateEmbedFS`, `templateMigrateEmbedFS`):
+Register each domain's migrations in `InitDi()` using `di.Define`. Because no interface is specified, `diogen` uses the constructor's return type (`embed.FS`) as the field type and automatically prefixes the field name with the constructor's package alias to avoid collisions between domains (e.g. `userMigrateEmbedFS`, `templateMigrateEmbedFS`):
 
 ```go
-import userMigrate "mymodule/domain/user/cmd/migrate"
+import (
+    userMigrate    "mymodule/domain/user/cmd/migrate"
+    productMigrate "mymodule/domain/product/cmd/migrate"
+    "gitlab.com/gorib/waffle/tools/migrate"
+)
 
+// Inside InitDi():
 di.Define(userMigrate.NewMigrations, di.Tag(migrate.MigrationsTag))
+di.Define(productMigrate.NewMigrations, di.Tag(migrate.MigrationsTag))
 ```
 
-The migrate command collects all registered sources and runs them all in order. Adding a new domain with migrations requires only the `di.Wire` call above — no changes to the migrate command itself.
+The migrate command collects all registered sources and runs them all in order. Adding a new domain with migrations requires only the `di.Define` call above — no changes to the migrate command itself.
 
 ## Database connection
 
@@ -124,6 +126,18 @@ Example: `20240315143022_create_users_table.sql`
 ## Missing migrations
 
 The migrate tool is configured with `goose.WithAllowMissing()`. This means if a migration file is deleted after being applied, goose will not error out on subsequent runs — it will simply skip the missing version.
+
+## File layout
+
+```
+domain/user/cmd/migrate/
+├── main.go              NewMigrations() — embeds the SQL directory
+└── migrations/
+    ├── 20240315143022_create_users_table.sql
+    └── 20240320091500_add_users_email_index.sql
+```
+
+`main.go` is the only Go file needed. The `migrations/` subdirectory holds all SQL files for this domain.
 
 ## DI tags
 

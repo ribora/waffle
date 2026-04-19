@@ -139,7 +139,7 @@ type ErrorMapper interface {
 }
 ```
 
-Optionally implemented by `ServiceHandler` to map domain errors to gRPC status codes.
+Optionally implemented by `Middleware` to map domain errors to gRPC status codes. The gRPC tool collects all `Errors()` maps from registered middlewares and merges them into the error-handling interceptor. See [tools/grpc.md](../tools/grpc.md#error-mapping) for the full pattern.
 
 ### StreamErrorMapper
 
@@ -149,7 +149,7 @@ type StreamErrorMapper interface {
 }
 ```
 
-Same as `ErrorMapper` but for stream RPCs.
+Same as `ErrorMapper` but collected from `StreamMiddleware` values.
 
 ---
 

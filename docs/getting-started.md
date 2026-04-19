@@ -117,8 +117,10 @@ This creates the model, service, postgres adapter, and DI configuration for a `u
 |-------|------|
 | Application lifecycle | [core/application.md](core/application.md) |
 | Writing commands | [core/commands.md](core/commands.md) |
-| HTTP server | [tools/http.md](tools/http.md) |
-| gRPC server | [tools/grpc.md](tools/grpc.md) |
+| HTTP server setup | [tools/http.md](tools/http.md) |
+| HTTP handler pattern | [tools/http-handler.md](tools/http-handler.md) |
+| gRPC server setup | [tools/grpc.md](tools/grpc.md) |
+| gRPC handler pattern | [tools/grpc-handler.md](tools/grpc-handler.md) |
 | Database migrations | [tools/migrate.md](tools/migrate.md) |
 | RabbitMQ consumer | [tools/scribus.md](tools/scribus.md) |
 | Dependency injection | [di/overview.md](di/overview.md) |

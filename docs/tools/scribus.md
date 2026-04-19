@@ -87,43 +87,94 @@ type Handler interface {
 
 `Keys()` returns the routing keys this handler subscribes to. `Run` is called for each incoming message.
 
-### Implementing a handler
+### Message model
+
+Define a local struct for the message payload in `cmd/scribus/model/`. It is separate from the domain model and can have `json` tags:
 
 ```go
-type OrderCreatedHandler struct {
-    service *order.Service
+// cmd/scribus/model/order.go
+package model
+
+type OrderCreated struct {
+    Id         int            `json:"id"`
+    CustomerId int            `json:"customerId"`
+    Items      []OrderItem    `json:"items"`
+}
+```
+
+### Implementing a handler
+
+The handler defines its own management interface (consumer-defined, same pattern as gRPC). The struct is private; the constructor is public.
+
+```go
+// cmd/scribus/order_created.go
+package scribus
+
+import (
+    "context"
+
+    scribusModel "mymodule/domain/order/cmd/scribus/model"
+    "mymodule/domain/order/model"
+    "mymodule/pkg/validator"
+    "gitlab.com/gorib/pry"
+)
+
+type OrderManagement interface {
+    HandleOrderCreated(ctx context.Context, order *model.Order) error
 }
 
-func NewOrderCreatedHandler(s *order.Service) *OrderCreatedHandler {
-    return &OrderCreatedHandler{service: s}
+func NewOrderCreatedHandler(management OrderManagement, logger pry.Logger) *orderCreatedHandler {
+    return &orderCreatedHandler{management: management, logger: logger}
 }
 
-func (h *OrderCreatedHandler) Keys() []string {
+type orderCreatedHandler struct {
+    management OrderManagement
+    logger     pry.Logger
+}
+
+func (h *orderCreatedHandler) Keys() []string {
     return []string{"order.created"}
 }
 
-func (h *OrderCreatedHandler) Run(ctx context.Context, payload []byte) error {
-    var event OrderCreatedEvent
-    if err := json.Unmarshal(payload, &event); err != nil {
-        return err
+func (h *orderCreatedHandler) Run(ctx context.Context, payload []byte) error {
+    msg, err := validator.Parse[scribusModel.OrderCreated](payload)
+    if err != nil {
+        h.logger.Error("Cannot parse message", pry.Err(err), pry.Ctx(ctx))
+        return nil // ACK: malformed message, re-queuing won't help
     }
-    return h.service.HandleOrderCreated(ctx, event)
+
+    err = h.management.HandleOrderCreated(ctx, &model.Order{
+        Id:         msg.Id,
+        CustomerId: msg.CustomerId,
+    })
+    if err != nil {
+        h.logger.Error("Cannot handle order.created", pry.Err(err), pry.Ctx(ctx))
+    }
+    return nil // ACK: log the error and move on
 }
 ```
 
+**Error handling**: scribus handlers always return `nil`. If processing fails, log the error and acknowledge the message. Returning a non-nil error causes the message to be re-queued, which is rarely the right behaviour for event-driven notifications.
+
 ### Registering a handler
 
-Tag with `scribus.CommandTag`:
+Tag with `wscribus.CommandTag`. Wire to the `scribus.Handler` interface:
 
 ```go
-di.Wire[scribus.Handler](NewOrderCreatedHandler, di.Tag(wscribus.CommandTag))
+di.Wire[wscribus.Handler](scribus.NewOrderCreatedHandler, di.Tag(wscribus.CommandTag))
 ```
 
-All tagged handlers are collected and dispatched to by routing key.
+Wire the service dependency via `di.Alias` on the service registration:
+
+```go
+di.Define(service.NewOrderService,
+    di.Alias[scribus.OrderManagement](),
+)
+```
 
 ## Batch mode
 
-In batch mode, a single `BatchHandler` receives all messages in a slice, grouped by routing key.
+In batch mode, a single `BatchHandler` receives a slice of messages accumulated over time (by page size or flush interval).
 
 ### BatchHandler interface
 
@@ -133,28 +184,39 @@ type BatchHandler interface {
 }
 ```
 
-`keys[i]` is the routing key of `payloads[i]`.
+`keys[i]` is the routing key of `payloads[i]`. In practice all messages in a batch usually share the same routing key.
 
 ### Implementing a batch handler
 
 ```go
-type EventBatchHandler struct {
-    service *analytics.Service
+type orderBatchHandler struct {
+    management OrderManagement
+    logger     pry.Logger
 }
 
-func (h *EventBatchHandler) Run(ctx context.Context, keys []string, payloads [][]byte) error {
-    events := make([]analytics.Event, len(payloads))
-    for i, p := range payloads {
-        events[i] = analytics.Event{Key: keys[i], Payload: p}
+func NewOrderBatchHandler(management OrderManagement, logger pry.Logger) *orderBatchHandler {
+    return &orderBatchHandler{management: management, logger: logger}
+}
+
+func (h *orderBatchHandler) Run(ctx context.Context, keys []string, payloads [][]byte) error {
+    for i, payload := range payloads {
+        msg, err := validator.Parse[scribusModel.OrderCreated](payload)
+        if err != nil {
+            h.logger.Error("Cannot parse message", pry.Err(err), pry.Ctx(ctx))
+            continue
+        }
+        if err = h.management.HandleOrderCreated(ctx, &model.Order{Id: msg.Id}); err != nil {
+            h.logger.Error("Cannot handle "+keys[i], pry.Err(err), pry.Ctx(ctx))
+        }
     }
-    return h.service.BulkIngest(ctx, events)
+    return nil
 }
 ```
 
 Register exactly one `BatchHandler` without a tag:
 
 ```go
-di.Wire[scribus.BatchHandler](NewEventBatchHandler)
+di.Wire[wscribus.BatchHandler](scribus.NewOrderBatchHandler)
 ```
 
 ## How routing works
