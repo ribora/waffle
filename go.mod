@@ -8,7 +8,7 @@ require (
 	github.com/pborman/getopt/v2 v2.1.0
 	github.com/pressly/goose/v3 v3.24.1
 	gitlab.com/gorib/amqp v1.0.1
-	gitlab.com/gorib/di v1.3.4
+	gitlab.com/gorib/di v1.3.5
 	gitlab.com/gorib/env v1.0.0
 	gitlab.com/gorib/grpc v1.0.0
 	gitlab.com/gorib/http v1.0.0
@@ -48,7 +48,7 @@ require (
 	github.com/valyala/fasthttp v1.68.0 // indirect
 	gitlab.com/gorib/criteria v0.0.0-20250224141747-7755bfaa022c // indirect
 	gitlab.com/gorib/failure v1.0.0 // indirect
-	gitlab.com/gorib/gorival v1.1.3 // indirect
+	gitlab.com/gorib/gorival v1.2.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/mod v0.29.0 // indirect
 	golang.org/x/net v0.47.0 // indirect
