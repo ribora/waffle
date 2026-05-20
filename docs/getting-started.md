@@ -66,34 +66,22 @@ The app prints available commands. Initially none are registered — add tools i
 
 ## Add your first tool
 
-Open `config/di/di.go` and copy the HTTP tool registrations inside `InitDi()` (see [tools/http.md](tools/http.md) for the full block):
+Open `config/di/di.go` and pull in the HTTP tool registrations via `di.Include`:
 
 ```go
 //go:generate go tool diogen -output config/diogen/di_gen.go -pkg diogen $GOFILE
 
 package di
 
-import (
-    "gitlab.com/gorib/di"
-    "gitlab.com/gorib/waffle/app"
-    whttp "gitlab.com/gorib/waffle/tools/http"
-)
+import "gitlab.com/gorib/di"
 
 func InitDi() {
-    di.Wire[app.BaseCommand](
-        func() app.BaseCommand { return app.NewCommand("http", "Start web server") },
-        di.For[whttp.HttpCommand](),
-    )
-    di.Wire[whttp.MiddlewareList](whttp.NewMiddlewareList, di.Args(map[string]any{
-        "middlewares": di.Tags[whttp.Middleware](whttp.MiddlewareTag),
-    }))
-    di.Wire[whttp.HttpCommand](whttp.NewHttpCommand, di.Tag(app.CommandTag))
-
-    di.Wire[app.App](app.Init, di.Args(map[string]any{
-        "commands": di.Tags[app.Command](app.CommandTag),
-    }))
+    di.Include("gitlab.com/gorib/waffle/app")
+    di.Include("gitlab.com/gorib/waffle/tools/http")
 }
 ```
+
+See [tools/http.md](tools/http.md) for what `di.Include` expands to and how to override individual registrations.
 
 Run `make generate` to regenerate the DI container, then start the HTTP server:
 

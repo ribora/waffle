@@ -52,10 +52,44 @@ di.Define(notificationService.NewNotificationManagement,
 | `di.Alias[I]()` | Expose the same concrete instance under an additional interface |
 | `di.Defaults(map[int]any{})` | Default values for positional arguments |
 | `di.Fallback()` | Mark as fallback — used only when no other registration matches |
+| `di.Include("path")` | Aggregate `di.Wire` / `di.Define` calls from another package (see below) |
+
+### di.Include — aggregating registrations from another package
+
+`di.Include` points Diogen at another package's source and merges the `di.Wire` / `di.Define` calls found there into your own configuration. Each waffle tool ships an `InitXxx()` function whose body is a set of DI registrations — `di.Include` lets you pull those registrations in by import path instead of copying them by hand:
+
+```go
+func InitDi() {
+    di.Include("gitlab.com/gorib/waffle/app")
+    di.Include("gitlab.com/gorib/waffle/tools/http")
+    di.Include("gitlab.com/gorib/waffle/tools/grpc")
+    di.Include("gitlab.com/gorib/waffle/tools/migrate")
+
+    // ... your own wiring ...
+}
+```
+
+Three namespaces ship with waffle:
+
+- `waffle/app` — the application root. Includes one registration: `app.App` wired from `app.Init` collecting all commands tagged `app.CommandTag`. Always the first include in your `InitDi`.
+- `waffle/tools/*` — tool registrations (each pulls a `Command` into the app).
+- `waffle/wiring/*` — decorators that swap a base type's constructor for one that adds cross-cutting behavior (e.g. `wiring/sqlotel.NewDb` wraps `storage/sql.NewDb` with tracing). Wiring packages are not included via `di.Include`; you reference their constructors directly in your own `di.Wire`.
+
+Properties:
+
+- Argument must be a **string literal** — Diogen reads it at generation time
+- The included package's whole AST is scanned for `di.Wire` / `di.Define` (it doesn't matter that they sit inside an unused `InitXxx()` function — Diogen never calls it)
+- Includes are **transitive**: A → B → C merges all three
+- **Cycles** (A → B → A) are detected and stopped
+- **Tags match across packages**: a tool registering `di.Tag(MiddlewareTag)` and your code registering under the same constant are collected together
+
+Constraints:
+
+- Conditional wiring (`if env := ... { di.Wire[...](...) }`) inside an included package may fail to compile if it references local variables — the generator copies expressions as-is. Keep conditions in your own `InitDi()`.
 
 ## The InitXxx functions
 
-Each waffle tool ships an `InitXxx()` function that shows **which `di.Wire` / `di.Define` calls are needed** for that tool. These functions are not meant to be called — they exist as reference implementations that you copy into your own `config/di/di.go`.
+Each waffle tool ships an `InitXxx()` function (e.g. `InitHttp()`, `InitGrpc()`) whose body is a set of `di.Wire` / `di.Define` calls. These functions are never called at runtime — Diogen reads their bodies directly via `di.Include`.
 
 For example, `tools/http/init.go`:
 
@@ -72,38 +106,32 @@ func InitHttp() {
 }
 ```
 
-To use the HTTP tool, copy these registrations into your `config/di/di.go`, adjusting package prefixes:
+To use the HTTP tool, include its package from `config/di/di.go`:
 
 ```go
 //go:generate go tool diogen -output config/diogen/di_gen.go -pkg diogen $GOFILE
 
 package di
 
-import (
-    "gitlab.com/gorib/di"
-    "gitlab.com/gorib/waffle/app"
-    whttp "gitlab.com/gorib/waffle/tools/http"
-)
+import "gitlab.com/gorib/di"
 
 func InitDi() {
-    // ... other registrations ...
+    di.Include("gitlab.com/gorib/waffle/app")
+    di.Include("gitlab.com/gorib/waffle/tools/http")
+    di.Include("gitlab.com/gorib/waffle/tools/grpc")
+    // ... other tool includes ...
 
-    di.Wire[app.BaseCommand](
-        func() app.BaseCommand { return app.NewCommand("http", "Start web server") },
-        di.For[whttp.HttpCommand](),
-    )
-    di.Wire[whttp.MiddlewareList](whttp.NewMiddlewareList, di.Args(map[string]any{
-        "middlewares": di.Tags[whttp.Middleware](whttp.MiddlewareTag),
-    }))
-    di.Wire[whttp.HttpCommand](whttp.NewHttpCommand, di.Tag(app.CommandTag))
-
-    di.Wire[app.App](app.Init, di.Args(map[string]any{
-        "commands": di.Tags[app.Command](app.CommandTag),
-    }))
+    // your own wiring lives here
 }
 ```
 
-Each tool's documentation page shows the exact registrations to copy. See [di/tags.md](tags.md) for all available tags.
+Diogen scans every included package's AST for `di.Wire` / `di.Define` calls and merges them into the generated container. You don't need to import the tool package directly — `di.Include` works purely by import path. See [di.Include](#diinclude--aggregating-registrations-from-another-package) above for the full semantics.
+
+Each tool's documentation page shows both forms — the short `di.Include(...)` and, for reference, the explicit registrations it expands to. See [di/tags.md](tags.md) for all available tags.
+
+### Manual registration (alternative)
+
+If you need finer control — for example, swapping a tool's command name or wrapping its constructor — copy the registrations from `InitXxx()` directly into your `InitDi()` instead of using `di.Include`. Both styles are supported in the same setup; you can `di.Include` some tools and hand-write others.
 
 ## Project layout
 
@@ -132,11 +160,16 @@ import (
     "gitlab.com/gorib/env"
     "gitlab.com/gorib/pry"
     "gitlab.com/gorib/storage/sql"
-    "gitlab.com/gorib/waffle/app"
-    grpcCommand "gitlab.com/gorib/waffle/tools/grpc"
 )
 
 func InitDi() {
+    // Core + tools — registrations pulled in by import path
+    di.Include("gitlab.com/gorib/waffle/app")
+    di.Include("gitlab.com/gorib/waffle/tools/http")
+    di.Include("gitlab.com/gorib/waffle/tools/grpc")
+    di.Include("gitlab.com/gorib/waffle/tools/migrate")
+
+    // Infrastructure
     di.Wire[pry.Logger](func() (pry.Logger, error) {
         return pry.New(env.Value("LOGLEVEL", "info"))
     })
@@ -146,12 +179,10 @@ func InitDi() {
     }))
 
     // ... domain wiring ...
-
-    di.Wire[app.App](app.Init, di.Args(map[string]any{
-        "commands": di.Tags[app.Command](app.CommandTag),
-    }))
 }
 ```
+
+Tool packages are referenced only as `di.Include` string arguments — they don't need to be imported in `di.go`. Diogen loads them at generation time and merges their registrations into the container.
 
 ### config/diogen/di.go
 

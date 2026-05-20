@@ -10,7 +10,13 @@ import "gitlab.com/gorib/waffle/app"
 application, err := app.Init(commands, logger)
 ```
 
-`Init` accepts a slice of `Command` values and a `pry.Logger`. In practice you never call this directly — it is wired via DI in `config/di/di.go`:
+`Init` accepts a slice of `Command` values and a `pry.Logger`. In practice you never call this directly — it is registered via `di.Include` in your `config/di/di.go`:
+
+```go
+di.Include("gitlab.com/gorib/waffle/app")
+```
+
+which expands to:
 
 ```go
 di.Wire[app.App](app.Init, di.Args(map[string]any{

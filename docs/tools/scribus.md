@@ -4,21 +4,23 @@ The scribus tool wraps `gitlab.com/gorib/amqp` into a waffle `Command` for consu
 
 ## Setup
 
-Copy the scribus registrations into `InitDi()` in `config/di/di.go`.
+Scribus ships **two** mode-specific subpackages — pick one. Common registrations (BaseCommand, AMQP Consumer) live in `tools/scribus` and are pulled in transitively.
 
 **Single mode** (each routing key dispatched to a dedicated `Handler`):
 
 ```go
-import (
-    "time"
-    "gitlab.com/gorib/amqp"
-    "gitlab.com/gorib/di"
-    "gitlab.com/gorib/env"
-    "gitlab.com/gorib/waffle/app"
-    wscribus "gitlab.com/gorib/waffle/tools/scribus"
-)
+import "gitlab.com/gorib/di"
 
-// Inside InitDi():
+func InitDi() {
+    di.Include("gitlab.com/gorib/waffle/tools/scribus/single")
+    // ... other registrations ...
+}
+```
+
+This expands to the registrations from [`tools/scribus/init.go`](../../tools/scribus/init.go) (common) plus [`tools/scribus/single/init.go`](../../tools/scribus/single/init.go):
+
+```go
+// common — from tools/scribus
 di.Wire[app.BaseCommand](
     func() app.BaseCommand { return app.NewCommand("scribus", "Start RabbitMq consumer") },
     di.For[wscribus.ScribusCommand](),
@@ -33,6 +35,8 @@ di.Wire[wscribus.Consumer](amqp.NewConsumer, di.Args(map[string]any{
         amqp.WithConsumerFlushInterval(5 * time.Second),
     },
 }))
+
+// single-mode — from tools/scribus/single
 di.Wire[wscribus.ScribusCommand](wscribus.NewScribusCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
     "commands": di.Tags[wscribus.Handler](wscribus.CommandTag),
 }))
@@ -41,10 +45,14 @@ di.Wire[wscribus.ScribusCommand](wscribus.NewScribusCommand, di.Tag(app.CommandT
 **Batch mode** (one `BatchHandler` processes all messages):
 
 ```go
-// Replace the NewScribusCommand registration with:
-di.Wire[wscribus.BatchHandler](scribusCommand.NewNotificationAcceptedCommand)
-di.Wire[wscribus.ScribusCommand](wscribus.NewBatchScribusCommand, di.Tag(app.CommandTag))
+func InitDi() {
+    di.Include("gitlab.com/gorib/waffle/tools/scribus/batch")
+    // ... and register your own BatchHandler implementation:
+    di.Wire[wscribus.BatchHandler](scribusCommand.NewNotificationAcceptedCommand)
+}
 ```
+
+`tools/scribus/batch` pulls in the same common block plus `di.Wire[ScribusCommand](NewBatchScribusCommand, ...)`. Your `BatchHandler` registration stays in your own `InitDi()`.
 
 Run `make generate` after adding this.
 

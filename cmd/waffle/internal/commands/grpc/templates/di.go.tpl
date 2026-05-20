@@ -4,6 +4,7 @@ import (
     grpc{{ title .Domain }} "{{ .Project }}/domain/{{ .Domain }}/cmd/grpc/{{ .Domain }}"
 
     "gitlab.com/gorib/di"
+    grpcCommand "gitlab.com/gorib/waffle/tools/grpc"
 )
 
 func Init{{ title .Domain }}Grpc() {

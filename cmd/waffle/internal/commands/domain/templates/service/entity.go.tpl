@@ -1,13 +1,15 @@
 package service
 
 import (
+{{- if .WithStorage }}
 	"context"
 
 	"gitlab.com/gorib/criteria"
+{{- end }}
 
 	"{{ .Project }}/domain/{{ .Domain }}/model"
 )
-
+{{ if .WithStorage }}
 type {{ title .Domain }}Repository interface {
 	Get(ctx context.Context, {{ .Domain }}Id int) (*model.{{ title .Domain }}, error)
 	Save(ctx context.Context, {{ .Domain }} *model.{{ title .Domain }}) (*model.{{ title .Domain }}, error)
@@ -46,3 +48,12 @@ func (m *{{ .Domain }}Management) ListPaged(ctx context.Context, expr criteria.E
 	}
 	return items, total, nil
 }
+{{- else }}
+var _ = model.{{ title .Domain }}{}
+
+func New{{ title .Domain }}Management() *{{ .Domain }}Management {
+	return &{{ .Domain }}Management{}
+}
+
+type {{ .Domain }}Management struct{}
+{{- end }}

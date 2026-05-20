@@ -7,9 +7,14 @@ import (
 	"os"
 	"slices"
 
+	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/cmdcommand"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/domain"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/grpc"
+	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/http"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/migrate"
+	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/migration"
+	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/repository"
+	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/scribus"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/service"
 )
 
@@ -57,7 +62,12 @@ func main() {
 	cmds.Add(service.New())
 	cmds.Add(domain.New())
 	cmds.Add(grpc.New())
+	cmds.Add(http.New())
+	cmds.Add(scribus.New())
 	cmds.Add(migrate.New())
+	cmds.Add(migration.New())
+	cmds.Add(repository.New())
+	cmds.Add(cmdcommand.New())
 
 	if len(os.Args) < 2 {
 		usage(cmds)

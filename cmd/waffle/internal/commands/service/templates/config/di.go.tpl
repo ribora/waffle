@@ -3,7 +3,6 @@ package config
 
 import (
 	"fmt"
-	"io/fs"
 	"net"
 	"strconv"
 
@@ -14,11 +13,13 @@ import (
 	"gitlab.com/gorib/pry"
 	"gitlab.com/gorib/pry/channels"
 	"gitlab.com/gorib/storage/sql"
-	"gitlab.com/gorib/waffle/app"
-	"gitlab.com/gorib/waffle/tools/migrate"
 )
 
 func InitDi() {
+	di.Include("gitlab.com/gorib/waffle/app")
+	di.Include("gitlab.com/gorib/waffle/tools/grpc")
+	di.Include("gitlab.com/gorib/waffle/tools/migrate")
+
 	di.Wire[pry.Logger](func() (pry.Logger, error) {
 		dsn := env.Value("SENTRY_DSN", "")
 		environment := env.Value("ENVIRONMENT", "noenv")
@@ -32,7 +33,7 @@ func InitDi() {
 
 	di.Wire[sql.Db](sql.NewDb, di.Args(map[string]any{
 		"driver": env.NeedValue[string]("DATABASE_DRIVER"),
-		"dsn": fmt.Sprintf("%s?dbname=%s&sslmode=disable", env.NeedValue[string]("DATABASE_DSN"), env.NeedValue[string]("DATABASE_NAME")),
+		"dsn":    fmt.Sprintf("%s?dbname=%s&sslmode=disable", env.NeedValue[string]("DATABASE_DSN"), env.NeedValue[string]("DATABASE_NAME")),
 	}))
 
 	di.Wire[net.Addr](net.ResolveTCPAddr, di.For[grpcCommand.GrpcCommand](), di.Args(map[string]any{
@@ -41,21 +42,5 @@ func InitDi() {
 			env.NeedValue[string]("DAEMON_HOST"),
 			strconv.FormatUint(uint64(env.NeedValue[uint16]("DAEMON_PORT")), 10),
 		),
-	}))
-
-	di.Wire[app.BaseCommand](func() app.BaseCommand { return app.NewCommand("grpc", "Start grpc server") }, di.For[grpcCommand.GrpcCommand]())
-	di.Wire[grpcCommand.GrpcCommand](grpcCommand.NewGrpcCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
-		"commands":          di.Tags[grpcCommand.ServiceHandler](grpcCommand.ServiceTag),
-		"middlewares":       di.Tags[grpcCommand.Middleware](grpcCommand.MiddlewareTag),
-		"streamMiddlewares": di.Tags[grpcCommand.StreamMiddleware](grpcCommand.StreamMiddlewareTag),
-	}))
-
-	di.Wire[app.BaseCommand](func() app.BaseCommand { return app.NewCommand("migrate", "Run migrations") }, di.For[migrate.MigrateCommand]())
-	di.Wire[migrate.MigrateCommand](migrate.NewMigrateCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
-		"migrations": di.Tags[fs.FS](migrate.MigrationsTag),
-	}))
-
-	di.Wire[app.App](app.Init, di.Args(map[string]any{
-		"commands": di.Tags[app.Command](app.CommandTag),
 	}))
 }

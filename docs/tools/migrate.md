@@ -4,7 +4,18 @@ The migrate tool wraps [goose v3](https://github.com/pressly/goose) into a waffl
 
 ## Setup
 
-Copy the migrate registrations into `InitDi()` in `config/di/di.go`:
+Add a single `di.Include` to `InitDi()` in `config/di/di.go`:
+
+```go
+import "gitlab.com/gorib/di"
+
+func InitDi() {
+    di.Include("gitlab.com/gorib/waffle/tools/migrate")
+    // ... other registrations ...
+}
+```
+
+This pulls in the registrations from [`tools/migrate/init.go`](../../tools/migrate/init.go), which is equivalent to writing them yourself:
 
 ```go
 import (

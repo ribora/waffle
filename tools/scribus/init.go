@@ -10,11 +10,15 @@ import (
 )
 
 type commandTag struct{}
+type middlewareTag struct{}
 
 var (
-	CommandTag = commandTag{}
+	CommandTag    = commandTag{}
+	MiddlewareTag = middlewareTag{}
 )
 
+// Registers only what's common to both modes — does NOT register a
+// ScribusCommand. Include tools/scribus/single or tools/scribus/batch.
 func InitScribus() {
 	di.Wire[app.BaseCommand](func() app.BaseCommand { return app.NewCommand("scribus", "Start RabbitMq consumer") }, di.For[ScribusCommand]())
 	di.Wire[Consumer](amqp.NewConsumer, di.Args(map[string]any{
@@ -27,12 +31,4 @@ func InitScribus() {
 			amqp.WithConsumerFlushInterval(5 * time.Second),
 		},
 	}))
-
-	// Single handler
-	di.Wire[ScribusCommand](NewScribusCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
-		"commands": di.Tags[Handler](CommandTag),
-	}))
-
-	// Batch handler
-	di.Wire[ScribusCommand](NewBatchScribusCommand, di.Tag(app.CommandTag))
 }

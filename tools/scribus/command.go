@@ -19,7 +19,7 @@ type ScribusCommand interface {
 }
 
 type Consumer interface {
-	SetHandler(handler func(ctx context.Context, keys []string, documents [][]byte) error) error
+	SetHandler(handler HandlerFunc) error
 	SetDsn(dsn string) error
 	SetExchange(exchange string) error
 	SetQueue(queue string) error
@@ -28,6 +28,18 @@ type Consumer interface {
 	SetFlushInterval(flushInterval time.Duration) error
 	SetReconnectInterval(interval time.Duration) error
 	Consume(ctx context.Context) error
+}
+
+// HandlerFunc is the raw consume callback the AMQP consumer invokes per
+// batch (or per message, with PageSize=1).
+type HandlerFunc = func(ctx context.Context, keys []string, documents [][]byte) error
+
+// Middleware wraps the consume callback. Registered under MiddlewareTag,
+// applied in registration order: the first middleware in the slice is the
+// outermost wrapper. tools/scribus/otel uses this to start a consumer span
+// per delivery.
+type Middleware interface {
+	Wrap(next HandlerFunc) HandlerFunc
 }
 
 type Handler interface {
@@ -41,6 +53,7 @@ type BatchHandler interface {
 
 func NewScribusCommand(
 	commands []Handler,
+	middlewares []Middleware,
 	command app.BaseCommand,
 	consumer Consumer,
 	logger pry.Logger,
@@ -54,19 +67,18 @@ func NewScribusCommand(
 			cmd[key] = c
 		}
 	}
-	err := consumer.SetHandler(func(ctx context.Context, keys []string, documents [][]byte) error {
+	handler := func(ctx context.Context, keys []string, documents [][]byte) error {
 		for idx, key := range keys {
-			if handler, found := cmd[key]; found {
+			if h, found := cmd[key]; found {
 				logger.Trace(fmt.Sprintf("%s %s", keys[idx], string(documents[idx])))
-				err := handler.Run(ctx, documents[idx])
-				if err != nil {
+				if err := h.Run(ctx, documents[idx]); err != nil {
 					return err
 				}
 			}
 		}
 		return nil
-	})
-	if err != nil {
+	}
+	if err := consumer.SetHandler(applyMiddlewares(handler, middlewares)); err != nil {
 		return nil, err
 	}
 
@@ -79,11 +91,12 @@ func NewScribusCommand(
 
 func NewBatchScribusCommand(
 	handler BatchHandler,
+	middlewares []Middleware,
 	command app.BaseCommand,
 	consumer Consumer,
 	logger pry.Logger,
 ) (*scribusCommand, error) {
-	if err := consumer.SetHandler(handler.Run); err != nil {
+	if err := consumer.SetHandler(applyMiddlewares(handler.Run, middlewares)); err != nil {
 		return nil, err
 	}
 
@@ -92,6 +105,13 @@ func NewBatchScribusCommand(
 		BaseCommand: command,
 		logger:      logger,
 	}, nil
+}
+
+func applyMiddlewares(handler HandlerFunc, middlewares []Middleware) HandlerFunc {
+	for i := len(middlewares) - 1; i >= 0; i-- {
+		handler = middlewares[i].Wrap(handler)
+	}
+	return handler
 }
 
 type scribusCommand struct {

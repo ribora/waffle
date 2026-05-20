@@ -1,10 +1,21 @@
 # HTTP Tool
 
-The HTTP tool wraps `gitlab.com/gorib/http` (Fiber) into a waffle `Command`. Call `InitHttp()` in your DI configuration to register the `http` command.
+The HTTP tool wraps `gitlab.com/gorib/http` (Fiber) into a waffle `Command`. Pull in its DI registrations via `di.Include` to register the `http` command.
 
 ## Setup
 
-Add the following registrations inside `InitDi()` in `config/di/di.go`:
+Add a single `di.Include` to `InitDi()` in `config/di/di.go`:
+
+```go
+import "gitlab.com/gorib/di"
+
+func InitDi() {
+    di.Include("gitlab.com/gorib/waffle/tools/http")
+    // ... other registrations ...
+}
+```
+
+This pulls in the registrations from [`tools/http/init.go`](../../tools/http/init.go), which is equivalent to writing them yourself:
 
 ```go
 import (
@@ -14,8 +25,6 @@ import (
 )
 
 func InitDi() {
-    // ... other registrations ...
-
     di.Wire[app.BaseCommand](
         func() app.BaseCommand { return app.NewCommand("http", "Start web server") },
         di.For[whttp.HttpCommand](),
@@ -26,6 +35,8 @@ func InitDi() {
     di.Wire[whttp.HttpCommand](whttp.NewHttpCommand, di.Tag(app.CommandTag))
 }
 ```
+
+Use the manual form when you need to override a registration (e.g. rename the command); otherwise prefer `di.Include`.
 
 Run `make generate`, then start the server:
 
@@ -128,7 +139,7 @@ di.Wire[whttp.Middleware](NewAuthMiddleware, di.Tag(whttp.MiddlewareTag))
 
 ### Using middleware in routes
 
-`InitHttp()` wires a `MiddlewareList` into the DI container. Inject it wherever you register routes and look up middleware by name:
+The HTTP tool wires a `MiddlewareList` into the DI container. Inject it wherever you register routes and look up middleware by name:
 
 ```go
 func NewRouter(middlewares whttp.MiddlewareList, userHandler *user.UserHandler) *Router {

@@ -216,4 +216,4 @@ type Consumer interface {
 }
 ```
 
-The AMQP consumer from `gitlab.com/gorib/amqp`. Configured and started by `scribusCommand.Run`. You do not implement this — it is provided by `InitScribus()`.
+The AMQP consumer from `gitlab.com/gorib/amqp`. Configured and started by `scribusCommand.Run`. You do not implement this — it is provided by the registrations in `tools/scribus/init.go` (see [Scribus Tool](../tools/scribus.md) for setup).

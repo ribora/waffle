@@ -29,6 +29,7 @@ Waffle orchestrates these gorib packages:
 | `gitlab.com/gorib/storage/sql` | SQL query builder and repository |
 | `gitlab.com/gorib/amqp` | RabbitMQ consumer |
 | `gitlab.com/gorib/try` | Panic recovery |
+| `go.opentelemetry.io/otel` | Optional distributed tracing & metrics (see [tools/otel](tools/otel.md)) |
 
 ## Architecture
 
@@ -51,14 +52,15 @@ api/<service>/           ← API initialization, proto definitions
 
 The app discovers **Commands** at startup. Each runtime concern is a command:
 
-| Built-in command | Registered by |
+| Built-in command | Enable with |
 |-----------------|---------------|
-| `http` | `tools/http.InitHttp()` |
-| `grpc` | `tools/grpc.InitGrpc()` |
-| `migrate` | `tools/migrate.InitMigrate()` |
-| `scribus` | `tools/scribus.InitScribus()` |
+| `http` | `di.Include("gitlab.com/gorib/waffle/tools/http")` |
+| `grpc` | `di.Include("gitlab.com/gorib/waffle/tools/grpc")` |
+| `migrate` | `di.Include("gitlab.com/gorib/waffle/tools/migrate")` |
+| `scribus` (single mode) | `di.Include("gitlab.com/gorib/waffle/tools/scribus/single")` |
+| `scribus` (batch mode) | `di.Include("gitlab.com/gorib/waffle/tools/scribus/batch")` |
 
-You pick which commands your service needs by calling the corresponding `Init` functions in your DI configuration. Commands are invoked by name:
+You pick which commands your service needs by adding the corresponding `di.Include` call into your DI configuration. Commands are invoked by name:
 
 ```sh
 ./app http

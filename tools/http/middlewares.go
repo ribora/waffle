@@ -4,12 +4,16 @@ import (
 	"fmt"
 
 	"github.com/gofiber/fiber/v2"
+
+	httpServer "gitlab.com/gorib/http/server"
 )
 
-type Middleware interface {
-	Name() string
-	Run() fiber.Handler
-}
+// Re-exports so user code keeps using whttp.Middleware and friends without
+// importing gorib/http/server directly.
+type (
+	Middleware = httpServer.Middleware
+	Globaler   = httpServer.Globaler
+)
 
 type MiddlewareList interface {
 	Get(name string) fiber.Handler
