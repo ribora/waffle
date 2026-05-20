@@ -1,4 +1,4 @@
-package config
+package di
 
 import (
     grpc{{ title .Domain }} "{{ .Project }}/domain/{{ .Domain }}/cmd/grpc/{{ .Domain }}"

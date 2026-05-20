@@ -1,4 +1,4 @@
-package config
+package di
 
 import (
 	cmd{{ title .Command }} "{{ .Project }}/domain/{{ .Domain }}/cmd/{{ .Command }}"

@@ -1,4 +1,4 @@
-package config
+package di
 
 import (
 	scribus{{ title .Domain }} "{{ .Project }}/domain/{{ .Domain }}/cmd/scribus"

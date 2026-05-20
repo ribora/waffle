@@ -1,4 +1,4 @@
-package config
+package di
 
 import (
     "{{ .Project }}/domain/{{ .Domain }}/service"

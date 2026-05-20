@@ -1,5 +1,5 @@
 //go:generate go tool diogen -output config/diogen/di_gen.go -pkg diogen $GOFILE
-package config
+package di
 
 import (
 	"fmt"

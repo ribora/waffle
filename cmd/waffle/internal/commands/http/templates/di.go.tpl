@@ -1,4 +1,4 @@
-package config
+package di
 
 import (
 	http{{ title .Domain }} "{{ .Project }}/domain/{{ .Domain }}/cmd/http"

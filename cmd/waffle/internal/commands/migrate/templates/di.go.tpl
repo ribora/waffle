@@ -1,4 +1,4 @@
-package config
+package di
 
 import (
     {{ .Domain }}Migration "{{ .Project }}/domain/{{ .Domain }}/cmd/migrate"
