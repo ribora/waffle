@@ -103,6 +103,8 @@ gitlab.com/gorib/criteria v0.0.0-20250224141747-7755bfaa022c h1:Qm420y8EWcpOhnFX
 gitlab.com/gorib/criteria v0.0.0-20250224141747-7755bfaa022c/go.mod h1:z6oj5KnovZybNDhpXAksYT57vZOpJOkR6eqVwZpKgcI=
 gitlab.com/gorib/di v1.4.0 h1:/WltKenD0EQrOtHvR8Yjzx3TN0VzZN2aMY3bKINh12Q=
 gitlab.com/gorib/di v1.4.0/go.mod h1:aS+uYFUrXaULkaVKtYYWexAwRlm1HUInnV7iKxvAJHI=
+gitlab.com/gorib/di v1.4.1 h1:vfXMBq8XGhjYAabuWO2WMkQnqO2IYd/cOexoLeEPAjE=
+gitlab.com/gorib/di v1.4.1/go.mod h1:aS+uYFUrXaULkaVKtYYWexAwRlm1HUInnV7iKxvAJHI=
 gitlab.com/gorib/env v1.0.0 h1:5gAjCbI1Yt9qwTpn0gsMBiHZec+nmDiTIYaOLV2113k=
 gitlab.com/gorib/env v1.0.0/go.mod h1:IeCS2UN+84skNkRuv9LJelHRC8gkRqFSElOrDM7bA8Q=
 gitlab.com/gorib/failure v1.0.0 h1:ZQ5d/dFdJhhiSAPGQ0ErRBkDo4jYbD54XV/BXWXmA3w=
