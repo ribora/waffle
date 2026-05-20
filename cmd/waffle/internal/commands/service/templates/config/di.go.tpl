@@ -17,6 +17,7 @@ import (
 
 func InitDi() {
 	di.Include("gitlab.com/gorib/waffle/app")
+	di.Include("gitlab.com/gorib/waffle/tools/hilton")
 	di.Include("gitlab.com/gorib/waffle/tools/grpc")
 	di.Include("gitlab.com/gorib/waffle/tools/migrate")
 
@@ -31,7 +32,7 @@ func InitDi() {
 		return pry.New(env.Value("LOGLEVEL", "info"), pry.ToChannels(sentry))
 	})
 
-	di.Wire[sql.Db](sql.NewDb, di.Args(map[string]any{
+	di.Wire[sql.Db](sql.NewTracedDb, di.Args(map[string]any{
 		"driver": env.NeedValue[string]("DATABASE_DRIVER"),
 		"dsn":    fmt.Sprintf("%s?dbname=%s&sslmode=disable", env.NeedValue[string]("DATABASE_DSN"), env.NeedValue[string]("DATABASE_NAME")),
 	}))

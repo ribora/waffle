@@ -51,14 +51,12 @@ On startup, `GrpcCommand` calls `Start(registrar)` on each collected handler.
 
 **Package:** `gitlab.com/gorib/waffle/tools/grpc`
 
-Collects unary server interceptors applied to all RPCs.
+Collects unary server interceptors (built-in tracing/status/session/log/recover plus user-defined). Chained by `Order()` ascending (smaller = outer).
 
 ```go
-di.Define(NewAuthMiddleware, di.Tag(grpcCommand.MiddlewareTag))
-di.Define(NewLoggingMiddleware, di.Tag(grpcCommand.MiddlewareTag))
+di.Define(NewAuthInterceptor, di.Tag(grpcCommand.MiddlewareTag))
+di.Define(NewAuditInterceptor, di.Tag(grpcCommand.MiddlewareTag))
 ```
-
-Interceptors are chained in registration order.
 
 ---
 
@@ -69,7 +67,7 @@ Interceptors are chained in registration order.
 Same as `MiddlewareTag` but for stream interceptors.
 
 ```go
-di.Define(NewStreamLoggingMiddleware, di.Tag(grpcCommand.StreamMiddlewareTag))
+di.Define(NewStreamAuditInterceptor, di.Tag(grpcCommand.StreamMiddlewareTag))
 ```
 
 ---

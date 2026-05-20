@@ -16,6 +16,7 @@ func InitHttp() {
 	di.Wire[Middleware](middleware.NewCompressMW, di.Tag(MiddlewareTag))
 	di.Wire[Middleware](middleware.NewHealthMW, di.Tag(MiddlewareTag))
 	di.Wire[Middleware](middleware.NewSessionMW, di.Tag(MiddlewareTag))
+	di.Wire[Middleware](middleware.NewTracingMW, di.Tag(MiddlewareTag))
 	di.Wire[Middleware](middleware.NewLogMW, di.Tag(MiddlewareTag))
 	di.Wire[Middleware](middleware.NewRecoverMW, di.Tag(MiddlewareTag))
 

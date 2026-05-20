@@ -30,9 +30,9 @@ func InitDi() {
         di.For[wgrpc.GrpcCommand](),
     )
     di.Wire[wgrpc.GrpcCommand](wgrpc.NewGrpcCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
-        "commands":          di.Tags[wgrpc.ServiceHandler](wgrpc.ServiceTag),
-        "middlewares":       di.Tags[wgrpc.Middleware](wgrpc.MiddlewareTag),
-        "streamMiddlewares": di.Tags[wgrpc.StreamMiddleware](wgrpc.StreamMiddlewareTag),
+        "commands":           di.Tags[wgrpc.ServiceHandler](wgrpc.ServiceTag),
+        "interceptors":       di.Tags[wgrpc.Middleware](wgrpc.MiddlewareTag),
+        "streamInterceptors": di.Tags[wgrpc.StreamMiddleware](wgrpc.StreamMiddlewareTag),
     }))
 }
 ```
@@ -95,23 +95,29 @@ di.Define(usergrpc.NewUserGrpc, di.Tag(grpcCommand.ServiceTag))
 
 All tagged handlers are passed to `NewGrpcCommand` and registered with the server on startup.
 
-## Middleware
+## Interceptors
 
-### Unary middleware
+Built-in interceptors (tracing, status, session, log, recover) are wired automatically by `tools/grpc`. User-defined interceptors are chained alongside them, ordered by `Order()` ascending (smaller = outer).
+
+### Unary interceptor
 
 ```go
 type Middleware interface {
+    Name() string
+    Order() int
     Run() grpc.UnaryServerInterceptor
 }
 ```
 
-Implement for request logging, authentication, panic recovery, etc:
+Reserved conventional orders: 100 tracing, 200 status, 300 session, 400 log, 500 recover. Pick `Order()` ≥ 1000 for user interceptors.
 
 ```go
 type LoggingMiddleware struct {
     logger pry.Logger
 }
 
+func (LoggingMiddleware) Name() string { return "audit" }
+func (LoggingMiddleware) Order() int   { return 1000 }
 func (m *LoggingMiddleware) Run() grpc.UnaryServerInterceptor {
     return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
         m.logger.Info(info.FullMethod, pry.Ctx(ctx))
@@ -130,19 +136,17 @@ Tag with `grpcCommand.MiddlewareTag` using `di.Define`:
 di.Define(NewLoggingMiddleware, di.Tag(grpcCommand.MiddlewareTag))
 ```
 
-### Stream middleware
+### Stream interceptor
 
 ```go
 type StreamMiddleware interface {
+    Name() string
+    Order() int
     Run() grpc.StreamServerInterceptor
 }
 ```
 
-Tag with `grpcCommand.StreamMiddlewareTag` using `di.Define`:
-
-```go
-di.Define(NewStreamLoggingMiddleware, di.Tag(grpcCommand.StreamMiddlewareTag))
-```
+Tag with `grpcCommand.StreamMiddlewareTag` using `di.Define`.
 
 ## Error mapping
 
@@ -156,7 +160,7 @@ type ErrorMapper interface {
 }
 ```
 
-`ErrorMapper` is collected from **middleware** values, not from service handlers. The recommended pattern is a dedicated error handler registered under `grpcCommand.MiddlewareTag`.
+`ErrorMapper` is collected from **interceptor** values, not from service handlers. The recommended pattern is a dedicated error handler registered under `grpcCommand.MiddlewareTag`.
 
 A middleware can implement `ErrorMapper` purely for error code mapping — `Run()` is required to satisfy the `Middleware` interface but can be a pass-through no-op:
 
@@ -172,8 +176,9 @@ func (m *errorHandler) Errors() map[error]codes.Code {
     }
 }
 
-// Run satisfies the Middleware interface but does no interception itself.
-// The actual error mapping happens via Errors() above.
+func (errorHandler) Name() string  { return "error-mapper" }
+func (errorHandler) Order() int    { return 2000 }
+// Run is a pass-through; the actual mapping happens via Errors() above.
 func (m *errorHandler) Run() grpc.UnaryServerInterceptor {
     return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
         return handler(ctx, req)
@@ -181,13 +186,13 @@ func (m *errorHandler) Run() grpc.UnaryServerInterceptor {
 }
 ```
 
-Register it as middleware:
+Register it as an interceptor:
 
 ```go
 di.Define(NewErrorHandler, di.Tag(grpcCommand.MiddlewareTag))
 ```
 
-The gRPC tool collects all `Errors()` maps from registered middlewares that implement `ErrorMapper`, merges them, and uses the combined map in the error-handling interceptor.
+The gRPC tool collects all `Errors()` maps from registered interceptors that implement `ErrorMapper`, merges them into the shared `*server.ErrorMap`, and the built-in `status` interceptor reads it at request time.
 
 ### StreamErrorMapper
 
@@ -197,7 +202,7 @@ type StreamErrorMapper interface {
 }
 ```
 
-Same pattern for stream RPCs — implement on a middleware registered under `grpcCommand.StreamMiddlewareTag`.
+Same pattern for stream RPCs — implement on an interceptor registered under `grpcCommand.StreamMiddlewareTag`.
 
 ## DI tags
 

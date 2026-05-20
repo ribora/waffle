@@ -29,7 +29,7 @@ Waffle orchestrates these gorib packages:
 | `gitlab.com/gorib/storage/sql` | SQL query builder and repository |
 | `gitlab.com/gorib/amqp` | RabbitMQ consumer |
 | `gitlab.com/gorib/try` | Panic recovery |
-| `go.opentelemetry.io/otel` | Optional distributed tracing & metrics (see [tools/otel](tools/otel.md)) |
+| `gitlab.com/gorib/hilton` | Distributed tracing & metrics abstraction (see [tools/hilton](tools/hilton.md)) |
 
 ## Architecture
 

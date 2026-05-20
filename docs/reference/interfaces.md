@@ -115,16 +115,20 @@ Implemented by each gRPC domain handler. `Start` registers the proto-generated s
 
 ```go
 type Middleware interface {
+    Name() string
+    Order() int
     Run() grpc.UnaryServerInterceptor
 }
 ```
 
-A unary gRPC interceptor. Tag with `grpc.MiddlewareTag`.
+A unary gRPC interceptor. Tag with `grpc.MiddlewareTag`. Chained by `Order()` ascending (smaller = outer). Reserved framework orders: 100 tracing, 200 status, 300 session, 400 log, 500 recover.
 
 ### StreamMiddleware
 
 ```go
 type StreamMiddleware interface {
+    Name() string
+    Order() int
     Run() grpc.StreamServerInterceptor
 }
 ```

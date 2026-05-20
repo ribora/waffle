@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -21,13 +22,10 @@ type GrpcCommand interface {
 	app.Command
 }
 
-type Middleware interface {
-	Run() baseGrpc.UnaryServerInterceptor
-}
-
-type StreamMiddleware interface {
-	Run() baseGrpc.StreamServerInterceptor
-}
+type (
+	Middleware       = grpc.Interceptor
+	StreamMiddleware = grpc.StreamInterceptor
+)
 
 type ServiceHandler interface {
 	Start(baseGrpc.ServiceRegistrar)
@@ -46,57 +44,47 @@ type StreamErrorMapper interface {
 	StreamErrors() map[error]codes.Code
 }
 
-func NewGrpcCommand(commands []ServiceHandler, middlewares []Middleware, streamMiddlewares []StreamMiddleware, command app.BaseCommand, addr net.Addr, logger pry.Logger) *grpcCommand {
-	mw := make([]baseGrpc.UnaryServerInterceptor, 0, len(middlewares))
-	errMapper := make(map[error]codes.Code)
-	for _, middleware := range middlewares {
-		mw = append(mw, middleware.Run())
-		if em, ok := any(middleware).(ErrorMapper); ok {
+func NewGrpcCommand(commands []ServiceHandler, interceptors []Middleware, streamInterceptors []StreamMiddleware, errMap *grpc.ErrorMap, command app.BaseCommand, addr net.Addr, logger pry.Logger) *grpcCommand {
+	sortedUnary := append([]Middleware(nil), interceptors...)
+	sort.SliceStable(sortedUnary, func(i, j int) bool { return sortedUnary[i].Order() < sortedUnary[j].Order() })
+	mw := make([]baseGrpc.UnaryServerInterceptor, 0, len(sortedUnary))
+	for _, ic := range sortedUnary {
+		mw = append(mw, ic.Run())
+		if em, ok := any(ic).(ErrorMapper); ok {
 			for e, code := range em.Errors() {
-				errMapper[e] = code
+				errMap.Unary[e] = code
 			}
 		}
 	}
-	errMapperStream := make(map[error]codes.Code)
-	streamMw := make([]baseGrpc.StreamServerInterceptor, 0, len(middlewares))
-	for _, middleware := range streamMiddlewares {
-		streamMw = append(streamMw, middleware.Run())
-		if em, ok := any(middleware).(StreamErrorMapper); ok {
+	sortedStream := append([]StreamMiddleware(nil), streamInterceptors...)
+	sort.SliceStable(sortedStream, func(i, j int) bool { return sortedStream[i].Order() < sortedStream[j].Order() })
+	streamMw := make([]baseGrpc.StreamServerInterceptor, 0, len(sortedStream))
+	for _, ic := range sortedStream {
+		streamMw = append(streamMw, ic.Run())
+		if em, ok := any(ic).(StreamErrorMapper); ok {
 			for e, code := range em.StreamErrors() {
-				errMapperStream[e] = code
+				errMap.Stream[e] = code
 			}
 		}
 	}
 	return &grpcCommand{
-		commands:        commands,
-		middlewares:     mw,
-		streamMw:        streamMw,
-		errMapper:       errMapper,
-		errMapperStream: errMapperStream,
-		addr:            addr,
-		BaseCommand:     command,
-		logger:          logger,
+		commands:    commands,
+		middlewares: mw,
+		streamMw:    streamMw,
+		addr:        addr,
+		BaseCommand: command,
+		logger:      logger,
 	}
 }
 
 type grpcCommand struct {
 	app.BaseCommand
-	commands        []ServiceHandler
-	middlewares     []baseGrpc.UnaryServerInterceptor
-	streamMw        []baseGrpc.StreamServerInterceptor
-	errMapper       map[error]codes.Code
-	errMapperStream map[error]codes.Code
-	addr            net.Addr
-	connection      Server
-	logger          pry.Logger
-}
-
-func (c *grpcCommand) Errors() map[error]codes.Code {
-	return c.errMapper
-}
-
-func (c *grpcCommand) StreamErrors() map[error]codes.Code {
-	return c.errMapperStream
+	commands    []ServiceHandler
+	middlewares []baseGrpc.UnaryServerInterceptor
+	streamMw    []baseGrpc.StreamServerInterceptor
+	addr        net.Addr
+	connection  Server
+	logger      pry.Logger
 }
 
 func (c *grpcCommand) Setup(server *baseGrpc.Server) {

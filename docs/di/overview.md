@@ -72,8 +72,7 @@ func InitDi() {
 Three namespaces ship with waffle:
 
 - `waffle/app` — the application root. Includes one registration: `app.App` wired from `app.Init` collecting all commands tagged `app.CommandTag`. Always the first include in your `InitDi`.
-- `waffle/tools/*` — tool registrations (each pulls a `Command` into the app).
-- `waffle/wiring/*` — decorators that swap a base type's constructor for one that adds cross-cutting behavior (e.g. `wiring/sqlotel.NewDb` wraps `storage/sql.NewDb` with tracing). Wiring packages are not included via `di.Include`; you reference their constructors directly in your own `di.Wire`.
+- `waffle/tools/*` — tool registrations (each pulls a `Command` into the app, or a piece of infrastructure such as `tools/hilton` for tracing/metrics).
 
 Properties:
 

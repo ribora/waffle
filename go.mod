@@ -7,22 +7,16 @@ require (
 	github.com/gofiber/fiber/v2 v2.52.9
 	github.com/pborman/getopt/v2 v2.1.0
 	github.com/pressly/goose/v3 v3.24.1
-	gitlab.com/gorib/amqp v1.1.0
+	gitlab.com/gorib/amqp v1.1.1
 	gitlab.com/gorib/di v1.4.1
 	gitlab.com/gorib/env v1.0.0
-	gitlab.com/gorib/grpc v1.1.0
-	gitlab.com/gorib/http v1.1.0
+	gitlab.com/gorib/grpc v1.1.2
+	gitlab.com/gorib/hilton v1.0.0
+	gitlab.com/gorib/http v1.1.1
 	gitlab.com/gorib/pry v1.1.0
 	gitlab.com/gorib/session v1.1.0
-	gitlab.com/gorib/storage v1.0.0
+	gitlab.com/gorib/storage v1.1.0
 	gitlab.com/gorib/try v0.0.0-20250224141908-512acf4daa35
-	go.opentelemetry.io/otel v1.43.0
-	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.43.0
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.43.0
-	go.opentelemetry.io/otel/metric v1.43.0
-	go.opentelemetry.io/otel/sdk v1.43.0
-	go.opentelemetry.io/otel/sdk/metric v1.43.0
-	go.opentelemetry.io/otel/trace v1.43.0
 	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b
 	google.golang.org/grpc v1.80.0
 )
@@ -62,7 +56,14 @@ require (
 	gitlab.com/gorib/failure v1.0.0 // indirect
 	gitlab.com/gorib/gorival v1.3.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
+	go.opentelemetry.io/otel v1.43.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.43.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.43.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.43.0 // indirect
+	go.opentelemetry.io/otel/metric v1.43.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.43.0 // indirect
+	go.opentelemetry.io/otel/sdk/metric v1.43.0 // indirect
+	go.opentelemetry.io/otel/trace v1.43.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/mod v0.35.0 // indirect
@@ -79,6 +80,8 @@ require (
 	modernc.org/memory v1.11.0 // indirect
 	modernc.org/sqlite v1.42.2 // indirect
 )
+
+replace gitlab.com/gorib/hilton => ../hilton
 
 tool (
 	gitlab.com/gorib/di/cmd/diogen

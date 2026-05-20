@@ -11,6 +11,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/pborman/getopt/v2"
 
+	"gitlab.com/gorib/hilton"
 	"gitlab.com/gorib/pry"
 	"gitlab.com/gorib/try"
 )
@@ -28,20 +29,21 @@ type HasCloser interface {
 	Closer() func() error
 }
 
-func Init(commands []Command, logger pry.Logger) (*app, error) {
+func Init(commands []Command, logger pry.Logger, provider hilton.Provider) (*app, error) {
 	var cmd CommandList
 	for _, command := range commands {
 		if err := cmd.Add(command); err != nil {
 			return nil, err
 		}
 	}
-	return &app{commands: cmd, logger: logger}, nil
+	return &app{commands: cmd, logger: logger, provider: provider}, nil
 }
 
 type app struct {
 	commands CommandList
 	closer   func() error
 	logger   pry.Logger
+	provider hilton.Provider
 }
 
 func (a *app) RunUntilStop() {
@@ -65,7 +67,7 @@ func (a *app) Run() {
 	}
 
 	if cmd := a.commands.Get(command); cmd != nil {
-		ctx := NewContextWithCommand(cmd.Name(), opts.Args())
+		ctx := NewContextWithCommand(cmd.Name(), opts.Args(), a.provider)
 		os.Args = opts.Args()
 		var err error
 		try.Catch(func() {
