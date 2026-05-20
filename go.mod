@@ -10,7 +10,7 @@ require (
 	gitlab.com/gorib/amqp v1.1.1
 	gitlab.com/gorib/di v1.4.1
 	gitlab.com/gorib/env v1.0.0
-	gitlab.com/gorib/grpc v1.1.2
+	gitlab.com/gorib/grpc v1.1.3
 	gitlab.com/gorib/hilton v1.0.0
 	gitlab.com/gorib/http v1.1.1
 	gitlab.com/gorib/pry v1.1.0

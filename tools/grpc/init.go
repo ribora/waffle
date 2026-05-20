@@ -2,7 +2,6 @@ package grpc
 
 import (
 	"gitlab.com/gorib/di"
-	"gitlab.com/gorib/grpc/server"
 	"gitlab.com/gorib/grpc/server/interceptor"
 	"gitlab.com/gorib/waffle/app"
 )
@@ -10,15 +9,19 @@ import (
 type serviceTag struct{}
 type middlewareTag struct{}
 type streamMiddlewareTag struct{}
+type errorMapperTag struct{}
 
 var (
 	ServiceTag          = serviceTag{}
 	MiddlewareTag       = middlewareTag{}
 	StreamMiddlewareTag = streamMiddlewareTag{}
+	ErrorMapperTag      = errorMapperTag{}
 )
 
 func InitGrpc() {
-	di.Wire[*server.ErrorMap](server.NewErrorMap)
+	di.Wire[ErrorMapper](NewErrorMap, di.Args(map[string]any{
+		"mappers": di.Tags[ErrorMapper](ErrorMapperTag),
+	}))
 
 	di.Wire[Middleware](interceptor.NewTracingMW, di.Tag(MiddlewareTag))
 	di.Wire[Middleware](interceptor.NewStatusMW, di.Tag(MiddlewareTag))

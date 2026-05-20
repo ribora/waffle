@@ -11,7 +11,6 @@ import (
 
 	"github.com/pborman/getopt/v2"
 	baseGrpc "google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 
 	grpc "gitlab.com/gorib/grpc/server"
 	"gitlab.com/gorib/pry"
@@ -36,36 +35,20 @@ type Server interface {
 	Close() error
 }
 
-type ErrorMapper interface {
-	Errors() map[error]codes.Code
-}
+type ErrorMapper = grpc.ErrorMapper
 
-type StreamErrorMapper interface {
-	StreamErrors() map[error]codes.Code
-}
-
-func NewGrpcCommand(commands []ServiceHandler, interceptors []Middleware, streamInterceptors []StreamMiddleware, errMap *grpc.ErrorMap, command app.BaseCommand, addr net.Addr, logger pry.Logger) *grpcCommand {
+func NewGrpcCommand(commands []ServiceHandler, interceptors []Middleware, streamInterceptors []StreamMiddleware, command app.BaseCommand, addr net.Addr, logger pry.Logger) *grpcCommand {
 	sortedUnary := append([]Middleware(nil), interceptors...)
 	sort.SliceStable(sortedUnary, func(i, j int) bool { return sortedUnary[i].Order() < sortedUnary[j].Order() })
 	mw := make([]baseGrpc.UnaryServerInterceptor, 0, len(sortedUnary))
 	for _, ic := range sortedUnary {
 		mw = append(mw, ic.Run())
-		if em, ok := any(ic).(ErrorMapper); ok {
-			for e, code := range em.Errors() {
-				errMap.Unary[e] = code
-			}
-		}
 	}
 	sortedStream := append([]StreamMiddleware(nil), streamInterceptors...)
 	sort.SliceStable(sortedStream, func(i, j int) bool { return sortedStream[i].Order() < sortedStream[j].Order() })
 	streamMw := make([]baseGrpc.StreamServerInterceptor, 0, len(sortedStream))
 	for _, ic := range sortedStream {
 		streamMw = append(streamMw, ic.Run())
-		if em, ok := any(ic).(StreamErrorMapper); ok {
-			for e, code := range em.StreamErrors() {
-				errMap.Stream[e] = code
-			}
-		}
 	}
 	return &grpcCommand{
 		commands:    commands,
