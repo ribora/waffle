@@ -21,11 +21,6 @@ type GrpcCommand interface {
 	app.Command
 }
 
-type (
-	Middleware       = grpc.Interceptor
-	StreamMiddleware = grpc.StreamInterceptor
-)
-
 type ServiceHandler interface {
 	Start(baseGrpc.ServiceRegistrar)
 }
@@ -35,16 +30,14 @@ type Server interface {
 	Close() error
 }
 
-type ErrorMapper = grpc.ErrorMapper
-
-func NewGrpcCommand(commands []ServiceHandler, interceptors []Middleware, streamInterceptors []StreamMiddleware, command app.BaseCommand, addr net.Addr, logger pry.Logger) *grpcCommand {
-	sortedUnary := append([]Middleware(nil), interceptors...)
+func NewGrpcCommand(commands []ServiceHandler, interceptors []grpc.Interceptor, streamInterceptors []grpc.StreamInterceptor, command app.BaseCommand, addr net.Addr, logger pry.Logger) *grpcCommand {
+	sortedUnary := append([]grpc.Interceptor(nil), interceptors...)
 	sort.SliceStable(sortedUnary, func(i, j int) bool { return sortedUnary[i].Order() < sortedUnary[j].Order() })
 	mw := make([]baseGrpc.UnaryServerInterceptor, 0, len(sortedUnary))
 	for _, ic := range sortedUnary {
 		mw = append(mw, ic.Run())
 	}
-	sortedStream := append([]StreamMiddleware(nil), streamInterceptors...)
+	sortedStream := append([]grpc.StreamInterceptor(nil), streamInterceptors...)
 	sort.SliceStable(sortedStream, func(i, j int) bool { return sortedStream[i].Order() < sortedStream[j].Order() })
 	streamMw := make([]baseGrpc.StreamServerInterceptor, 0, len(sortedStream))
 	for _, ic := range sortedStream {

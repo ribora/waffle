@@ -20,6 +20,7 @@ This pulls in the registrations from [`tools/grpc/init.go`](../../tools/grpc/ini
 ```go
 import (
     "gitlab.com/gorib/di"
+    "gitlab.com/gorib/grpc/server"
     "gitlab.com/gorib/waffle/app"
     wgrpc "gitlab.com/gorib/waffle/tools/grpc"
 )
@@ -31,8 +32,8 @@ func InitDi() {
     )
     di.Wire[wgrpc.GrpcCommand](wgrpc.NewGrpcCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
         "commands":           di.Tags[wgrpc.ServiceHandler](wgrpc.ServiceTag),
-        "interceptors":       di.Tags[wgrpc.Middleware](wgrpc.MiddlewareTag),
-        "streamInterceptors": di.Tags[wgrpc.StreamMiddleware](wgrpc.StreamMiddlewareTag),
+        "interceptors":       di.Tags[server.Interceptor](wgrpc.MiddlewareTag),
+        "streamInterceptors": di.Tags[server.StreamInterceptor](wgrpc.StreamMiddlewareTag),
     }))
 }
 ```
@@ -102,7 +103,8 @@ Built-in interceptors (tracing, status, session, log, recover) are wired automat
 ### Unary interceptor
 
 ```go
-type Middleware interface {
+// gitlab.com/gorib/grpc/server
+type Interceptor interface {
     Name() string
     Order() int
     Run() grpc.UnaryServerInterceptor
@@ -112,13 +114,13 @@ type Middleware interface {
 Reserved conventional orders: 100 tracing, 200 status, 300 session, 400 log, 500 recover. Pick `Order()` ≥ 1000 for user interceptors.
 
 ```go
-type LoggingMiddleware struct {
+type LoggingInterceptor struct {
     logger pry.Logger
 }
 
-func (LoggingMiddleware) Name() string { return "audit" }
-func (LoggingMiddleware) Order() int   { return 1000 }
-func (m *LoggingMiddleware) Run() grpc.UnaryServerInterceptor {
+func (LoggingInterceptor) Name() string { return "audit" }
+func (LoggingInterceptor) Order() int   { return 1000 }
+func (m *LoggingInterceptor) Run() grpc.UnaryServerInterceptor {
     return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
         m.logger.Info(info.FullMethod, pry.Ctx(ctx))
         resp, err := handler(ctx, req)
@@ -133,13 +135,14 @@ func (m *LoggingMiddleware) Run() grpc.UnaryServerInterceptor {
 Tag with `grpcCommand.MiddlewareTag` using `di.Define`:
 
 ```go
-di.Define(NewLoggingMiddleware, di.Tag(grpcCommand.MiddlewareTag))
+di.Define(NewLoggingInterceptor, di.Tag(grpcCommand.MiddlewareTag))
 ```
 
 ### Stream interceptor
 
 ```go
-type StreamMiddleware interface {
+// gitlab.com/gorib/grpc/server
+type StreamInterceptor interface {
     Name() string
     Order() int
     Run() grpc.StreamServerInterceptor
@@ -155,62 +158,43 @@ gRPC returns status codes. Map domain errors to codes so callers receive meaning
 ### ErrorMapper interface
 
 ```go
+// gitlab.com/gorib/grpc/server
 type ErrorMapper interface {
     Errors() map[error]codes.Code
 }
 ```
 
-`ErrorMapper` is collected from **interceptor** values, not from service handlers. The recommended pattern is a dedicated error handler registered under `grpcCommand.MiddlewareTag`.
-
-A middleware can implement `ErrorMapper` purely for error code mapping — `Run()` is required to satisfy the `Middleware` interface but can be a pass-through no-op:
+`ErrorMapper` is a standalone concept — not coupled to interceptors. Register implementations under `grpcCommand.ErrorMapperTag`; the framework aggregates them into a single `ErrorMapper` that the built-in `status` and `log` interceptors read at request time.
 
 ```go
-func NewErrorHandler() *errorHandler { return &errorHandler{} }
+type domainErrors struct{}
 
-type errorHandler struct{}
+func NewDomainErrors() *domainErrors { return &domainErrors{} }
 
-func (m *errorHandler) Errors() map[error]codes.Code {
+func (domainErrors) Errors() map[error]codes.Code {
     return map[error]codes.Code{
         model.ErrUserNotFound: codes.NotFound,
         model.ErrUserConflict: codes.AlreadyExists,
     }
 }
-
-func (errorHandler) Name() string  { return "error-mapper" }
-func (errorHandler) Order() int    { return 2000 }
-// Run is a pass-through; the actual mapping happens via Errors() above.
-func (m *errorHandler) Run() grpc.UnaryServerInterceptor {
-    return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-        return handler(ctx, req)
-    }
-}
 ```
 
-Register it as an interceptor:
+Register:
 
 ```go
-di.Define(NewErrorHandler, di.Tag(grpcCommand.MiddlewareTag))
+di.Define(NewDomainErrors, di.Tag(grpcCommand.ErrorMapperTag))
 ```
 
-The gRPC tool collects all `Errors()` maps from registered interceptors that implement `ErrorMapper`, merges them into the shared `*server.ErrorMap`, and the built-in `status` interceptor reads it at request time.
-
-### StreamErrorMapper
-
-```go
-type StreamErrorMapper interface {
-    StreamErrors() map[error]codes.Code
-}
-```
-
-Same pattern for stream RPCs — implement on an interceptor registered under `grpcCommand.StreamMiddlewareTag`.
+The same `ErrorMapper` instance feeds both unary and stream `status` interceptors — there's no separate `StreamErrorMapper`.
 
 ## DI tags
 
 | Tag | Collects |
 |-----|---------|
 | `grpc.ServiceTag` | All `ServiceHandler` implementations |
-| `grpc.MiddlewareTag` | All `Middleware` (unary) implementations |
-| `grpc.StreamMiddlewareTag` | All `StreamMiddleware` implementations |
+| `grpc.MiddlewareTag` | All `Interceptor` (unary) implementations |
+| `grpc.StreamMiddlewareTag` | All `StreamInterceptor` implementations |
+| `grpc.ErrorMapperTag` | All `ErrorMapper` implementations |
 
 ## Graceful shutdown
 

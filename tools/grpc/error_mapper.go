@@ -1,8 +1,12 @@
 package grpc
 
-import "google.golang.org/grpc/codes"
+import (
+	"google.golang.org/grpc/codes"
 
-func NewErrorMap(mappers []ErrorMapper) ErrorMapper {
+	"gitlab.com/gorib/grpc/server"
+)
+
+func NewErrorMap(mappers []server.ErrorMapper) server.ErrorMapper {
 	em := errorsMap{}
 	for _, m := range mappers {
 		for k, v := range m.Errors() {

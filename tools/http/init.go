@@ -13,12 +13,12 @@ var (
 )
 
 func InitHttp() {
-	di.Wire[Middleware](middleware.NewCompressMW, di.Tag(MiddlewareTag))
-	di.Wire[Middleware](middleware.NewHealthMW, di.Tag(MiddlewareTag))
-	di.Wire[Middleware](middleware.NewSessionMW, di.Tag(MiddlewareTag))
-	di.Wire[Middleware](middleware.NewTracingMW, di.Tag(MiddlewareTag))
-	di.Wire[Middleware](middleware.NewLogMW, di.Tag(MiddlewareTag))
-	di.Wire[Middleware](middleware.NewRecoverMW, di.Tag(MiddlewareTag))
+	di.Define(middleware.NewCompressMW, di.Tag(MiddlewareTag))
+	di.Define(middleware.NewHealthMW, di.Tag(MiddlewareTag))
+	di.Define(middleware.NewSessionMW, di.Tag(MiddlewareTag))
+	di.Define(middleware.NewTracingMW, di.Tag(MiddlewareTag))
+	di.Define(middleware.NewLogMW, di.Tag(MiddlewareTag))
+	di.Define(middleware.NewRecoverMW, di.Tag(MiddlewareTag))
 
 	di.Wire[app.BaseCommand](func() app.BaseCommand { return app.NewCommand("http", "Start web server") }, di.For[HttpCommand]())
 	di.Wire[MiddlewareList](NewMiddlewareList, di.Args(map[string]any{

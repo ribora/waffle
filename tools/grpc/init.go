@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"gitlab.com/gorib/di"
+	"gitlab.com/gorib/grpc/server"
 	"gitlab.com/gorib/grpc/server/interceptor"
 	"gitlab.com/gorib/waffle/app"
 )
@@ -19,26 +20,26 @@ var (
 )
 
 func InitGrpc() {
-	di.Wire[ErrorMapper](NewErrorMap, di.Args(map[string]any{
-		"mappers": di.Tags[ErrorMapper](ErrorMapperTag),
+	di.Wire[server.ErrorMapper](NewErrorMap, di.Args(map[string]any{
+		"mappers": di.Tags[server.ErrorMapper](ErrorMapperTag),
 	}))
 
-	di.Wire[Middleware](interceptor.NewTracingMW, di.Tag(MiddlewareTag))
-	di.Wire[Middleware](interceptor.NewStatusMW, di.Tag(MiddlewareTag))
-	di.Wire[Middleware](interceptor.NewSessionMW, di.Tag(MiddlewareTag))
-	di.Wire[Middleware](interceptor.NewLogMW, di.Tag(MiddlewareTag))
-	di.Wire[Middleware](interceptor.NewRecoverMW, di.Tag(MiddlewareTag))
+	di.Define(interceptor.NewTracingMW, di.Tag(MiddlewareTag))
+	di.Define(interceptor.NewStatusMW, di.Tag(MiddlewareTag))
+	di.Define(interceptor.NewSessionMW, di.Tag(MiddlewareTag))
+	di.Define(interceptor.NewLogMW, di.Tag(MiddlewareTag))
+	di.Define(interceptor.NewRecoverMW, di.Tag(MiddlewareTag))
 
-	di.Wire[StreamMiddleware](interceptor.NewStreamTracingMW, di.Tag(StreamMiddlewareTag))
-	di.Wire[StreamMiddleware](interceptor.NewStreamStatusMW, di.Tag(StreamMiddlewareTag))
-	di.Wire[StreamMiddleware](interceptor.NewStreamSessionMW, di.Tag(StreamMiddlewareTag))
-	di.Wire[StreamMiddleware](interceptor.NewStreamLogMW, di.Tag(StreamMiddlewareTag))
-	di.Wire[StreamMiddleware](interceptor.NewStreamRecoverMW, di.Tag(StreamMiddlewareTag))
+	di.Define(interceptor.NewStreamTracingMW, di.Tag(StreamMiddlewareTag))
+	di.Define(interceptor.NewStreamStatusMW, di.Tag(StreamMiddlewareTag))
+	di.Define(interceptor.NewStreamSessionMW, di.Tag(StreamMiddlewareTag))
+	di.Define(interceptor.NewStreamLogMW, di.Tag(StreamMiddlewareTag))
+	di.Define(interceptor.NewStreamRecoverMW, di.Tag(StreamMiddlewareTag))
 
 	di.Wire[app.BaseCommand](func() app.BaseCommand { return app.NewCommand("grpc", "Start grpc server") }, di.For[GrpcCommand]())
 	di.Wire[GrpcCommand](NewGrpcCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
 		"commands":           di.Tags[ServiceHandler](ServiceTag),
-		"interceptors":       di.Tags[Middleware](MiddlewareTag),
-		"streamInterceptors": di.Tags[StreamMiddleware](StreamMiddlewareTag),
+		"interceptors":       di.Tags[server.Interceptor](MiddlewareTag),
+		"streamInterceptors": di.Tags[server.StreamInterceptor](StreamMiddlewareTag),
 	}))
 }

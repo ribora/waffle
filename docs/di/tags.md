@@ -8,9 +8,10 @@ Tags are empty struct values used to group multiple values of the same interface
 |-----|---------|--------------|-------------------|
 | `app.CommandTag` | `waffle/app` | `di.Wire[app.Command](..., di.Tag(app.CommandTag))` | `[]app.Command` |
 | `grpc.ServiceTag` | `tools/grpc` | `di.Define(..., di.Tag(grpc.ServiceTag))` | `[]ServiceHandler` |
-| `grpc.MiddlewareTag` | `tools/grpc` | `di.Define(..., di.Tag(grpc.MiddlewareTag))` | `[]Middleware` |
-| `grpc.StreamMiddlewareTag` | `tools/grpc` | `di.Define(..., di.Tag(grpc.StreamMiddlewareTag))` | `[]StreamMiddleware` |
-| `http.MiddlewareTag` | `tools/http` | `di.Wire[http.Middleware](..., di.Tag(http.MiddlewareTag))` | `[]Middleware` → `MiddlewareList` |
+| `grpc.MiddlewareTag` | `tools/grpc` | `di.Define(..., di.Tag(grpc.MiddlewareTag))` | `[]server.Interceptor` |
+| `grpc.StreamMiddlewareTag` | `tools/grpc` | `di.Define(..., di.Tag(grpc.StreamMiddlewareTag))` | `[]server.StreamInterceptor` |
+| `grpc.ErrorMapperTag` | `tools/grpc` | `di.Define(..., di.Tag(grpc.ErrorMapperTag))` | `[]server.ErrorMapper` |
+| `http.MiddlewareTag` | `tools/http` | `di.Define(..., di.Tag(http.MiddlewareTag))` | `[]Middleware` → `MiddlewareList` |
 | `migrate.MigrationsTag` | `tools/migrate` | `di.Wire[domainMigrate.Migration](..., di.Tag(migrate.MigrationsTag))` | `[]fs.FS` |
 | `scribus.CommandTag` | `tools/scribus` | `di.Wire[scribus.Handler](..., di.Tag(scribus.CommandTag))` | `[]Handler` |
 
@@ -68,6 +69,18 @@ Same as `MiddlewareTag` but for stream interceptors.
 
 ```go
 di.Define(NewStreamAuditInterceptor, di.Tag(grpcCommand.StreamMiddlewareTag))
+```
+
+---
+
+## grpc.ErrorMapperTag
+
+**Package:** `gitlab.com/gorib/waffle/tools/grpc`
+
+Collects `server.ErrorMapper` implementations — domain error → gRPC code maps. The framework merges them into a single `ErrorMapper` consumed by the built-in `status` and `log` interceptors (one map for both unary and stream chains).
+
+```go
+di.Define(domainErrors.NewMapper, di.Tag(grpcCommand.ErrorMapperTag))
 ```
 
 ---

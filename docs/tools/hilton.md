@@ -4,17 +4,17 @@
 
 ## Setup
 
-One include enables the whole stack:
+Nothing to do — `tools/hilton` is included transitively via `waffle/app`:
 
 ```go
 func InitDi() {
-    di.Include("gitlab.com/gorib/waffle/tools/hilton")
+    di.Include("gitlab.com/gorib/waffle/app") // pulls hilton + wires app.App
     di.Include("gitlab.com/gorib/waffle/tools/http")
     di.Include("gitlab.com/gorib/waffle/tools/grpc")
 }
 ```
 
-`tools/hilton` wires a single `hilton.Provider` from env-vars. Other tools — `tools/http`, `tools/grpc`, and any I/O client (HTTP client, AMQP, SQL) — pick it up automatically.
+Every service that uses waffle gets a `hilton.Provider` wired automatically. With empty `OTEL_EXPORTER_OTLP_ENDPOINT` the provider is a noop — spans/metrics are created and propagated but not exported. No conditional plumbing in service code.
 
 ## Configuration
 

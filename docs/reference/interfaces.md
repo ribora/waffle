@@ -111,10 +111,11 @@ type ServiceHandler interface {
 
 Implemented by each gRPC domain handler. `Start` registers the proto-generated server with the gRPC registrar.
 
-### Middleware
+### Interceptor
 
 ```go
-type Middleware interface {
+// gitlab.com/gorib/grpc/server
+type Interceptor interface {
     Name() string
     Order() int
     Run() grpc.UnaryServerInterceptor
@@ -123,10 +124,11 @@ type Middleware interface {
 
 A unary gRPC interceptor. Tag with `grpc.MiddlewareTag`. Chained by `Order()` ascending (smaller = outer). Reserved framework orders: 100 tracing, 200 status, 300 session, 400 log, 500 recover.
 
-### StreamMiddleware
+### StreamInterceptor
 
 ```go
-type StreamMiddleware interface {
+// gitlab.com/gorib/grpc/server
+type StreamInterceptor interface {
     Name() string
     Order() int
     Run() grpc.StreamServerInterceptor
@@ -138,22 +140,13 @@ A stream gRPC interceptor. Tag with `grpc.StreamMiddlewareTag`.
 ### ErrorMapper
 
 ```go
+// gitlab.com/gorib/grpc/server
 type ErrorMapper interface {
     Errors() map[error]codes.Code
 }
 ```
 
-Optionally implemented by `Middleware` to map domain errors to gRPC status codes. The gRPC tool collects all `Errors()` maps from registered middlewares and merges them into the error-handling interceptor. See [tools/grpc.md](../tools/grpc.md#error-mapping) for the full pattern.
-
-### StreamErrorMapper
-
-```go
-type StreamErrorMapper interface {
-    StreamErrors() map[error]codes.Code
-}
-```
-
-Same as `ErrorMapper` but collected from `StreamMiddleware` values.
+A standalone error→gRPC code mapping. Tag with `grpc.ErrorMapperTag`. The framework aggregates all registered mappers; the built-in `status` and `log` interceptors read the merged map at request time. The same map covers both unary and stream chains. See [tools/grpc.md](../tools/grpc.md#error-mapping) for the full pattern.
 
 ---
 
