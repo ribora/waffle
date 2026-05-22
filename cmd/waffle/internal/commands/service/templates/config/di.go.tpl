@@ -2,46 +2,33 @@
 package di
 
 import (
-	"fmt"
-	"net"
-	"strconv"
-
-	grpcCommand "gitlab.com/gorib/waffle/tools/grpc"
-
 	"gitlab.com/gorib/di"
-	"gitlab.com/gorib/env"
-	"gitlab.com/gorib/pry"
-	"gitlab.com/gorib/pry/channels"
-	"gitlab.com/gorib/storage/sql"
 )
 
 func InitDi() {
-	di.Include("gitlab.com/gorib/waffle/app")
-	di.Include("gitlab.com/gorib/waffle/tools/hilton")
-	di.Include("gitlab.com/gorib/waffle/tools/grpc")
-	di.Include("gitlab.com/gorib/waffle/tools/migrate")
+	di.Include("gitlab.com/gorib/waffle/config/app")
 
-	di.Wire[pry.Logger](func() (pry.Logger, error) {
-		dsn := env.Value("SENTRY_DSN", "")
-		environment := env.Value("ENVIRONMENT", "noenv")
-		serviceName := env.Value("SERVICE", "nocontour")
-		sentry, err := channels.Sentry("error", channels.WithSentryConnection(dsn, environment, channels.WithSentryService(serviceName)))
-		if err != nil {
-			return nil, err
-		}
-		return pry.New(env.Value("LOGLEVEL", "info"), pry.ToChannels(sentry))
-	})
+	// logger
+	di.Include("gitlab.com/gorib/waffle/config/service/pry")
 
-	di.Wire[sql.Db](sql.NewTracedDb, di.Args(map[string]any{
-		"driver": env.NeedValue[string]("DATABASE_DRIVER"),
-		"dsn":    fmt.Sprintf("%s?dbname=%s&sslmode=disable", env.NeedValue[string]("DATABASE_DSN"), env.NeedValue[string]("DATABASE_NAME")),
-	}))
+	// observability
+	di.Include("gitlab.com/gorib/waffle/config/service/hilton")
 
-	di.Wire[net.Addr](net.ResolveTCPAddr, di.For[grpcCommand.GrpcCommand](), di.Args(map[string]any{
-		"network": "tcp",
-		"address": net.JoinHostPort(
-			env.NeedValue[string]("DAEMON_HOST"),
-			strconv.FormatUint(uint64(env.NeedValue[uint16]("DAEMON_PORT")), 10),
-		),
-	}))
+	// select your sql db: CHOOSE ONLY ONE VARIANT
+	// di.Include("gitlab.com/gorib/waffle/config/service/sql")
+	// di.Include("gitlab.com/gorib/waffle/config/service/sql/tracing")
+
+	// uncomment if your service uses migrations
+	// di.Include("gitlab.com/gorib/waffle/config/tools/migrate")
+
+	// uncomment if your service uses http server
+	// di.Include("gitlab.com/gorib/waffle/config/tools/http")
+
+	// uncomment if your service uses grpc server
+	// di.Include("gitlab.com/gorib/waffle/config/tools/grpc")
+
+	// uncomment if your service uses scribus
+	// CHOOSE ONLY ONE VARIANT either batch processing or single processing
+	// di.Include("gitlab.com/gorib/waffle/config/tools/scribus/batch")
+	// di.Include("gitlab.com/gorib/waffle/config/tools/scribus/single")
 }

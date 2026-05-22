@@ -7,6 +7,7 @@ import (
 	"gitlab.com/gorib/di"
 	"gitlab.com/gorib/env"
 	"gitlab.com/gorib/waffle/app"
+	"gitlab.com/gorib/waffle/tools/scribus"
 )
 
 type commandTag struct{}
@@ -20,8 +21,8 @@ var (
 // Registers only what's common to both modes — does NOT register a
 // ScribusCommand. Include tools/scribus/single or tools/scribus/batch.
 func InitScribus() {
-	di.Wire[app.BaseCommand](func() app.BaseCommand { return app.NewCommand("scribus", "Start RabbitMq consumer") }, di.For[ScribusCommand]())
-	di.Wire[Consumer](amqp.NewConsumer, di.Args(map[string]any{
+	di.Wire[app.BaseCommand](func() app.BaseCommand { return app.NewCommand("scribus", "Start RabbitMq consumer") }, di.For[scribus.ScribusCommand]())
+	di.Wire[scribus.Consumer](amqp.NewConsumer, di.Args(map[string]any{
 		"dsn":        env.NeedValue[string]("RABBIT_DSN"),
 		"exchange":   env.NeedValue[string]("RABBIT_EXCHANGE"),
 		"queue":      env.NeedValue[string]("RABBIT_QUEUE"),

@@ -1,11 +1,3 @@
-// Package hilton wires a hilton.Provider into the DI graph.
-// Reading OTEL_EXPORTER_OTLP_ENDPOINT, SERVICE and ENVIRONMENT from env.
-// Without an endpoint the provider is real but exports nowhere — spans and
-// metrics are created and propagated via traceparent but discarded.
-//
-// Application:
-//
-//	di.Include("gitlab.com/gorib/waffle/tools/hilton")
 package hilton
 
 import (

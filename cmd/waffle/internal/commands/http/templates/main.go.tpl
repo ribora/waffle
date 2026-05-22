@@ -14,22 +14,19 @@ type {{ title .Domain }}Management interface {
 
 func NewRouter(
 	{{ .Domain }}Management {{ title .Domain }}Management,
-	mw http.MiddlewareList,
 	logger pry.Logger,
 ) httpServer.Router {
 	return &router{
 		{{ .Domain }}Management: {{ .Domain }}Management,
-		mw:                       mw,
 		logger:                   logger,
 	}
 }
 
 type router struct {
 	{{ .Domain }}Management {{ title .Domain }}Management
-	mw     http.MiddlewareList
 	logger pry.Logger
 }
 
-func (r *router) Setup(app *fiber.App) {
+func (r *router) Setup(app *fiber.App, mws http.Middlewares) {
 	// Register routes here.
 }

@@ -24,7 +24,7 @@ type Server interface {
 	Close() error
 }
 
-func NewHttpCommand(router http.Router, command app.BaseCommand, addr net.Addr, logger pry.Logger, middlewares []Middleware) *httpCommand {
+func NewHttpCommand(router http.Router, command app.BaseCommand, addr net.Addr, logger pry.Logger, middlewares []http.Middleware) *httpCommand {
 	return &httpCommand{
 		router:      router,
 		addr:        addr,
@@ -40,7 +40,7 @@ type httpCommand struct {
 	app.BaseCommand
 	connection  Server
 	logger      pry.Logger
-	middlewares []Middleware
+	middlewares []http.Middleware
 }
 
 func (c *httpCommand) Run(ctx context.Context) error {
