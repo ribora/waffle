@@ -4,18 +4,17 @@ go 1.25.0
 
 require (
 	github.com/fatih/color v1.18.0
-	github.com/gofiber/fiber/v2 v2.52.9
 	github.com/pborman/getopt/v2 v2.1.0
 	github.com/pressly/goose/v3 v3.24.1
-	gitlab.com/gorib/amqp v1.1.1
+	gitlab.com/gorib/amqp v1.1.2
 	gitlab.com/gorib/di v1.4.1
 	gitlab.com/gorib/env v1.0.0
-	gitlab.com/gorib/grpc v1.1.3
-	gitlab.com/gorib/hilton v1.0.0
-	gitlab.com/gorib/http v1.1.1
+	gitlab.com/gorib/grpc v1.1.4
+	gitlab.com/gorib/hilton v1.0.3
+	gitlab.com/gorib/http v1.1.3
 	gitlab.com/gorib/pry v1.1.0
 	gitlab.com/gorib/session v1.1.0
-	gitlab.com/gorib/storage v1.1.0
+	gitlab.com/gorib/storage v1.1.1
 	gitlab.com/gorib/try v0.0.0-20250224141908-512acf4daa35
 	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b
 	google.golang.org/grpc v1.80.0
@@ -28,9 +27,11 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dave/jennifer v1.7.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/getsentry/sentry-go v0.31.1 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-sql-driver/mysql v1.8.1 // indirect
+	github.com/gofiber/fiber/v2 v2.52.9 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
@@ -58,8 +59,10 @@ require (
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.43.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.43.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.43.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.43.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.43.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.43.0 // indirect
 	go.opentelemetry.io/otel/metric v1.43.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.43.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.43.0 // indirect
