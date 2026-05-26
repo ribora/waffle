@@ -1,21 +1,22 @@
 # gRPC Tool
 
-The gRPC tool wraps `gitlab.com/gorib/grpc/server` into a waffle `Command`. Pull in its DI registrations via `di.Include` to register the `grpc` command.
+The gRPC tool wraps `gitlab.com/gorib/grpc/server` into a waffle `Command`. Blank-import its config package to register the `grpc` command.
 
 ## Setup
 
-Add a single `di.Include` to `InitDi()` in `config/di/di.go`:
+Add a single blank import to `config/di/modules.go`:
 
 ```go
-import "gitlab.com/gorib/di"
+// config/di/modules.go
+package di
 
-func InitDi() {
-    di.Include("gitlab.com/gorib/waffle/config/tools/grpc")
-    // ... other registrations ...
-}
+import (
+    _ "gitlab.com/gorib/waffle/config/tools/grpc"
+    // ... other modules ...
+)
 ```
 
-This pulls in the registrations from [`tools/grpc/init.go`](../../tools/grpc/init.go), which is equivalent to writing them yourself:
+This pulls in the registrations from [`config/tools/grpc/init.go`](../../config/tools/grpc/init.go), which is equivalent to writing them yourself:
 
 ```go
 import (
@@ -38,7 +39,7 @@ func InitDi() {
 }
 ```
 
-Use the manual form when you need to override a registration (e.g. rename the command); otherwise prefer `di.Include`.
+Use the manual form when you need to override a registration (e.g. rename the command); otherwise prefer the blank import.
 
 Run `make generate`, then start the server:
 

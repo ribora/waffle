@@ -59,9 +59,22 @@ func Init() (app.App, error) {
 
 ### DI registrations
 
-**`config/di/di.go`**
+DI configuration lives in two files inside `config/di/`:
 
-The single file where all DI wiring lives. Contains the `//go:generate` directive and an `InitDi()` function. `di.Include("gitlab.com/gorib/waffle/config/app")` must always be present — it registers the application root that collects all `Command` tags.
+**`config/di/modules.go`** — the set of waffle modules this service composes. Contains **only** blank imports, no other code. `_ "gitlab.com/gorib/waffle/config/app"` must always be present — it registers the application root that collects all `Command` tags.
+
+```go
+// Composition of waffle modules used by this service.
+package di
+
+import (
+    _ "gitlab.com/gorib/waffle/config/app"
+    _ "gitlab.com/gorib/waffle/config/service/pry"
+    // ... other modules ...
+)
+```
+
+**`config/di/di.go`** — the `//go:generate` directive and `InitDi()` with service-specific wiring:
 
 ```go
 //go:generate go tool diogen -output config/diogen/di_gen.go -pkg diogen $GOFILE
@@ -75,17 +88,15 @@ import (
 )
 
 func InitDi() {
-    di.Include("gitlab.com/gorib/waffle/config/app")
-
     di.Wire[pry.Logger](func() (pry.Logger, error) {
         return pry.New(env.Value("LOGLEVEL", "info"))
     })
 
-    // Add tool and domain registrations here
+    // Add domain registrations here
 }
 ```
 
-Each tool page shows the exact block to copy inside `InitDi()`. Example for the HTTP tool:
+Each tool page shows the exact block to copy inside `InitDi()` when you need manual control. Example for the HTTP tool:
 
 ```go
 di.Wire[app.BaseCommand](

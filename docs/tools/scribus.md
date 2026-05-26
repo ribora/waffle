@@ -4,23 +4,24 @@ The scribus tool wraps `gitlab.com/gorib/amqp` into a waffle `Command` for consu
 
 ## Setup
 
-Scribus ships **two** mode-specific subpackages — pick one. Common registrations (BaseCommand, AMQP Consumer) live in `tools/scribus` and are pulled in transitively.
+Scribus ships **two** mode-specific subpackages — pick one. Common registrations (BaseCommand, AMQP Consumer, middlewares) live in `config/tools/scribus` and are pulled in transitively.
 
 **Single mode** (each routing key dispatched to a dedicated `Handler`):
 
 ```go
-import "gitlab.com/gorib/di"
+// config/di/modules.go
+package di
 
-func InitDi() {
-    di.Include("gitlab.com/gorib/waffle/config/tools/scribus/single")
-    // ... other registrations ...
-}
+import (
+    _ "gitlab.com/gorib/waffle/config/tools/scribus/single"
+    // ... other modules ...
+)
 ```
 
-This expands to the registrations from [`tools/scribus/init.go`](../../tools/scribus/init.go) (common) plus [`tools/scribus/single/init.go`](../../tools/scribus/single/init.go):
+This expands to the registrations from [`config/tools/scribus/init.go`](../../config/tools/scribus/init.go) (common) plus [`config/tools/scribus/single/init.go`](../../config/tools/scribus/single/init.go):
 
 ```go
-// common — from tools/scribus
+// common — from config/tools/scribus
 di.Wire[app.BaseCommand](
     func() app.BaseCommand { return app.NewCommand("scribus", "Start RabbitMq consumer") },
     di.For[wscribus.ScribusCommand](),
@@ -35,24 +36,32 @@ di.Wire[wscribus.Consumer](amqp.NewConsumer, di.Args(map[string]any{
         amqp.WithConsumerFlushInterval(5 * time.Second),
     },
 }))
+di.Define(interceptor.NewTracing, di.Tag(wscribus.MiddlewareTag))
+di.Define(interceptor.NewLog,     di.Tag(wscribus.MiddlewareTag))
+di.Define(interceptor.NewRecover, di.Tag(wscribus.MiddlewareTag))
 
-// single-mode — from tools/scribus/single
+// single-mode — from config/tools/scribus/single
 di.Wire[wscribus.ScribusCommand](wscribus.NewScribusCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
-    "commands": di.Tags[wscribus.Handler](wscribus.CommandTag),
+    "commands":    di.Tags[wscribus.Handler](wscribus.CommandTag),
+    "middlewares": di.Tags[wscribus.Middleware](wscribus.MiddlewareTag),
 }))
 ```
 
 **Batch mode** (one `BatchHandler` processes all messages):
 
 ```go
+// config/di/modules.go
+import (
+    _ "gitlab.com/gorib/waffle/config/tools/scribus/batch"
+)
+
+// config/di/di.go — register your own BatchHandler:
 func InitDi() {
-    di.Include("gitlab.com/gorib/waffle/config/tools/scribus/batch")
-    // ... and register your own BatchHandler implementation:
     di.Wire[wscribus.BatchHandler](scribusCommand.NewNotificationAcceptedCommand)
 }
 ```
 
-`tools/scribus/batch` pulls in the same common block plus `di.Wire[ScribusCommand](NewBatchScribusCommand, ...)`. Your `BatchHandler` registration stays in your own `InitDi()`.
+`config/tools/scribus/batch` pulls in the same common block plus `di.Wire[ScribusCommand](NewBatchScribusCommand, ...)`. Your `BatchHandler` registration stays in your own `InitDi()`.
 
 Run `make generate` after adding this.
 

@@ -4,14 +4,19 @@
 
 ## Setup
 
-Nothing to do — `tools/hilton` is included transitively via `waffle/app`:
+Nothing to do — `service/hilton` is included transitively via `config/app`:
 
 ```go
-func InitDi() {
-    di.Include("gitlab.com/gorib/waffle/config/app") wires app.App
-    di.Include("gitlab.com/gorib/waffle/config/tools/http")
-    di.Include("gitlab.com/gorib/waffle/config/tools/grpc")
-}
+// config/di/modules.go
+package di
+
+import (
+    _ "gitlab.com/gorib/waffle/config/app"            // wires app.App
+    _ "gitlab.com/gorib/waffle/config/service/hilton" // observability
+    _ "gitlab.com/gorib/waffle/config/service/pry"    // logging
+    _ "gitlab.com/gorib/waffle/config/tools/http"
+    _ "gitlab.com/gorib/waffle/config/tools/grpc"
+)
 ```
 
 Every service that uses waffle gets a `hilton.Provider` wired automatically. With empty `OTEL_EXPORTER_OTLP_ENDPOINT` the provider is a noop — spans/metrics are created and propagated but not exported. No conditional plumbing in service code.
@@ -39,12 +44,14 @@ Once on ctx, any I/O code path reads it via `hilton.ProviderFromContext(ctx)`. A
 | Layer | Span kind | Metrics |
 |-------|-----------|---------|
 | HTTP server | `Server` | `http.server.request.duration` |
-| HTTP client | `Client` | (span only) |
-| gRPC server | `Server` | `rpc.server.duration`, `rpc.server.requests` |
-| gRPC client | `Client` | `rpc.client.duration`, `rpc.client.requests` |
+| HTTP client | `Client` | `http.client.request.duration` |
+| gRPC server | `Server` | `rpc.server.duration` |
+| gRPC client | `Client` | `rpc.client.duration` |
 | AMQP publisher | `Producer` | (span only) |
-| AMQP consumer | `Consumer` | (span only) |
-| SQL (`sql.NewTracedDb`) | `Client` | `db.client.operation.duration`, `db.client.operations` |
+| AMQP consumer | `Consumer` | `messaging.receive.duration`, `messaging.receive.messages` (counts individual messages in batches) |
+| Redis | `Client` | `db.client.operation.duration` |
+| SQL | `Client` | `db.client.operation.duration` |
+| Elasticsearch | `Client` | `db.client.operation.duration` |
 
 W3C `traceparent` is propagated across all boundaries via the active `hilton.Propagator`.
 

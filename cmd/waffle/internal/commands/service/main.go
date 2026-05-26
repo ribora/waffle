@@ -39,6 +39,7 @@ func (c *cmd) Run(ctx context.Context, _ ...string) error {
 		filepath.Join("templates", "cmd", "app", "main.go.tpl"):                filepath.Join("cmd", "app", "main.go"),
 		filepath.Join("templates", "config", "config.go.tpl"):                  filepath.Join("config", "config.go"),
 		filepath.Join("templates", "config", "di.go.tpl"):                      filepath.Join("config", "di", "di.go"),
+		filepath.Join("templates", "config", "modules.go.tpl"):                 filepath.Join("config", "di", "modules.go"),
 		filepath.Join("templates", "config", "diogen.go.tpl"):                  filepath.Join("config", "diogen", "di.go"),
 		filepath.Join("templates", "gitignore.tpl"):                            filepath.Join(".gitignore"),
 		filepath.Join("templates", "Makefile.tpl"):                             filepath.Join("Makefile"),

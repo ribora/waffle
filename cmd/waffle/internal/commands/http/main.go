@@ -46,7 +46,7 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 		return err
 	}
 
-	fmt.Println("Done. Add `di.Include(\"gitlab.com/gorib/waffle/tools/http\")` to config/di/di.go if not already present.")
+	fmt.Println("Done. Add `_ \"gitlab.com/gorib/waffle/config/tools/http\"` to config/di/modules.go if not already present.")
 
 	info, err := exec.Command("make", ".tidy", "generate").CombinedOutput()
 	if err != nil {

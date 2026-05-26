@@ -52,15 +52,15 @@ api/<service>/           ← API initialization, proto definitions
 
 The app discovers **Commands** at startup. Each runtime concern is a command:
 
-| Built-in command | Enable with                                                         |
-|-----------------|---------------------------------------------------------------------|
-| `http` | `di.Include("gitlab.com/gorib/waffle/config/tools/http")`           |
-| `grpc` | `di.Include("gitlab.com/gorib/waffle/config/tools/grpc")`           |
-| `migrate` | `di.Include("gitlab.com/gorib/waffle/config/tools/migrate")`        |
-| `scribus` (single mode) | `di.Include("gitlab.com/gorib/waffle/config/tools/scribus/single")` |
-| `scribus` (batch mode) | `di.Include("gitlab.com/gorib/waffle/config/tools/scribus/batch")`  |
+| Built-in command | Enable with (blank import in `config/di/modules.go`)                  |
+|-----------------|-----------------------------------------------------------------------|
+| `http` | `_ "gitlab.com/gorib/waffle/config/tools/http"`                       |
+| `grpc` | `_ "gitlab.com/gorib/waffle/config/tools/grpc"`                       |
+| `migrate` | `_ "gitlab.com/gorib/waffle/config/tools/migrate"`                    |
+| `scribus` (single mode) | `_ "gitlab.com/gorib/waffle/config/tools/scribus/single"`             |
+| `scribus` (batch mode) | `_ "gitlab.com/gorib/waffle/config/tools/scribus/batch"`              |
 
-You pick which commands your service needs by adding the corresponding `di.Include` call into your DI configuration. Commands are invoked by name:
+You pick which commands your service needs by adding the corresponding blank import to `config/di/modules.go`. Commands are invoked by name:
 
 ```sh
 ./app http

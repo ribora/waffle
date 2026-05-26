@@ -66,22 +66,21 @@ The app prints available commands. Initially none are registered — add tools i
 
 ## Add your first tool
 
-Open `config/di/di.go` and pull in the HTTP tool registrations via `di.Include`:
+Open `config/di/modules.go` and add a blank import for the HTTP tool:
 
 ```go
-//go:generate go tool diogen -output config/diogen/di_gen.go -pkg diogen $GOFILE
-
+// config/di/modules.go
 package di
 
-import "gitlab.com/gorib/di"
-
-func InitDi() {
-    di.Include("gitlab.com/gorib/waffle/config/app")
-    di.Include("gitlab.com/gorib/waffle/config/tools/http")
-}
+import (
+    _ "gitlab.com/gorib/waffle/config/app"
+    _ "gitlab.com/gorib/waffle/config/tools/http"
+)
 ```
 
-See [tools/http.md](tools/http.md) for what `di.Include` expands to and how to override individual registrations.
+`config/di/di.go` stays empty for now — service-specific `di.Wire` / `di.Define` calls go there later.
+
+See [tools/http.md](tools/http.md) for what the HTTP module expands to and how to override individual registrations.
 
 Run `make generate` to regenerate the DI container, then start the HTTP server:
 

@@ -52,34 +52,40 @@ di.Define(notificationService.NewNotificationManagement,
 | `di.Alias[I]()` | Expose the same concrete instance under an additional interface |
 | `di.Defaults(map[int]any{})` | Default values for positional arguments |
 | `di.Fallback()` | Mark as fallback — used only when no other registration matches |
-| `di.Include("path")` | Aggregate `di.Wire` / `di.Define` calls from another package (see below) |
+| _blank import_ `_ "path"` | Aggregate `di.Wire` / `di.Define` calls from another package (see below) |
 
-### di.Include — aggregating registrations from another package
+### Modules — aggregating registrations from another package
 
-`di.Include` points Diogen at another package's source and merges the `di.Wire` / `di.Define` calls found there into your own configuration. Each waffle tool ships an `InitXxx()` function whose body is a set of DI registrations — `di.Include` lets you pull those registrations in by import path instead of copying them by hand:
+A blank import (`import _ "path"`) tells Diogen to load the referenced package's source and merge the `di.Wire` / `di.Define` calls found there into your own configuration. Each waffle tool ships an `InitXxx()` function whose body is a set of DI registrations — blank-importing the tool's config package lets you pull those registrations in by import path instead of copying them by hand.
+
+The convention is to keep all module includes in a dedicated `modules.go` file (a sibling of `di.go`), containing **only** the import block:
 
 ```go
-func InitDi() {
-    di.Include("gitlab.com/gorib/waffle/config/app")
-    di.Include("gitlab.com/gorib/waffle/config/tools/http")
-    di.Include("gitlab.com/gorib/waffle/config/tools/grpc")
-    di.Include("gitlab.com/gorib/waffle/config/tools/migrate")
+// config/di/modules.go
+package di
 
-    // ... your own wiring ...
-}
+import (
+    _ "gitlab.com/gorib/waffle/config/app"
+    _ "gitlab.com/gorib/waffle/config/tools/http"
+    _ "gitlab.com/gorib/waffle/config/tools/grpc"
+    _ "gitlab.com/gorib/waffle/config/tools/migrate"
+)
 ```
+
+This keeps the high-level service composition visually separate from the imperative `di.Wire` calls in `di.go`.
 
 Three namespaces ship with waffle:
 
-- `waffle/app` — the application root. Includes one registration: `app.App` wired from `app.Init` collecting all commands tagged `app.CommandTag`. Always the first include in your `InitDi`.
-- `waffle/tools/*` — tool registrations (each pulls a `Command` into the app, or a piece of infrastructure such as `tools/hilton` for tracing/metrics).
+- `waffle/config/app` — the application root. Includes one registration: `app.App` wired from `app.Init` collecting all commands tagged `app.CommandTag`. Always present in your `modules.go`.
+- `waffle/config/service/*` — infrastructure modules (`pry` logger, `hilton` observability, `sql` db, `redis`, `elastic`).
+- `waffle/config/tools/*` — tool registrations (each pulls a `Command` into the app, e.g. `http`, `grpc`, `migrate`, `scribus/single`, `scribus/batch`).
 
 Properties:
 
-- Argument must be a **string literal** — Diogen reads it at generation time
+- Only blank imports are scanned. Regular imports (used for type references in your code) are *not* treated as DI modules — if you need both, declare both: a regular import for the type usage and a blank import for the DI scan.
 - The included package's whole AST is scanned for `di.Wire` / `di.Define` (it doesn't matter that they sit inside an unused `InitXxx()` function — Diogen never calls it)
-- Includes are **transitive**: A → B → C merges all three
-- **Cycles** (A → B → A) are detected and stopped
+- Includes are **transitive**: A blank-imports B, B blank-imports C — all three are merged
+- **Cycles** (A → B → A) are caught by the Go compiler as a real import cycle
 - **Tags match across packages**: a tool registering `di.Tag(MiddlewareTag)` and your code registering under the same constant are collected together
 
 Constraints:
@@ -88,9 +94,9 @@ Constraints:
 
 ## The InitXxx functions
 
-Each waffle tool ships an `InitXxx()` function (e.g. `InitHttp()`, `InitGrpc()`) whose body is a set of `di.Wire` / `di.Define` calls. These functions are never called at runtime — Diogen reads their bodies directly via `di.Include`.
+Each waffle tool ships an `InitXxx()` function (e.g. `InitHttp()`, `InitGrpc()`) whose body is a set of `di.Wire` / `di.Define` calls. These functions are never called at runtime — Diogen reads their bodies directly when you blank-import the surrounding package.
 
-For example, `tools/http/init.go`:
+For example, `config/tools/http/init.go`:
 
 ```go
 func InitHttp() {
@@ -105,32 +111,27 @@ func InitHttp() {
 }
 ```
 
-To use the HTTP tool, include its package from `config/di/di.go`:
+To use the HTTP tool, blank-import its config package from `config/di/modules.go`:
 
 ```go
-//go:generate go tool diogen -output config/diogen/di_gen.go -pkg diogen $GOFILE
-
+// config/di/modules.go
 package di
 
-import "gitlab.com/gorib/di"
-
-func InitDi() {
-    di.Include("gitlab.com/gorib/waffle/config/app")
-    di.Include("gitlab.com/gorib/waffle/config/tools/http")
-    di.Include("gitlab.com/gorib/waffle/config/tools/grpc")
-    // ... other tool includes ...
-
-    // your own wiring lives here
-}
+import (
+    _ "gitlab.com/gorib/waffle/config/app"
+    _ "gitlab.com/gorib/waffle/config/tools/http"
+    _ "gitlab.com/gorib/waffle/config/tools/grpc"
+    // ... other tool modules ...
+)
 ```
 
-Diogen scans every included package's AST for `di.Wire` / `di.Define` calls and merges them into the generated container. You don't need to import the tool package directly — `di.Include` works purely by import path. See [di.Include](#diinclude--aggregating-registrations-from-another-package) above for the full semantics.
+Diogen scans every blank-imported package's AST for `di.Wire` / `di.Define` calls and merges them into the generated container. You don't reference the tool package directly anywhere — the blank import is the entire wiring contract. See [Modules](#modules--aggregating-registrations-from-another-package) above for the full semantics.
 
-Each tool's documentation page shows both forms — the short `di.Include(...)` and, for reference, the explicit registrations it expands to. See [di/tags.md](tags.md) for all available tags.
+Each tool's documentation page shows both forms — the short blank-import line and, for reference, the explicit registrations it expands to. See [di/tags.md](tags.md) for all available tags.
 
 ### Manual registration (alternative)
 
-If you need finer control — for example, swapping a tool's command name or wrapping its constructor — copy the registrations from `InitXxx()` directly into your `InitDi()` instead of using `di.Include`. Both styles are supported in the same setup; you can `di.Include` some tools and hand-write others.
+If you need finer control — for example, swapping a tool's command name or wrapping its constructor — copy the registrations from `InitXxx()` directly into your `InitDi()` instead of blank-importing the module. Both styles are supported in the same setup; you can blank-import some tools and hand-write others.
 
 ## Project layout
 
@@ -139,15 +140,38 @@ DI configuration lives in two directories:
 ```
 config/
 └── di/
+    ├── modules.go    Blank imports of waffle modules — no other code.
     ├── di.go         Hand-written wiring. Contains //go:generate directive and InitDi().
     └── diogen/
         ├── di.go     Hand-written adapter. Calls InitApp() and wires the closer.
         └── di_gen.go Generated container. Do not edit.
 ```
 
+### config/di/modules.go
+
+Declares which waffle modules this service is composed of. Contains **only** blank imports — no other code, no other imports:
+
+```go
+// Composition of waffle modules used by this service.
+// Each blank import contributes its di.* registrations to the generated
+// container via diogen. Add or remove a line to change the set of modules.
+package di
+
+import (
+    _ "gitlab.com/gorib/waffle/config/app"
+    _ "gitlab.com/gorib/waffle/config/service/pry"
+    _ "gitlab.com/gorib/waffle/config/service/hilton"
+    _ "gitlab.com/gorib/waffle/config/tools/http"
+    _ "gitlab.com/gorib/waffle/config/tools/grpc"
+    _ "gitlab.com/gorib/waffle/config/tools/migrate"
+)
+```
+
+Keeping the module composition in its own file separates the high-level "what this service is made of" question from the lower-level "how the service-specific pieces wire together" question.
+
 ### config/di/di.go
 
-The single file where all DI registrations live. It contains the `//go:generate` directive that triggers code generation, and a single `InitDi()` function with all wiring calls:
+Holds the `//go:generate` directive and the `InitDi()` function with service-specific wiring:
 
 ```go
 //go:generate go tool diogen -output config/diogen/di_gen.go -pkg diogen $GOFILE
@@ -162,12 +186,6 @@ import (
 )
 
 func InitDi() {
-    // Core + tools — registrations pulled in by import path
-    di.Include("gitlab.com/gorib/waffle/config/app")
-    di.Include("gitlab.com/gorib/waffle/config/tools/http")
-    di.Include("gitlab.com/gorib/waffle/config/tools/grpc")
-    di.Include("gitlab.com/gorib/waffle/config/tools/migrate")
-
     // Infrastructure
     di.Wire[pry.Logger](func() (pry.Logger, error) {
         return pry.New(env.Value("LOGLEVEL", "info"))
@@ -181,7 +199,7 @@ func InitDi() {
 }
 ```
 
-Tool packages are referenced only as `di.Include` string arguments — they don't need to be imported in `di.go`. Diogen loads them at generation time and merges their registrations into the container.
+Module packages are referenced only via blank imports in `modules.go` — they don't appear in `di.go`. Diogen loads them at generation time and merges their registrations into the container.
 
 ### config/diogen/di.go
 
