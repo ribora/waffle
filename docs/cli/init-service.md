@@ -61,7 +61,7 @@ func Init() (app.App, error) {
 
 **`config/di/di.go`**
 
-The single file where all DI wiring lives. Contains the `//go:generate` directive and an `InitDi()` function. `di.Include("gitlab.com/gorib/waffle/app")` must always be present — it registers the application root that collects all `Command` tags.
+The single file where all DI wiring lives. Contains the `//go:generate` directive and an `InitDi()` function. `di.Include("gitlab.com/gorib/waffle/config/app")` must always be present — it registers the application root that collects all `Command` tags.
 
 ```go
 //go:generate go tool diogen -output config/diogen/di_gen.go -pkg diogen $GOFILE
@@ -75,7 +75,7 @@ import (
 )
 
 func InitDi() {
-    di.Include("gitlab.com/gorib/waffle/app")
+    di.Include("gitlab.com/gorib/waffle/config/app")
 
     di.Wire[pry.Logger](func() (pry.Logger, error) {
         return pry.New(env.Value("LOGLEVEL", "info"))

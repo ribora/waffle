@@ -60,10 +60,10 @@ di.Define(notificationService.NewNotificationManagement,
 
 ```go
 func InitDi() {
-    di.Include("gitlab.com/gorib/waffle/app")
-    di.Include("gitlab.com/gorib/waffle/tools/http")
-    di.Include("gitlab.com/gorib/waffle/tools/grpc")
-    di.Include("gitlab.com/gorib/waffle/tools/migrate")
+    di.Include("gitlab.com/gorib/waffle/config/app")
+    di.Include("gitlab.com/gorib/waffle/config/tools/http")
+    di.Include("gitlab.com/gorib/waffle/config/tools/grpc")
+    di.Include("gitlab.com/gorib/waffle/config/tools/migrate")
 
     // ... your own wiring ...
 }
@@ -115,9 +115,9 @@ package di
 import "gitlab.com/gorib/di"
 
 func InitDi() {
-    di.Include("gitlab.com/gorib/waffle/app")
-    di.Include("gitlab.com/gorib/waffle/tools/http")
-    di.Include("gitlab.com/gorib/waffle/tools/grpc")
+    di.Include("gitlab.com/gorib/waffle/config/app")
+    di.Include("gitlab.com/gorib/waffle/config/tools/http")
+    di.Include("gitlab.com/gorib/waffle/config/tools/grpc")
     // ... other tool includes ...
 
     // your own wiring lives here
@@ -163,10 +163,10 @@ import (
 
 func InitDi() {
     // Core + tools — registrations pulled in by import path
-    di.Include("gitlab.com/gorib/waffle/app")
-    di.Include("gitlab.com/gorib/waffle/tools/http")
-    di.Include("gitlab.com/gorib/waffle/tools/grpc")
-    di.Include("gitlab.com/gorib/waffle/tools/migrate")
+    di.Include("gitlab.com/gorib/waffle/config/app")
+    di.Include("gitlab.com/gorib/waffle/config/tools/http")
+    di.Include("gitlab.com/gorib/waffle/config/tools/grpc")
+    di.Include("gitlab.com/gorib/waffle/config/tools/migrate")
 
     // Infrastructure
     di.Wire[pry.Logger](func() (pry.Logger, error) {

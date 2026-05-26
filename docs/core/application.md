@@ -13,7 +13,7 @@ application, err := app.Init(commands, logger)
 `Init` accepts a slice of `Command` values and a `pry.Logger`. In practice you never call this directly — it is registered via `di.Include` in your `config/di/di.go`:
 
 ```go
-di.Include("gitlab.com/gorib/waffle/app")
+di.Include("gitlab.com/gorib/waffle/config/app")
 ```
 
 which expands to:

@@ -76,8 +76,8 @@ package di
 import "gitlab.com/gorib/di"
 
 func InitDi() {
-    di.Include("gitlab.com/gorib/waffle/app")
-    di.Include("gitlab.com/gorib/waffle/tools/http")
+    di.Include("gitlab.com/gorib/waffle/config/app")
+    di.Include("gitlab.com/gorib/waffle/config/tools/http")
 }
 ```
 

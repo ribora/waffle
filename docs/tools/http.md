@@ -10,7 +10,7 @@ Add a single `di.Include` to `InitDi()` in `config/di/di.go`:
 import "gitlab.com/gorib/di"
 
 func InitDi() {
-    di.Include("gitlab.com/gorib/waffle/tools/http")
+    di.Include("gitlab.com/gorib/waffle/config/tools/http")
     // ... other registrations ...
 }
 ```

@@ -8,9 +8,9 @@ Nothing to do — `tools/hilton` is included transitively via `waffle/app`:
 
 ```go
 func InitDi() {
-    di.Include("gitlab.com/gorib/waffle/app") // pulls hilton + wires app.App
-    di.Include("gitlab.com/gorib/waffle/tools/http")
-    di.Include("gitlab.com/gorib/waffle/tools/grpc")
+    di.Include("gitlab.com/gorib/waffle/config/app") wires app.App
+    di.Include("gitlab.com/gorib/waffle/config/tools/http")
+    di.Include("gitlab.com/gorib/waffle/config/tools/grpc")
 }
 ```
 

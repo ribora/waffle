@@ -12,7 +12,7 @@ Scribus ships **two** mode-specific subpackages — pick one. Common registratio
 import "gitlab.com/gorib/di"
 
 func InitDi() {
-    di.Include("gitlab.com/gorib/waffle/tools/scribus/single")
+    di.Include("gitlab.com/gorib/waffle/config/tools/scribus/single")
     // ... other registrations ...
 }
 ```
@@ -46,7 +46,7 @@ di.Wire[wscribus.ScribusCommand](wscribus.NewScribusCommand, di.Tag(app.CommandT
 
 ```go
 func InitDi() {
-    di.Include("gitlab.com/gorib/waffle/tools/scribus/batch")
+    di.Include("gitlab.com/gorib/waffle/config/tools/scribus/batch")
     // ... and register your own BatchHandler implementation:
     di.Wire[wscribus.BatchHandler](scribusCommand.NewNotificationAcceptedCommand)
 }
