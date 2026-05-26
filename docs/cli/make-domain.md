@@ -79,13 +79,13 @@ func NewUserService(repo UserRepository) *UserService {
 
 **`domain/user/adapter/postgres/user.go`**
 
-The repository implementation using `gitlab.com/gorib/storage/sql`. Wraps the `sql.Repository` generic and exposes domain-typed methods:
+The repository implementation using `gitlab.com/gorib/sql`. Wraps the `sql.Repository` generic and exposes domain-typed methods:
 
 ```go
 package postgres
 
 import (
-    sql "gitlab.com/gorib/storage/sql"
+    sql "gitlab.com/gorib/sql"
     "mymodule/domain/user/model"
 )
 
@@ -156,7 +156,7 @@ di.Define(service.NewUserService,
 ## Post-generation steps
 
 ```sh
-go get gitlab.com/gorib/storage/sql/cmd/store
+go get gitlab.com/gorib/sql/cmd/store
 make .tidy generate
 ```
 

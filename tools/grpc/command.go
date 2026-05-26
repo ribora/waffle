@@ -17,6 +17,20 @@ import (
 	"gitlab.com/gorib/waffle/app"
 )
 
+type (
+	serviceTag          struct{}
+	middlewareTag       struct{}
+	streamMiddlewareTag struct{}
+	errorMapperTag      struct{}
+)
+
+var (
+	ServiceTag          = serviceTag{}
+	MiddlewareTag       = middlewareTag{}
+	StreamMiddlewareTag = streamMiddlewareTag{}
+	ErrorMapperTag      = errorMapperTag{}
+)
+
 type GrpcCommand interface {
 	app.Command
 }

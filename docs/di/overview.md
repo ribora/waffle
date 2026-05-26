@@ -158,7 +158,7 @@ import (
     "gitlab.com/gorib/di"
     "gitlab.com/gorib/env"
     "gitlab.com/gorib/pry"
-    "gitlab.com/gorib/storage/sql"
+    "gitlab.com/gorib/sql"
 )
 
 func InitDi() {

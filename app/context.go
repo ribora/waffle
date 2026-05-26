@@ -5,13 +5,13 @@ import (
 	"strings"
 
 	"gitlab.com/gorib/hilton"
+	"gitlab.com/gorib/pry"
 	"gitlab.com/gorib/session"
 )
 
-// NewContextWithCommand builds the root ctx for a CLI command — session
-// describing the invocation, plus the hilton provider for downstream I/O.
-// A nil provider is safe.
-func NewContextWithCommand(name string, args []string, provider hilton.Provider) context.Context {
+// NewContextWithCommand builds the root ctx for a CLI command — session,
+// hilton provider, and pry logger for downstream I/O.
+func NewContextWithCommand(name string, args []string, provider hilton.Provider, logger pry.Logger) context.Context {
 	ctx := session.NewContextWithSession(
 		context.Background(),
 		session.Session{
@@ -20,5 +20,6 @@ func NewContextWithCommand(name string, args []string, provider hilton.Provider)
 			Body:   strings.Join(args, " "),
 		},
 	)
-	return hilton.ContextWithProvider(ctx, provider)
+	ctx = hilton.ContextWithProvider(ctx, provider)
+	return pry.ContextWithLogger(ctx, logger)
 }

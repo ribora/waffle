@@ -34,7 +34,7 @@ Each command ships embedded Go templates. When you run a command, waffle renders
 Some commands run additional steps after writing files:
 
 - `init:service` — runs `go get gitlab.com/gorib/digen` then `make .tidy generate`
-- `make:domain` — runs `go get gitlab.com/gorib/storage/sql/cmd/store` then `make .tidy generate`
+- `make:domain` — runs `go get gitlab.com/gorib/sql/cmd/store` then `make .tidy generate`
 - `make:domain:grpc` — runs `make .tidy generate`
 - `make:domain:migrate` — runs `make .tidy generate`
 

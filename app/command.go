@@ -12,6 +12,10 @@ import (
 	"github.com/pborman/getopt/v2"
 )
 
+type commandTag struct{}
+
+var CommandTag = commandTag{}
+
 type BaseCommand interface {
 	Name() string
 	Description() string

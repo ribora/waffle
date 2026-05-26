@@ -64,7 +64,7 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 		if err := migrate.Generate(domain, projectName); err != nil {
 			return err
 		}
-		info, err := exec.Command("go", "get", "-tool", "gitlab.com/gorib/storage/sql/cmd/store@latest").CombinedOutput()
+		info, err := exec.Command("go", "get", "-tool", "gitlab.com/gorib/sql/cmd/store@latest").CombinedOutput()
 		if err != nil {
 			return fmt.Errorf("%v: %v", err, string(info))
 		}

@@ -10,9 +10,13 @@ import (
 	"github.com/pborman/getopt/v2"
 	"github.com/pressly/goose/v3"
 
-	"gitlab.com/gorib/storage/sql"
+	"gitlab.com/gorib/sql"
 	"gitlab.com/gorib/waffle/app"
 )
+
+type migrationsTag struct{}
+
+var MigrationsTag = migrationsTag{}
 
 type MigrateCommand interface {
 	app.Command

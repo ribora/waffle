@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -14,12 +15,22 @@ import (
 	"gitlab.com/gorib/waffle/app"
 )
 
+type (
+	commandTag    struct{}
+	middlewareTag struct{}
+)
+
+var (
+	CommandTag    = commandTag{}
+	MiddlewareTag = middlewareTag{}
+)
+
 type ScribusCommand interface {
 	app.Command
 }
 
 type Consumer interface {
-	SetHandler(handler HandlerFunc) error
+	SetHandler(handler func(ctx context.Context, keys []string, documents [][]byte) error) error
 	SetDsn(dsn string) error
 	SetExchange(exchange string) error
 	SetQueue(queue string) error
@@ -30,16 +41,19 @@ type Consumer interface {
 	Consume(ctx context.Context) error
 }
 
-// HandlerFunc is the raw consume callback the AMQP consumer invokes per
-// batch (or per message, with PageSize=1).
-type HandlerFunc = func(ctx context.Context, keys []string, documents [][]byte) error
-
-// Middleware wraps the consume callback. Registered under MiddlewareTag,
-// applied in registration order: the first middleware in the slice is the
-// outermost wrapper. tools/scribus/otel uses this to start a consumer span
-// per delivery.
 type Middleware interface {
-	Wrap(next HandlerFunc) HandlerFunc
+	Name() string
+	Order() int
+	Wrap(next func(ctx context.Context, keys []string, documents [][]byte) error) func(ctx context.Context, keys []string, documents [][]byte) error
+}
+
+func applyMiddlewares(handler func(ctx context.Context, keys []string, documents [][]byte) error, middlewares []Middleware) func(ctx context.Context, keys []string, documents [][]byte) error {
+	sorted := append([]Middleware(nil), middlewares...)
+	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Order() < sorted[j].Order() })
+	for i := len(sorted) - 1; i >= 0; i-- {
+		handler = sorted[i].Wrap(handler)
+	}
+	return handler
 }
 
 type Handler interface {
@@ -105,13 +119,6 @@ func NewBatchScribusCommand(
 		BaseCommand: command,
 		logger:      logger,
 	}, nil
-}
-
-func applyMiddlewares(handler HandlerFunc, middlewares []Middleware) HandlerFunc {
-	for i := len(middlewares) - 1; i >= 0; i-- {
-		handler = middlewares[i].Wrap(handler)
-	}
-	return handler
 }
 
 type scribusCommand struct {

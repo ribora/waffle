@@ -4,18 +4,11 @@ import (
 	"time"
 
 	"gitlab.com/gorib/amqp"
+	"gitlab.com/gorib/amqp/interceptor"
 	"gitlab.com/gorib/di"
 	"gitlab.com/gorib/env"
 	"gitlab.com/gorib/waffle/app"
 	"gitlab.com/gorib/waffle/tools/scribus"
-)
-
-type commandTag struct{}
-type middlewareTag struct{}
-
-var (
-	CommandTag    = commandTag{}
-	MiddlewareTag = middlewareTag{}
 )
 
 // Registers only what's common to both modes — does NOT register a
@@ -32,4 +25,10 @@ func InitScribus() {
 			amqp.WithConsumerFlushInterval(5 * time.Second),
 		},
 	}))
+
+	// Cross-cutting amqp middlewares (tracing, log, recover) — picked up by
+	// scribus via MiddlewareTag and applied around the dispatch handler.
+	di.Define(interceptor.NewTracing, di.Tag(scribus.MiddlewareTag))
+	di.Define(interceptor.NewLog, di.Tag(scribus.MiddlewareTag))
+	di.Define(interceptor.NewRecover, di.Tag(scribus.MiddlewareTag))
 }

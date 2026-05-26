@@ -7,13 +7,15 @@ import (
 	"os/signal"
 	"sort"
 	"syscall"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/pborman/getopt/v2"
 
+	"gitlab.com/gorib/failure"
 	"gitlab.com/gorib/hilton"
 	"gitlab.com/gorib/pry"
-	"gitlab.com/gorib/try"
+	"gitlab.com/gorib/session"
 )
 
 type Configure interface{}
@@ -67,14 +69,44 @@ func (a *app) Run() {
 	}
 
 	if cmd := a.commands.Get(command); cmd != nil {
-		ctx := NewContextWithCommand(cmd.Name(), opts.Args(), a.provider)
+		ctx := NewContextWithCommand(cmd.Name(), opts.Args(), a.provider, a.logger)
 		os.Args = opts.Args()
-		var err error
-		try.Catch(func() {
-			err = cmd.Run(ctx)
-		}, func(throwable error) {
-			err = throwable
-		})
+
+		const instrumentationName = "gitlab.com/gorib/waffle/app"
+		tracer := a.provider.Tracer(instrumentationName)
+		meter := a.provider.Meter(instrumentationName)
+
+		duration := meter.Histogram("cli.command.duration", hilton.WithDescription("Duration of CLI commands"), hilton.WithUnit("s"))
+
+		ctx, span := tracer.Start(ctx, "cmd."+cmd.Name(),
+			hilton.WithSpanKind(hilton.SpanKindInternal),
+			hilton.WithAttributes(hilton.StringAttr("cli.command", cmd.Name())),
+		)
+		defer span.End()
+
+		if s := session.FromContext(ctx); s != nil {
+			if tp := hilton.FormatTraceparent(span.SpanContext()); tp != "" {
+				s.Traceparent = tp
+			}
+		}
+
+		start := time.Now()
+		err := failure.Catch(func() error { return cmd.Run(ctx) })
+		took := time.Since(start).Seconds()
+
+		status := "ok"
+		if err != nil {
+			status = "error"
+			span.RecordError(err)
+			span.SetStatus(hilton.StatusError, err.Error())
+		}
+
+		attrs := []hilton.Attribute{
+			hilton.StringAttr("cli.command", cmd.Name()),
+			hilton.StringAttr("status", status),
+		}
+		duration.Record(ctx, took, attrs...)
+
 		if err != nil {
 			a.logger.Error(err, pry.Ctx(ctx))
 			os.Exit(1)

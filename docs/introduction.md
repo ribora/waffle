@@ -26,7 +26,7 @@ Waffle orchestrates these gorib packages:
 | `gitlab.com/gorib/env` | Type-safe environment variable reading |
 | `gitlab.com/gorib/http` | Fiber-based HTTP router |
 | `gitlab.com/gorib/grpc` | gRPC server helpers |
-| `gitlab.com/gorib/storage/sql` | SQL query builder and repository |
+| `gitlab.com/gorib/sql` | SQL query builder and repository |
 | `gitlab.com/gorib/amqp` | RabbitMQ consumer |
 | `gitlab.com/gorib/try` | Panic recovery |
 | `gitlab.com/gorib/hilton` | Distributed tracing & metrics abstraction (see [tools/hilton](tools/hilton.md)) |

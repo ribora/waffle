@@ -15,6 +15,10 @@ import (
 	"gitlab.com/gorib/waffle/app"
 )
 
+type middlewareTag struct{}
+
+var MiddlewareTag = middlewareTag{}
+
 type HttpCommand interface {
 	app.Command
 }

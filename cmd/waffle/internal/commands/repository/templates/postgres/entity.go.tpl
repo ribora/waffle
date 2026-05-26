@@ -8,7 +8,7 @@ import (
 
 	"gitlab.com/gorib/criteria"
 	"gitlab.com/gorib/pry"
-	"gitlab.com/gorib/storage/sql"
+	"gitlab.com/gorib/sql"
 
 	"{{ .Project }}/domain/{{ .Domain }}/model"
 )
