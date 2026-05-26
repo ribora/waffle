@@ -8,7 +8,7 @@ import (
 
 // Register your scribus.BatchHandler implementation alongside this.
 func InitBatch() {
-	di.Include("gitlab.com/gorib/waffle/tools/scribus")
+	di.Include("gitlab.com/gorib/waffle/config/tools/scribus")
 	di.Wire[scribus.ScribusCommand](scribus.NewBatchScribusCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
 		"middlewares": di.Tags[scribus.Middleware](scribus.MiddlewareTag),
 	}))
