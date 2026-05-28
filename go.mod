@@ -11,9 +11,9 @@ require (
 	gitlab.com/gorib/elastic v1.0.0
 	gitlab.com/gorib/env v1.0.0
 	gitlab.com/gorib/failure v1.1.0
-	gitlab.com/gorib/grpc v1.2.0
+	gitlab.com/gorib/grpc v1.2.1
 	gitlab.com/gorib/hilton v1.0.3
-	gitlab.com/gorib/http v1.2.1
+	gitlab.com/gorib/http v1.2.2
 	gitlab.com/gorib/pry v1.2.0
 	gitlab.com/gorib/redis v1.0.0
 	gitlab.com/gorib/session v1.1.0
