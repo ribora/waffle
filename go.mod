@@ -6,18 +6,18 @@ require (
 	github.com/fatih/color v1.18.0
 	github.com/pborman/getopt/v2 v2.1.0
 	github.com/pressly/goose/v3 v3.24.1
-	gitlab.com/gorib/amqp v1.2.1
+	gitlab.com/gorib/amqp v1.3.0
 	gitlab.com/gorib/di v1.5.0
-	gitlab.com/gorib/elastic v1.0.0
+	gitlab.com/gorib/elastic v1.1.0
 	gitlab.com/gorib/env v1.0.0
 	gitlab.com/gorib/failure v1.1.0
-	gitlab.com/gorib/grpc v1.2.1
+	gitlab.com/gorib/grpc v1.3.0
 	gitlab.com/gorib/hilton v1.0.3
-	gitlab.com/gorib/http v1.2.2
+	gitlab.com/gorib/http v1.3.0
 	gitlab.com/gorib/pry v1.2.0
-	gitlab.com/gorib/redis v1.0.1
+	gitlab.com/gorib/redis v1.1.0
 	gitlab.com/gorib/session v1.1.0
-	gitlab.com/gorib/sql v1.0.1
+	gitlab.com/gorib/sql v1.1.0
 	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b
 	google.golang.org/grpc v1.80.0
 )
