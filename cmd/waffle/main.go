@@ -7,6 +7,7 @@ import (
 	"os"
 	"slices"
 
+	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/agents"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/cmdcommand"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/domain"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/grpc"
@@ -68,6 +69,7 @@ func main() {
 	cmds.Add(migration.New())
 	cmds.Add(repository.New())
 	cmds.Add(cmdcommand.New())
+	cmds.Add(agents.New())
 
 	if len(os.Args) < 2 {
 		usage(cmds)

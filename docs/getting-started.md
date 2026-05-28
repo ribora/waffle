@@ -98,6 +98,23 @@ waffle make:domain user
 
 This creates the model, service, postgres adapter, and DI configuration for a `user` domain. See [make:domain](cli/make-domain.md) for details.
 
+## Upgrading waffle
+
+When you bump waffle to a newer version, refresh the AI-agent instructions:
+
+```sh
+go get gitlab.com/gorib/waffle@latest
+go get -tool gitlab.com/gorib/waffle/cmd/waffle@latest
+waffle agents                  # refresh AGENTS.md with new conventions
+go mod tidy
+make generate
+```
+
+`waffle agents` rewrites `AGENTS.md` (the AI-agent instructions file that
+ships with every waffle service) so AI coding assistants follow the current
+framework conventions. Without this step, agents may keep using deprecated
+patterns from the previous waffle version. See [agents](cli/agents.md).
+
 ## Next steps
 
 | Topic | Page |

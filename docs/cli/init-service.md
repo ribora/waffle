@@ -177,7 +177,17 @@ go get gitlab.com/gorib/digen
 make .tidy generate
 ```
 
-This installs the DI code generator and produces the initial `diogen/di_gen.go` so the project compiles immediately.
+This installs the DI code generator and produces the initial `diogen/di_gen.go` so the project compiles immediately. It also writes `AGENTS.md` (+ symlinks `CLAUDE.md`, `.cursorrules`) with the current framework conventions for AI coding agents — see [agents](agents.md).
+
+## Keeping AGENTS.md in sync
+
+After every waffle upgrade (`go get gitlab.com/gorib/waffle@latest`) run:
+
+```sh
+waffle agents
+```
+
+This rewrites `AGENTS.md` with the conventions of the new waffle version. Commit the diff. AGENTS.md is fully waffle-managed — hand edits are lost on regeneration. Put service-specific notes in `CONTRIBUTING.md` instead.
 
 ## What to do next
 

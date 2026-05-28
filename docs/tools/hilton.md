@@ -4,7 +4,7 @@
 
 ## Setup
 
-Nothing to do — `service/hilton` is included transitively via `config/app`:
+Add a blank import for `config/service/hilton` to your `modules.go`:
 
 ```go
 // config/di/modules.go
@@ -19,7 +19,7 @@ import (
 )
 ```
 
-Every service that uses waffle gets a `hilton.Provider` wired automatically. With empty `OTEL_EXPORTER_OTLP_ENDPOINT` the provider is a noop — spans/metrics are created and propagated but not exported. No conditional plumbing in service code.
+Once `service/hilton` is in `modules.go`, `hilton.Provider` is wired automatically and injected into every HTTP/gRPC handler context and CLI command root. With empty `OTEL_EXPORTER_OTLP_ENDPOINT` the provider is a noop — spans/metrics are created and propagated but not exported. No conditional plumbing in service code.
 
 ## Configuration
 

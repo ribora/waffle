@@ -15,7 +15,13 @@ go install gitlab.com/gorib/waffle/cmd/waffle@latest
 | `waffle init:service` | Bootstrap a new microservice project |
 | `waffle make:domain <name>` | Add a domain (model, service, postgres adapter) |
 | `waffle make:domain:grpc <name>` | Add a gRPC handler for an existing domain |
+| `waffle make:domain:http <name>` | Add an HTTP handler for an existing domain |
+| `waffle make:domain:scribus <name> <event>` | Add an AMQP consumer for an existing domain |
 | `waffle make:domain:migrate <name>` | Add database migrations for an existing domain |
+| `waffle make:domain:repository <name> <entity>` | Add a secondary repository |
+| `waffle make:domain:migration <name> <description>` | Add a new SQL migration |
+| `waffle make:domain:command <name> <command>` | Add a CLI subcommand scoped to a domain |
+| `waffle agents` | Regenerate `AGENTS.md` after a waffle upgrade ([details](agents.md)) |
 
 ## How it works
 

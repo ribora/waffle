@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/agents"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
 )
 
@@ -48,6 +49,9 @@ func (c *cmd) Run(ctx context.Context, _ ...string) error {
 
 	err = c.Write(sources, params)
 	if err != nil {
+		return err
+	}
+	if err := agents.Generate(projectName); err != nil {
 		return err
 	}
 	info, err := exec.Command("go", "get", "-tool", "gitlab.com/gorib/di/cmd/diogen@latest").CombinedOutput()

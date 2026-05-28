@@ -19,6 +19,7 @@ Waffle is an opinionated meta-framework for building Go microservices on the Gol
 - [make:domain](docs/cli/make-domain.md) — Model, service, postgres adapter, stored struct
 - [make:domain:grpc](docs/cli/make-domain-grpc.md) — Proto definition, gRPC handler, error mapping
 - [make:domain:migrate](docs/cli/make-domain-migrate.md) — Migration runner, SQL files, goose format
+- [agents](docs/cli/agents.md) — Regenerate AGENTS.md (run after every waffle upgrade)
 
 ### Tools
 - [HTTP](docs/tools/http.md) — Fiber server, middleware registry, route registration
