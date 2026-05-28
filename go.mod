@@ -15,7 +15,7 @@ require (
 	gitlab.com/gorib/hilton v1.0.3
 	gitlab.com/gorib/http v1.2.2
 	gitlab.com/gorib/pry v1.2.0
-	gitlab.com/gorib/redis v1.0.0
+	gitlab.com/gorib/redis v1.0.1
 	gitlab.com/gorib/session v1.1.0
 	gitlab.com/gorib/sql v1.0.1
 	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b
