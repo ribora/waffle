@@ -59,9 +59,6 @@ func (a *app) RunUntilStop() {
 	cancel()
 	if err := <-closed; err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Failed to gracefully shutdown an application: %v\n", err)
-		if code == 0 {
-			code = 1
-		}
 	}
 	os.Exit(code)
 }
