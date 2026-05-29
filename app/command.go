@@ -90,7 +90,7 @@ func (b *baseCommand) Usage() error {
 		getopt.SetParameters("")
 		_, _ = fmt.Fprintf(os.Stderr, "%s\n", b.Description())
 		getopt.PrintUsage(os.Stderr)
-		os.Exit(2)
+		return ErrUsage
 	}
 	return nil
 }

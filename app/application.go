@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -24,7 +25,7 @@ type Configure interface{}
 
 type App interface {
 	RunUntilStop()
-	Run() int
+	Run() error
 	Stop() error
 }
 
@@ -55,15 +56,33 @@ func (a *app) RunUntilStop() {
 
 	closed := make(chan error, 1)
 	go a.Watch(ctx, closed)
-	code := a.Run()
+	runErr := a.Run()
 	cancel()
+
 	if err := <-closed; err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Failed to gracefully shutdown an application: %v\n", err)
 	}
-	os.Exit(code)
+
+	os.Exit(exitCode(runErr))
 }
 
-func (a *app) Run() int {
+// exitCode maps a Run() error to a POSIX-style process exit code.
+//
+//	nil       → 0  success
+//	ErrUsage  → 2  user invoked the command incorrectly
+//	other     → 1  runtime failure
+func exitCode(err error) int {
+	switch {
+	case err == nil:
+		return 0
+	case errors.Is(err, ErrUsage):
+		return 2
+	default:
+		return 1
+	}
+}
+
+func (a *app) Run() error {
 	opts := getopt.New()
 	var help bool
 	opts.FlagLong(&help, "help", 'h', "Display this help message")
@@ -76,54 +95,54 @@ func (a *app) Run() int {
 	}
 	if help {
 		a.usage(opts.PrintUsage)
-		return 2
+		return ErrUsage
 	}
 
-	if cmd := a.commands.Get(command); cmd != nil {
-		ctx := NewContextWithCommand(cmd.Name(), opts.Args(), a.provider, a.logger)
-		os.Args = opts.Args()
-
-		tracer := a.provider.Tracer(instrumentationName)
-		meter := a.provider.Meter(instrumentationName)
-
-		duration := meter.Histogram("cli.command.duration", hilton.WithDescription("Duration of CLI commands"), hilton.WithUnit("s"))
-
-		ctx, span := tracer.Start(ctx, "cmd."+cmd.Name(),
-			hilton.WithSpanKind(hilton.SpanKindInternal),
-			hilton.WithAttributes(hilton.StringAttr("cli.command", cmd.Name())),
-		)
-		defer span.End()
-
-		if s := session.FromContext(ctx); s != nil {
-			if tp := hilton.FormatTraceparent(span.SpanContext()); tp != "" {
-				s.Traceparent = tp
-			}
-		}
-
-		start := time.Now()
-		err := failure.Catch(func() error { return cmd.Run(ctx) })
-		took := time.Since(start).Seconds()
-
-		attrs := []hilton.Attribute{
-			hilton.StringAttr("cli.command", cmd.Name()),
-		}
-		if err != nil {
-			span.RecordError(err)
-			span.SetStatus(hilton.StatusError, err.Error())
-			attrs = append(attrs, hilton.StringAttr("error.type", fmt.Sprintf("%T", err)))
-		}
-		duration.Record(ctx, took, attrs...)
-
-		if err != nil {
-			a.logger.Error(err, pry.Ctx(ctx))
-			return 1
-		}
-	} else {
+	cmd := a.commands.Get(command)
+	if cmd == nil {
 		color.Red("Unknown command '%s'.\n", command)
 		a.usage(opts.PrintUsage)
-		return 2
+		return ErrUsage
 	}
-	return 0
+
+	ctx := NewContextWithCommand(cmd.Name(), opts.Args(), a.provider, a.logger)
+	os.Args = opts.Args()
+
+	tracer := a.provider.Tracer(instrumentationName)
+	meter := a.provider.Meter(instrumentationName)
+
+	duration := meter.Histogram("cli.command.duration", hilton.WithDescription("Duration of CLI commands"), hilton.WithUnit("s"))
+
+	ctx, span := tracer.Start(ctx, "cmd."+cmd.Name(),
+		hilton.WithSpanKind(hilton.SpanKindInternal),
+		hilton.WithAttributes(hilton.StringAttr("cli.command", cmd.Name())),
+	)
+	defer span.End()
+
+	if s := session.FromContext(ctx); s != nil {
+		if tp := hilton.FormatTraceparent(span.SpanContext()); tp != "" {
+			s.Traceparent = tp
+		}
+	}
+
+	start := time.Now()
+	err := failure.Catch(func() error { return cmd.Run(ctx) })
+	took := time.Since(start).Seconds()
+
+	attrs := []hilton.Attribute{
+		hilton.StringAttr("cli.command", cmd.Name()),
+	}
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(hilton.StatusError, err.Error())
+		attrs = append(attrs, hilton.StringAttr("error.type", fmt.Sprintf("%T", err)))
+	}
+	duration.Record(ctx, took, attrs...)
+
+	if err != nil && !errors.Is(err, ErrUsage) {
+		a.logger.Error(err, pry.Ctx(ctx))
+	}
+	return err
 }
 
 func (a *app) Stop() error {
