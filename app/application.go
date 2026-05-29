@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"sort"
 	"syscall"
 	"time"
 
@@ -18,6 +17,8 @@ import (
 	"gitlab.com/gorib/pry"
 	"gitlab.com/gorib/session"
 )
+
+const instrumentationName = "gitlab.com/gorib/waffle/app"
 
 type Configure interface{}
 
@@ -85,7 +86,6 @@ func (a *app) Run() int {
 		ctx := NewContextWithCommand(cmd.Name(), opts.Args(), a.provider, a.logger)
 		os.Args = opts.Args()
 
-		const instrumentationName = "gitlab.com/gorib/waffle/app"
 		tracer := a.provider.Tracer(instrumentationName)
 		meter := a.provider.Meter(instrumentationName)
 
@@ -107,16 +107,13 @@ func (a *app) Run() int {
 		err := failure.Catch(func() error { return cmd.Run(ctx) })
 		took := time.Since(start).Seconds()
 
-		status := "ok"
-		if err != nil {
-			status = "error"
-			span.RecordError(err)
-			span.SetStatus(hilton.StatusError, err.Error())
-		}
-
 		attrs := []hilton.Attribute{
 			hilton.StringAttr("cli.command", cmd.Name()),
-			hilton.StringAttr("status", status),
+		}
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(hilton.StatusError, err.Error())
+			attrs = append(attrs, hilton.StringAttr("error.type", fmt.Sprintf("%T", err)))
 		}
 		duration.Record(ctx, took, attrs...)
 
@@ -142,6 +139,7 @@ func (a *app) Stop() error {
 func (a *app) Watch(ctx context.Context, closed chan error) {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sig)
 	select {
 	case <-sig:
 	case <-ctx.Done():
@@ -163,11 +161,6 @@ func (a *app) Closer() func() error {
 func (a *app) usage(printer func(w io.Writer)) {
 	printer(os.Stderr)
 	_, _ = fmt.Fprintf(os.Stderr, "Available commands:\n")
-	var names []string
-	for command := range a.commands {
-		names = append(names, command)
-	}
-	sort.Strings(names)
 	for cmd := range a.commands.List() {
 		fmt.Printf("\t%s\t%s\n", color.New(color.FgGreen).Sprint(cmd.Name()), cmd.Description())
 	}
