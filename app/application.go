@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -22,7 +23,7 @@ type Configure interface{}
 
 type App interface {
 	RunUntilStop()
-	Run()
+	Run() int
 	Stop() error
 }
 
@@ -49,11 +50,22 @@ type app struct {
 }
 
 func (a *app) RunUntilStop() {
-	go a.Watch()
-	a.Run()
+	ctx, cancel := context.WithCancel(context.Background())
+
+	closed := make(chan error, 1)
+	go a.Watch(ctx, closed)
+	code := a.Run()
+	cancel()
+	if err := <-closed; err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "Failed to gracefully shutdown an application: %v\n", err)
+		if code == 0 {
+			code = 1
+		}
+	}
+	os.Exit(code)
 }
 
-func (a *app) Run() {
+func (a *app) Run() int {
 	opts := getopt.New()
 	var help bool
 	opts.FlagLong(&help, "help", 'h', "Display this help message")
@@ -66,6 +78,7 @@ func (a *app) Run() {
 	}
 	if help {
 		a.usage(opts.PrintUsage)
+		return 2
 	}
 
 	if cmd := a.commands.Get(command); cmd != nil {
@@ -109,13 +122,14 @@ func (a *app) Run() {
 
 		if err != nil {
 			a.logger.Error(err, pry.Ctx(ctx))
-			os.Exit(1)
+			return 1
 		}
 	} else {
 		color.Red("Unknown command '%s'.\n", command)
 		a.usage(opts.PrintUsage)
-		os.Exit(2)
+		return 2
 	}
+	return 0
 }
 
 func (a *app) Stop() error {
@@ -125,13 +139,17 @@ func (a *app) Stop() error {
 	return nil
 }
 
-func (a *app) Watch() {
+func (a *app) Watch(ctx context.Context, closed chan error) {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-	<-sig
-	if err := a.Stop(); err != nil {
-		panic(err)
+	select {
+	case <-sig:
+	case <-ctx.Done():
 	}
+	if err := a.Stop(); err != nil {
+		closed <- err
+	}
+	close(closed)
 }
 
 func (a *app) SetCloser(closer func() error) {
@@ -153,5 +171,4 @@ func (a *app) usage(printer func(w io.Writer)) {
 	for cmd := range a.commands.List() {
 		fmt.Printf("\t%s\t%s\n", color.New(color.FgGreen).Sprint(cmd.Name()), cmd.Description())
 	}
-	os.Exit(2)
 }
