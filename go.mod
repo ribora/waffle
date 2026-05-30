@@ -12,8 +12,8 @@ require (
 	gitlab.com/gorib/env v1.0.0
 	gitlab.com/gorib/failure v1.1.0
 	gitlab.com/gorib/grpc v1.3.1
-	gitlab.com/gorib/hilton v1.0.3
-	gitlab.com/gorib/http v1.3.1
+	gitlab.com/gorib/hilton v1.0.4
+	gitlab.com/gorib/http v1.4.0
 	gitlab.com/gorib/pry v1.2.0
 	gitlab.com/gorib/redis v1.1.0
 	gitlab.com/gorib/session v1.1.0
@@ -61,8 +61,8 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.68.0 // indirect
 	gitlab.com/gorib/criteria v0.0.0-20250224141747-7755bfaa022c // indirect
-	gitlab.com/gorib/goriscan v1.0.1 // indirect
-	gitlab.com/gorib/gorival v1.3.1 // indirect
+	gitlab.com/gorib/goriscan v1.1.0 // indirect
+	gitlab.com/gorib/gorival v1.4.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.43.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.43.0 // indirect
