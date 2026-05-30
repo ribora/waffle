@@ -148,7 +148,7 @@ func (c *scribusCommand) Usage() error {
 		getopt.SetParameters("[amqp://user:pass@host:port exchange query:routing.key]")
 		_, _ = fmt.Fprintf(os.Stderr, "%s\n", c.Description())
 		getopt.PrintUsage(os.Stderr)
-		os.Exit(2)
+		return app.ErrUsage
 	}
 
 	if *timeout != 0 {

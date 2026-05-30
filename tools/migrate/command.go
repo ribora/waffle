@@ -58,7 +58,7 @@ func (c *migrateCommand) Run(ctx context.Context) (err error) {
 		_, _ = fmt.Fprintf(os.Stderr, "\treset\t\tRoll back all migrations\n")
 		_, _ = fmt.Fprintf(os.Stderr, "\tstatus\t\tDump the migration status for the current DB\n")
 		_, _ = fmt.Fprintf(os.Stderr, "\tversion\t\tPrint the current version of the database\n")
-		os.Exit(2)
+		return app.ErrUsage
 	}
 
 	if *connection != "" {

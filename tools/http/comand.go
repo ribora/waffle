@@ -66,7 +66,7 @@ func (c *httpCommand) Usage() error {
 		getopt.SetParameters("")
 		_, _ = os.Stderr.WriteString(c.Description())
 		getopt.PrintUsage(os.Stderr)
-		os.Exit(2)
+		return app.ErrUsage
 	}
 	if *listen != "" {
 		parts := strings.Split(*listen, ":")

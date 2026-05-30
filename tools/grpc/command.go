@@ -102,7 +102,7 @@ func (c *grpcCommand) Usage() error {
 		getopt.SetParameters("")
 		_, _ = fmt.Fprintf(os.Stderr, "%s\n", c.Description())
 		getopt.PrintUsage(os.Stderr)
-		os.Exit(2)
+		return app.ErrUsage
 	}
 	if *listen != "" {
 		parts := strings.Split(*listen, ":")
