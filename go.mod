@@ -1,6 +1,6 @@
 module gitlab.com/gorib/waffle
 
-go 1.25.7
+go 1.25.0
 
 require (
 	github.com/fatih/color v1.18.0
@@ -17,7 +17,7 @@ require (
 	gitlab.com/gorib/pry v1.2.0
 	gitlab.com/gorib/redis v1.1.0
 	gitlab.com/gorib/session v1.1.0
-	gitlab.com/gorib/sql v1.1.0
+	gitlab.com/gorib/sql v1.2.1
 	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b
 	google.golang.org/grpc v1.80.0
 )
@@ -39,6 +39,7 @@ require (
 	github.com/gofiber/fiber/v2 v2.52.9 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 // indirect
+	github.com/iancoleman/strcase v0.3.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/pgx/v5 v5.8.0 // indirect
@@ -60,7 +61,7 @@ require (
 	github.com/sethvargo/go-retry v0.3.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.68.0 // indirect
-	gitlab.com/gorib/criteria v0.0.0-20250224141747-7755bfaa022c // indirect
+	gitlab.com/gorib/criteria v1.0.0 // indirect
 	gitlab.com/gorib/goriscan v1.1.0 // indirect
 	gitlab.com/gorib/gorival v1.4.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
