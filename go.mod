@@ -17,7 +17,7 @@ require (
 	gitlab.com/gorib/pry v1.2.0
 	gitlab.com/gorib/redis v1.1.0
 	gitlab.com/gorib/session v1.1.0
-	gitlab.com/gorib/sql v1.2.1
+	gitlab.com/gorib/sql v1.3.0
 	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b
 	google.golang.org/grpc v1.80.0
 )
