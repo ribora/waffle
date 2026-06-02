@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/pborman/getopt/v2"
@@ -34,7 +33,7 @@ type Consumer interface {
 	SetDsn(dsn string) error
 	SetExchange(exchange string) error
 	SetQueue(queue string) error
-	SetRoutingKey(routingKey string) error
+	Bind(routingKey string) error
 	SetPageSize(pageSize uint16) error
 	SetFlushInterval(flushInterval time.Duration) error
 	SetReconnectInterval(interval time.Duration) error
@@ -63,6 +62,7 @@ type Handler interface {
 
 type BatchHandler interface {
 	Run(ctx context.Context, keys []string, payload [][]byte) error
+	Keys() []string
 }
 
 func NewScribusCommand(
@@ -79,6 +79,9 @@ func NewScribusCommand(
 	for _, c := range commands {
 		for _, key := range c.Keys() {
 			cmd[key] = c
+			if err := consumer.Bind(key); err != nil {
+				return nil, err
+			}
 		}
 	}
 	handler := func(ctx context.Context, keys []string, documents [][]byte) error {
@@ -110,6 +113,15 @@ func NewBatchScribusCommand(
 	consumer Consumer,
 	logger pry.Logger,
 ) (*scribusCommand, error) {
+	keys := handler.Keys()
+	if len(keys) == 0 {
+		return nil, errors.New("batch handler exposes no routing keys")
+	}
+	for _, key := range keys {
+		if err := consumer.Bind(key); err != nil {
+			return nil, err
+		}
+	}
 	if err := consumer.SetHandler(applyMiddlewares(handler.Run, middlewares)); err != nil {
 		return nil, err
 	}
@@ -140,13 +152,15 @@ func (c *scribusCommand) Run(ctx context.Context) error {
 func (c *scribusCommand) Usage(ctx context.Context) error {
 	opts := getopt.New()
 	var help bool
-	getopt.FlagLong(&help, "help", 'h', "Display this help message")
-	timeout := getopt.DurationLong("flush-timeout", 't', 0, "Flush every [n] seconds", "n")
-	reconnect := getopt.DurationLong("reconnect-timeout", 'r', 0, "Reconnect every [n] seconds", "n")
-	page := getopt.Uint16Long("page", 'p', 0, "Number of items for bulk processing")
-	getopt.Parse()
+	opts.FlagLong(&help, "help", 'h', "Display this help message")
+	timeout := opts.DurationLong("flush-timeout", 't', 0, "Flush every [n] seconds", "n")
+	reconnect := opts.DurationLong("reconnect-timeout", 'r', 0, "Reconnect every [n] seconds", "n")
+	page := opts.Uint16Long("page", 'p', 0, "Number of items for bulk processing")
+	if err := opts.Getopt(app.Args(ctx), nil); err != nil {
+		return err
+	}
 	if help {
-		opts.SetParameters("[amqp://user:pass@host:port exchange query:routing.key]")
+		opts.SetParameters("[amqp://user:pass@host:port exchange queue]")
 		_, _ = fmt.Fprintf(os.Stderr, "%s\n", c.Description())
 		opts.PrintUsage(os.Stderr)
 		return app.ErrUsage
@@ -171,10 +185,7 @@ func (c *scribusCommand) Usage(ctx context.Context) error {
 		}
 		_ = c.consumer.SetDsn(opts.Args()[1])
 		_ = c.consumer.SetExchange(opts.Args()[2])
-		queue := strings.Split(opts.Args()[3], ":")
-		queue = append(queue, "#")
-		_ = c.consumer.SetQueue(queue[0])
-		_ = c.consumer.SetRoutingKey(queue[1])
+		_ = c.consumer.SetQueue(opts.Args()[3])
 	}
 	return nil
 }

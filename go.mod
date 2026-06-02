@@ -7,7 +7,7 @@ require (
 	github.com/go-co-op/gocron/v2 v2.18.2
 	github.com/pborman/getopt/v2 v2.1.0
 	github.com/pressly/goose/v3 v3.24.1
-	gitlab.com/gorib/amqp v1.3.0
+	gitlab.com/gorib/amqp v1.4.0
 	gitlab.com/gorib/di v1.5.1
 	gitlab.com/gorib/elastic v1.1.0
 	gitlab.com/gorib/env v1.0.0
@@ -57,6 +57,7 @@ require (
 	github.com/redis/go-redis/v9 v9.7.1 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
+	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/rs/zerolog v1.34.0 // indirect
 	github.com/samber/lo v1.52.0 // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
@@ -78,6 +79,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.43.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
+	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b // indirect
 	golang.org/x/mod v0.36.0 // indirect
 	golang.org/x/net v0.54.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
