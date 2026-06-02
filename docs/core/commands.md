@@ -8,7 +8,7 @@ Commands are the unit of work in a waffle application. Each runtime concern — 
 type BaseCommand interface {
     Name() string
     Description() string
-    Usage() error
+    Usage(ctx context.Context) error
 }
 
 type Command interface {
@@ -19,19 +19,7 @@ type Command interface {
 
 `BaseCommand` carries identity and help text. `Command` adds execution. The separation exists because tool constructors (e.g. `NewGrpcCommand`) accept a `BaseCommand` rather than a full `Command`, keeping the name/description wiring decoupled from the implementation.
 
-## CommandList
-
-`CommandList` is a `map[string]Command` with helper methods:
-
-```go
-type CommandList map[string]Command
-
-func (c CommandList) Add(command Command) error
-func (c CommandList) Get(command string) Command
-func (c CommandList) List() <-chan Command
-```
-
-`Add` validates that the name is unique — duplicate registration returns an error. `List` returns commands over a channel in alphabetical order, used by the usage printer.
+`Usage(ctx)` reads argv from the context (see [Context](context.md)) and parses flags. It is called by `Run` before the command starts work.
 
 ## Writing a custom command
 
@@ -40,7 +28,8 @@ Implement the `Command` interface. Embed `app.BaseCommand` (the interface) and s
 ```go
 type warmCacheCommand struct {
     app.BaseCommand
-    cache *Cache
+    cache  *Cache
+    prefix string
 }
 
 func NewWarmCacheCommand(cache *Cache) app.Command {
@@ -51,14 +40,12 @@ func NewWarmCacheCommand(cache *Cache) app.Command {
 }
 
 func (c *warmCacheCommand) Run(ctx context.Context) error {
-    if err := c.Usage(); err != nil {
+    if err := c.Usage(ctx); err != nil {
         return err
     }
-    return c.cache.Warm(ctx)
+    return c.cache.Warm(ctx, c.prefix)
 }
 ```
-
-`Run` calls `Usage()` first to parse flags before execution begins.
 
 ## Registering a custom command
 
@@ -72,35 +59,86 @@ After `make generate`, the app will list and dispatch `warm-cache` alongside the
 
 ## Flag parsing inside a command
 
-Waffle uses `github.com/pborman/getopt/v2` for flag parsing. Implement `Usage() error` on your command, declare flags with `getopt` global functions, call `getopt.Parse()`, and handle `--help`:
+Waffle uses `github.com/pborman/getopt/v2`. Each command parses its own argv from the context — never from `os.Args` directly — so cron and any other scheduler can invoke commands without race conditions on the global flag set.
 
 ```go
 import (
+    "context"
+    "fmt"
     "os"
+
     "github.com/pborman/getopt/v2"
+    "gitlab.com/gorib/waffle/app"
 )
 
-func (c *warmCacheCommand) Usage() error {
+func (c *warmCacheCommand) Usage(ctx context.Context) error {
+    opts := getopt.New()
     var help bool
-    getopt.FlagLong(&help, "help", 'h', "Display this help message")
-    prefix := getopt.StringLong("prefix", 'p', "", "Key prefix to warm")
-    getopt.Parse()
+    opts.FlagLong(&help, "help", 'h', "Display this help message")
+    prefix := opts.StringLong("prefix", 'p', "", "Key prefix to warm")
+    if err := opts.Getopt(app.Args(ctx), nil); err != nil {
+        return err
+    }
     if help {
-        getopt.SetParameters("")
-        os.Stderr.WriteString(c.Description() + "\n")
-        getopt.PrintUsage(os.Stderr)
-        os.Exit(2)
+        opts.SetParameters("")
+        _, _ = fmt.Fprintf(os.Stderr, "%s\n", c.Description())
+        opts.PrintUsage(os.Stderr)
+        return app.ErrUsage
     }
     c.prefix = *prefix
     return nil
 }
 ```
 
-`getopt` is a global — all flags registered before `getopt.Parse()` is called are parsed together. There is no per-command flag set and no `FlagSet()` method on `BaseCommand`.
+The pattern is always:
+
+1. `opts := getopt.New()` — a fresh option set, never the global default.
+2. Declare flags on `opts`.
+3. `opts.Getopt(app.Args(ctx), nil)` — parse the context-borne argv.
+4. Handle `--help` by returning `app.ErrUsage`.
+
+Returning `app.ErrUsage` makes the process exit with code 2 (POSIX convention for usage errors) without logging it as an error.
+
+## Daemons
+
+Long-running commands — HTTP/gRPC servers, queue consumers — implement the `Daemon` marker interface:
+
+```go
+type Daemon interface {
+    Command
+    Daemon()
+}
+```
+
+The implementation is a no-op method:
+
+```go
+func (c *httpCommand) Daemon() {}
+```
+
+Schedulers like cron (see [tools/cron](../tools/cron.md)) refuse to invoke daemons because their `Run(ctx)` blocks until ctx is cancelled — invoking one on a cron tick would jam the scheduler forever. Mark any command whose `Run` does not return promptly.
+
+## Orchestrators and CommandsAware
+
+Commands that need peer access (e.g. cron, which dispatches other commands on a schedule) implement `CommandsAware`:
+
+```go
+type Commands interface {
+    Get(name string) Command
+}
+
+type CommandsAware interface {
+    SetCommands(Commands)
+}
+```
+
+`app.Init` calls `SetCommands` once after the registry is built, before the app starts dispatching. The `Commands` view is read-only by design — orchestrators look up peers by name but cannot mutate the registry.
+
+Cron is the only built-in `CommandsAware` consumer. Custom orchestrators are possible but rare; most cross-cutting concerns belong in middleware, not in a sibling command.
 
 ## Built-in commands
 
-The following commands are provided by waffle tools. Copy their registrations into `InitDi()` in `config/di/di.go` — see each tool's documentation page for the exact block.
+The following commands are provided by waffle tools. Include each tool's `Init...()` in your `modules.go` to register the corresponding command.
 
 | Name | Package | Documentation |
 |------|---------|---------------|
@@ -108,3 +146,4 @@ The following commands are provided by waffle tools. Copy their registrations in
 | `grpc` | `tools/grpc` | [tools/grpc.md](../tools/grpc.md) |
 | `migrate` | `tools/migrate` | [tools/migrate.md](../tools/migrate.md) |
 | `scribus` | `tools/scribus` | [tools/scribus.md](../tools/scribus.md) |
+| `cron` | `tools/cron` | [tools/cron.md](../tools/cron.md) |

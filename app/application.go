@@ -35,17 +35,22 @@ type HasCloser interface {
 }
 
 func Init(commands []Command, logger pry.Logger, provider hilton.Provider) (*app, error) {
-	var cmd CommandList
+	cmd := make(commandList, len(commands))
 	for _, command := range commands {
 		if err := cmd.Add(command); err != nil {
 			return nil, err
+		}
+	}
+	for _, command := range commands {
+		if a, ok := command.(CommandsAware); ok {
+			a.SetCommands(cmd)
 		}
 	}
 	return &app{commands: cmd, logger: logger, provider: provider}, nil
 }
 
 type app struct {
-	commands CommandList
+	commands commandList
 	closer   func() error
 	logger   pry.Logger
 	provider hilton.Provider
@@ -100,13 +105,12 @@ func (a *app) Run() error {
 
 	cmd := a.commands.Get(command)
 	if cmd == nil {
-		color.Red("Unknown command '%s'.\n", command)
+		_, _ = color.New(color.FgRed).Fprintf(os.Stderr, "Unknown command '%s'.\n", command)
 		a.usage(opts.PrintUsage)
 		return ErrUsage
 	}
 
 	ctx := NewContextWithCommand(cmd.Name(), opts.Args(), a.provider, a.logger)
-	os.Args = opts.Args()
 
 	tracer := a.provider.Tracer(instrumentationName)
 	meter := a.provider.Meter(instrumentationName)
@@ -176,8 +180,9 @@ func (a *app) Closer() func() error {
 
 func (a *app) usage(printer func(w io.Writer)) {
 	printer(os.Stderr)
-	_, _ = fmt.Fprintf(os.Stderr, "Available commands:\n")
-	for cmd := range a.commands.List() {
-		fmt.Printf("\t%s\t%s\n", color.New(color.FgGreen).Sprint(cmd.Name()), cmd.Description())
+	items := make(map[string]string, len(a.commands))
+	for name, cmd := range a.commands {
+		items[name] = cmd.Description()
 	}
+	PrintList(os.Stderr, "Available commands:", items)
 }

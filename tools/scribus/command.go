@@ -129,7 +129,7 @@ type scribusCommand struct {
 }
 
 func (c *scribusCommand) Run(ctx context.Context) error {
-	if err := c.Usage(); err != nil {
+	if err := c.Usage(ctx); err != nil {
 		return err
 	}
 
@@ -137,7 +137,8 @@ func (c *scribusCommand) Run(ctx context.Context) error {
 	return c.consumer.Consume(ctx)
 }
 
-func (c *scribusCommand) Usage() error {
+func (c *scribusCommand) Usage(ctx context.Context) error {
+	opts := getopt.New()
 	var help bool
 	getopt.FlagLong(&help, "help", 'h', "Display this help message")
 	timeout := getopt.DurationLong("flush-timeout", 't', 0, "Flush every [n] seconds", "n")
@@ -145,9 +146,9 @@ func (c *scribusCommand) Usage() error {
 	page := getopt.Uint16Long("page", 'p', 0, "Number of items for bulk processing")
 	getopt.Parse()
 	if help {
-		getopt.SetParameters("[amqp://user:pass@host:port exchange query:routing.key]")
+		opts.SetParameters("[amqp://user:pass@host:port exchange query:routing.key]")
 		_, _ = fmt.Fprintf(os.Stderr, "%s\n", c.Description())
-		getopt.PrintUsage(os.Stderr)
+		opts.PrintUsage(os.Stderr)
 		return app.ErrUsage
 	}
 
@@ -164,16 +165,18 @@ func (c *scribusCommand) Usage() error {
 	if *page != 0 {
 		_ = c.consumer.SetPageSize(*page)
 	}
-	if len(getopt.Args()) > 0 {
-		if len(getopt.Args()) != 4 {
+	if len(opts.Args()) > 0 {
+		if len(opts.Args()) != 4 {
 			return errors.New("unexpected connection parameters count")
 		}
-		_ = c.consumer.SetDsn(getopt.Args()[1])
-		_ = c.consumer.SetExchange(getopt.Args()[2])
-		queue := strings.Split(getopt.Args()[3], ":")
+		_ = c.consumer.SetDsn(opts.Args()[1])
+		_ = c.consumer.SetExchange(opts.Args()[2])
+		queue := strings.Split(opts.Args()[3], ":")
 		queue = append(queue, "#")
 		_ = c.consumer.SetQueue(queue[0])
 		_ = c.consumer.SetRoutingKey(queue[1])
 	}
 	return nil
 }
+
+func (c *scribusCommand) Daemon() {}

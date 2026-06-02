@@ -27,10 +27,9 @@ di.Wire[app.BaseCommand](
     di.For[wscribus.ScribusCommand](),
 )
 di.Wire[wscribus.Consumer](amqp.NewConsumer, di.Args(map[string]any{
-    "dsn":        env.NeedValue[string]("RABBIT_DSN"),
-    "exchange":   env.NeedValue[string]("RABBIT_EXCHANGE"),
-    "queue":      env.NeedValue[string]("RABBIT_QUEUE"),
-    "routingKey": "#",
+    "dsn":      env.NeedValue[string]("RABBIT_DSN"),
+    "exchange": env.NeedValue[string]("RABBIT_EXCHANGE"),
+    "queue":    env.NeedValue[string]("RABBIT_QUEUE"),
     "opts": []amqp.ConsumerOptions{
         amqp.WithConsumerPageSize(1),
         amqp.WithConsumerFlushInterval(5 * time.Second),
@@ -88,6 +87,14 @@ Example:
 ## Environment variables
 
 Environment variables are not read automatically. They are wired explicitly in `InitDi()` via `env.NeedValue` / `env.Value` as shown in the Setup section above. Variable names are chosen by you. The CLI positional arguments take precedence at runtime.
+
+## Routing keys
+
+Routing keys are **not** configured in env. Each `Handler` (single mode) or `BatchHandler` (batch mode) declares its own keys via `Keys() []string`, and scribus binds the consumer's queue to those keys at startup. Adding a new handler — or a new key on an existing handler — automatically extends the binding set on next deploy.
+
+Bindings are additive: `QueueBind` is idempotent at the broker level, so repeated startups don't churn. Removing a key from a `Handler` stops new messages from being delivered for that key only after the stale binding is removed manually via RabbitMQ Management UI (or `rabbitmqadmin delete binding`). Scribus does not unbind for you — the consumer code only knows what it currently *wants*, not what was bound before.
+
+For ad-hoc fan-out (consume every message regardless of routing), implement `Keys() []string{"#"}` on the handler. Wildcard semantics are RabbitMQ's, not scribus's.
 
 ## Single mode
 
@@ -197,11 +204,12 @@ In batch mode, a single `BatchHandler` receives a slice of messages accumulated 
 
 ```go
 type BatchHandler interface {
+    Keys() []string
     Run(ctx context.Context, keys []string, payloads [][]byte) error
 }
 ```
 
-`keys[i]` is the routing key of `payloads[i]`. In practice all messages in a batch usually share the same routing key.
+`Keys()` returns the routing keys this batch handler subscribes to — scribus auto-binds them on the queue at startup. `Run` is called with a slice of messages; `keys[i]` is the routing key of `payloads[i]`.
 
 ### Implementing a batch handler
 

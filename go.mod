@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/fatih/color v1.18.0
+	github.com/go-co-op/gocron/v2 v2.18.2
 	github.com/pborman/getopt/v2 v2.1.0
 	github.com/pressly/goose/v3 v3.24.1
 	gitlab.com/gorib/amqp v1.3.0
@@ -18,7 +19,6 @@ require (
 	gitlab.com/gorib/redis v1.1.0
 	gitlab.com/gorib/session v1.1.0
 	gitlab.com/gorib/sql v1.3.0
-	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b
 	google.golang.org/grpc v1.80.0
 )
 
@@ -46,6 +46,7 @@ require (
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/jmattheis/goverter v1.9.4 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
+	github.com/jonboulle/clockwork v0.5.0 // indirect
 	github.com/klauspost/compress v1.18.1 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect

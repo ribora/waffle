@@ -18,6 +18,33 @@ Creates a `context.Background()` enriched with a `session.Session`:
 
 The context is created in `Run()` before the command's `Run(ctx)` method is called. You do not call `NewContextWithCommand` directly.
 
+The same call also stashes the raw argv in the context. Commands retrieve it via `app.Args(ctx)` rather than touching `os.Args` — see [Args](#args).
+
+## Args
+
+```go
+func Args(ctx context.Context) []string
+func WithArgs(ctx context.Context, args []string) context.Context
+```
+
+`Args(ctx)` returns the argv shaped `[<command-name>, <rest>...]`, the form `(*getopt.Set).Getopt` accepts. Use it inside `Usage(ctx)` to parse flags:
+
+```go
+func (c *myCommand) Usage(ctx context.Context) error {
+    opts := getopt.New()
+    var help bool
+    opts.FlagLong(&help, "help", 'h', "Display this help message")
+    if err := opts.Getopt(app.Args(ctx), nil); err != nil {
+        return err
+    }
+    // ...
+}
+```
+
+This indirection exists so commands invoked by a scheduler (cron) see *their own* argv from the schedule entry, not the process's `os.Args`. The CLI dispatch path and the cron tick path both produce a context with the right argv attached — the command does not know which path it came through.
+
+`WithArgs(ctx, args)` is the setter, used by orchestrators (cron) to build a child context for the command they're about to invoke. Most application code never calls it directly.
+
 ## Reading session data
 
 Use `session.FromContext` to access the session anywhere a context flows:

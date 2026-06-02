@@ -4,13 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"sort"
+	"strings"
 
-	"golang.org/x/exp/maps"
-
+	"github.com/fatih/color"
 	"github.com/pborman/getopt/v2"
 )
+
+var ItemColor = color.New(color.FgGreen)
 
 type commandTag struct{}
 
@@ -19,7 +22,7 @@ var CommandTag = commandTag{}
 type BaseCommand interface {
 	Name() string
 	Description() string
-	Usage() error
+	Usage(ctx context.Context) error
 }
 
 type Command interface {
@@ -27,40 +30,52 @@ type Command interface {
 	Run(ctx context.Context) error
 }
 
-type CommandList map[string]Command
+type Daemon interface {
+	Command
+	Daemon()
+}
 
-func (l *CommandList) Add(command Command) error {
+type Commands interface {
+	Get(name string) Command
+}
+
+type CommandsAware interface {
+	SetCommands(Commands)
+}
+
+type commandList map[string]Command
+
+func (l commandList) Add(command Command) error {
 	if command.Name() == "" {
 		return errors.New("empty command name")
 	}
-	if *l == nil {
-		*l = make(CommandList)
-	}
-	if _, ok := (*l)[command.Name()]; ok {
+	if _, ok := l[command.Name()]; ok {
 		return fmt.Errorf("command '%s' has been already registered", command.Name())
 	}
-	(*l)[command.Name()] = command
+	l[command.Name()] = command
 	return nil
 }
 
-func (l *CommandList) Get(command string) Command {
-	return (*l)[command]
+func (l commandList) Get(command string) Command {
+	return l[command]
 }
 
-func (l *CommandList) List() <-chan Command {
-	ch := make(chan Command, len(*l))
-	commands := maps.Values(*l)
-	sort.SliceStable(
-		commands,
-		func(i, j int) bool {
-			return commands[i].Name() < commands[j].Name()
-		},
-	)
-	for _, value := range commands {
-		ch <- value
+func PrintList(w io.Writer, header string, items map[string]string) {
+	if len(items) == 0 {
+		return
 	}
-	close(ch)
-	return ch
+	names := make([]string, 0, len(items))
+	width := 0
+	for n := range items {
+		names = append(names, n)
+		width = max(width, len(n))
+	}
+	sort.Strings(names)
+	_, _ = fmt.Fprintln(w, header)
+	for _, n := range names {
+		name := ItemColor.Sprint(n) + strings.Repeat(" ", width+1-len(n))
+		_, _ = fmt.Fprintf(w, "\t%s\t%s\n", name, items[n])
+	}
 }
 
 func NewCommand(name, description string) *baseCommand {
@@ -82,14 +97,17 @@ func (b *baseCommand) Description() string {
 	return b.description
 }
 
-func (b *baseCommand) Usage() error {
+func (b *baseCommand) Usage(ctx context.Context) error {
+	opts := getopt.New()
 	var help bool
-	getopt.FlagLong(&help, "help", 'h', "Display this help message")
-	getopt.Parse()
+	opts.FlagLong(&help, "help", 'h', "Display this help message")
+	if err := opts.Getopt(Args(ctx), nil); err != nil {
+		return err
+	}
 	if help {
-		getopt.SetParameters("")
+		opts.SetParameters("")
 		_, _ = fmt.Fprintf(os.Stderr, "%s\n", b.Description())
-		getopt.PrintUsage(os.Stderr)
+		opts.PrintUsage(os.Stderr)
 		return ErrUsage
 	}
 	return nil

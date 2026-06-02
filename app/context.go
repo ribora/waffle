@@ -9,8 +9,9 @@ import (
 	"gitlab.com/gorib/session"
 )
 
-// NewContextWithCommand builds the root ctx for a CLI command — session,
-// hilton provider, and pry logger for downstream I/O.
+type argsKey struct{}
+
+// args is shaped [<command-name>, <rest>...] — same form (*getopt.Set).Getopt expects.
 func NewContextWithCommand(name string, args []string, provider hilton.Provider, logger pry.Logger) context.Context {
 	ctx := session.NewContextWithSession(
 		context.Background(),
@@ -21,5 +22,17 @@ func NewContextWithCommand(name string, args []string, provider hilton.Provider,
 		},
 	)
 	ctx = hilton.ContextWithProvider(ctx, provider)
+	ctx = context.WithValue(ctx, argsKey{}, args)
 	return pry.ContextWithLogger(ctx, logger)
+}
+
+func Args(ctx context.Context) []string {
+	if v, ok := ctx.Value(argsKey{}).([]string); ok {
+		return v
+	}
+	return nil
+}
+
+func WithArgs(ctx context.Context, args []string) context.Context {
+	return context.WithValue(ctx, argsKey{}, args)
 }

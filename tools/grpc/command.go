@@ -84,7 +84,7 @@ func (c *grpcCommand) Setup(server *baseGrpc.Server) {
 }
 
 func (c *grpcCommand) Run(ctx context.Context) error {
-	err := c.Usage()
+	err := c.Usage(ctx)
 	if err != nil {
 		return err
 	}
@@ -93,15 +93,18 @@ func (c *grpcCommand) Run(ctx context.Context) error {
 	return c.connection.Serve(ctx)
 }
 
-func (c *grpcCommand) Usage() error {
+func (c *grpcCommand) Usage(ctx context.Context) error {
+	opts := getopt.New()
 	var help bool
-	getopt.FlagLong(&help, "help", 'h', "Display this help message")
-	listen := getopt.StringLong("listen", 'l', "", "Listen for incoming connections on [host:port]", "host:port")
-	getopt.Parse()
+	opts.FlagLong(&help, "help", 'h', "Display this help message")
+	listen := opts.StringLong("listen", 'l', "", "Listen for incoming connections on [host:port]", "host:port")
+	if err := opts.Getopt(app.Args(ctx), nil); err != nil {
+		return err
+	}
 	if help {
-		getopt.SetParameters("")
+		opts.SetParameters("")
 		_, _ = fmt.Fprintf(os.Stderr, "%s\n", c.Description())
-		getopt.PrintUsage(os.Stderr)
+		opts.PrintUsage(os.Stderr)
 		return app.ErrUsage
 	}
 	if *listen != "" {
@@ -125,6 +128,8 @@ func (c *grpcCommand) Usage() error {
 	}
 	return nil
 }
+
+func (c *grpcCommand) Daemon() {}
 
 func (c *grpcCommand) Close() error {
 	if c.connection != nil {

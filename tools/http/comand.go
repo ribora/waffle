@@ -48,7 +48,7 @@ type httpCommand struct {
 }
 
 func (c *httpCommand) Run(ctx context.Context) error {
-	err := c.Usage()
+	err := c.Usage(ctx)
 	if err != nil {
 		return err
 	}
@@ -57,15 +57,18 @@ func (c *httpCommand) Run(ctx context.Context) error {
 	return c.connection.Serve(ctx)
 }
 
-func (c *httpCommand) Usage() error {
+func (c *httpCommand) Usage(ctx context.Context) error {
+	opts := getopt.New()
 	var help bool
-	getopt.FlagLong(&help, "help", 'h', "Display this help message")
-	listen := getopt.StringLong("listen", 'l', "", "Listen for incoming connections on [host:port]", "host:port")
-	getopt.Parse()
+	opts.FlagLong(&help, "help", 'h', "Display this help message")
+	listen := opts.StringLong("listen", 'l', "", "Listen for incoming connections on [host:port]", "host:port")
+	if err := opts.Getopt(app.Args(ctx), nil); err != nil {
+		return err
+	}
 	if help {
-		getopt.SetParameters("")
+		opts.SetParameters("")
 		_, _ = os.Stderr.WriteString(c.Description())
-		getopt.PrintUsage(os.Stderr)
+		opts.PrintUsage(os.Stderr)
 		return app.ErrUsage
 	}
 	if *listen != "" {
@@ -89,6 +92,8 @@ func (c *httpCommand) Usage() error {
 	}
 	return nil
 }
+
+func (c *httpCommand) Daemon() {}
 
 func (c *httpCommand) Close() error {
 	if c.connection != nil {

@@ -37,27 +37,31 @@ type migrateCommand struct {
 }
 
 func (c *migrateCommand) Run(ctx context.Context) (err error) {
+	opts := getopt.New()
 	var help bool
-	getopt.FlagLong(&help, "help", 'h', "Display this help message")
-	connection := getopt.StringLong("connection", 'c', "", "Database connection string specified for database type", "driver://user:pass@host:port")
-	getopt.Parse()
-	args := getopt.Args()
+	opts.FlagLong(&help, "help", 'h', "Display this help message")
+	connection := opts.StringLong("connection", 'c', "", "Database connection string specified for database type", "driver://user:pass@host:port")
+	if err := opts.Getopt(app.Args(ctx), nil); err != nil {
+		return err
+	}
+	args := opts.Args()
 	if len(args) == 0 {
 		args = append(args, "up")
 	}
 	if help {
-		getopt.SetParameters("command")
-		getopt.PrintUsage(os.Stderr)
-		_, _ = fmt.Fprintf(os.Stderr, "Commands:\n")
-		_, _ = fmt.Fprintf(os.Stderr, "\tup\t\tMigrate the DB to the most recent version available\n")
-		_, _ = fmt.Fprintf(os.Stderr, "\tup-by-one\tMigrate the DB up by 1\n")
-		_, _ = fmt.Fprintf(os.Stderr, "\tup-to VERSION\tMigrate the DB to a specific VERSION\n")
-		_, _ = fmt.Fprintf(os.Stderr, "\tdown\t\tRoll back the version by 1\n")
-		_, _ = fmt.Fprintf(os.Stderr, "\tdown-to VERSION\tRoll back to a specific VERSION\n")
-		_, _ = fmt.Fprintf(os.Stderr, "\tredo\t\tRe-run the latest migration\n")
-		_, _ = fmt.Fprintf(os.Stderr, "\treset\t\tRoll back all migrations\n")
-		_, _ = fmt.Fprintf(os.Stderr, "\tstatus\t\tDump the migration status for the current DB\n")
-		_, _ = fmt.Fprintf(os.Stderr, "\tversion\t\tPrint the current version of the database\n")
+		opts.SetParameters("command")
+		opts.PrintUsage(os.Stderr)
+		app.PrintList(os.Stderr, "Commands:", map[string]string{
+			"up":              "Migrate the DB to the most recent version available",
+			"up-by-one":       "Migrate the DB up by 1",
+			"up-to VERSION":   "Migrate the DB to a specific VERSION",
+			"down":            "Roll back the version by 1",
+			"down-to VERSION": "Roll back to a specific VERSION",
+			"redo":            "Re-run the latest migration",
+			"reset":           "Roll back all migrations",
+			"status":          "Dump the migration status for the current DB",
+			"version":         "Print the current version of the database",
+		})
 		return app.ErrUsage
 	}
 
