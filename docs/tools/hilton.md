@@ -4,22 +4,22 @@
 
 ## Setup
 
-Add a blank import for `config/service/hilton` to your `modules.go`:
+Add a blank import for `config/service/hilton/otel` to your `modules.go`:
 
 ```go
 // config/di/modules.go
 package di
 
 import (
-    _ "gitlab.com/gorib/waffle/config/app"            // wires app.App
-    _ "gitlab.com/gorib/waffle/config/service/hilton" // observability
-    _ "gitlab.com/gorib/waffle/config/service/pry"    // logging
+    _ "gitlab.com/gorib/waffle/config/app"                 // wires app.App
+    _ "gitlab.com/gorib/waffle/config/service/hilton/otel" // OTel observability
+    _ "gitlab.com/gorib/waffle/config/service/pry"         // logging
     _ "gitlab.com/gorib/waffle/config/tools/http"
     _ "gitlab.com/gorib/waffle/config/tools/grpc"
 )
 ```
 
-Once `service/hilton` is in `modules.go`, `hilton.Provider` is wired automatically and injected into every HTTP/gRPC handler context and CLI command root. With empty `OTEL_EXPORTER_OTLP_ENDPOINT` the provider is a noop — spans/metrics are created and propagated but not exported. No conditional plumbing in service code.
+Once `service/hilton/otel` is in `modules.go`, `hilton.Provider` is wired automatically and injected into every HTTP/gRPC handler context and CLI command root. With empty `OTEL_EXPORTER_OTLP_ENDPOINT` the provider is a noop — spans/metrics are created and propagated but not exported. No conditional plumbing in service code.
 
 ## Configuration
 

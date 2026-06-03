@@ -49,6 +49,13 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 	if err != nil {
 		return err
 	}
+	if err := c.UncommentModule("gitlab.com/gorib/waffle/config/tools/grpc"); err != nil {
+		return err
+	}
+	// Proto-gen before tidy so pb/* exists locally — otherwise tidy tries to fetch it as a remote module.
+	if info, err := exec.Command("go", "generate", "./api/...").CombinedOutput(); err != nil {
+		return fmt.Errorf("%v: %v", err, string(info))
+	}
 	info, err := exec.Command("make", ".tidy", "generate").CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%v: %v", err, string(info))

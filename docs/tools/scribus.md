@@ -67,14 +67,16 @@ Run `make generate` after adding this.
 ## Running the consumer
 
 ```sh
-./app scribus <dsn> <exchange> <queue>:<routing-key>
+./app scribus [<dsn> <exchange> <queue>]
 ```
 
-Example:
+With no positional arguments, transport config is taken from DI (env-bound `RABBIT_DSN` / `RABBIT_EXCHANGE` / `RABBIT_QUEUE`). All three positional args together override that — useful for ad-hoc local debugging against a different broker:
 
 ```sh
-./app scribus amqp://guest:guest@localhost:5672 events orders:order.created
+./app scribus amqp://guest:guest@localhost:5672 events local-debug
 ```
+
+Routing keys are **not** a CLI argument — they come from each registered `Handler.Keys()` / `BatchHandler.Keys()`. The CLI only overrides the transport (DSN/exchange/queue), never the bindings.
 
 ### Flags
 
@@ -248,10 +250,11 @@ di.Wire[wscribus.BatchHandler](scribus.NewOrderBatchHandler)
 
 On startup the scribus command:
 
-1. Parses `<queue>:<routing-key>` from the positional argument (if provided)
-2. For each incoming message, reads the routing key from the AMQP delivery
-3. In single mode: looks up the handler by key and calls `Run`
-4. In batch mode: accumulates messages until `--page` is reached or `--flush-timeout` expires, then calls `BatchHandler.Run` with the batch
+1. Collects every registered handler's `Keys()` and calls `consumer.Bind(key)` for each — the broker is told to deliver only those keys.
+2. (Optional) overrides DSN/exchange/queue from CLI positional args.
+3. Opens the consumer; for each incoming message reads its routing key from the AMQP delivery.
+4. In single mode: looks up the handler by key and calls `Run`.
+5. In batch mode: accumulates messages until `--page` is reached or `--flush-timeout` expires, then calls `BatchHandler.Run` with the batch.
 
 ## DI tags
 

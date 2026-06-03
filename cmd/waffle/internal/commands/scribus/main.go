@@ -46,10 +46,10 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 	}
 
 	mode := "single"
-	includeTool := "gitlab.com/gorib/waffle/tools/scribus/single"
+	includeTool := "gitlab.com/gorib/waffle/config/tools/scribus/single"
 	if batch {
 		mode = "batch"
-		includeTool = "gitlab.com/gorib/waffle/tools/scribus/batch"
+		includeTool = "gitlab.com/gorib/waffle/config/tools/scribus/batch"
 	}
 
 	path := filepath.Join("domain", domain)
@@ -63,7 +63,9 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 		return err
 	}
 
-	fmt.Printf("Done. Add `_ %q` to config/di/modules.go if not already present.\n", includeTool)
+	if err := c.UncommentModule(includeTool); err != nil {
+		return err
+	}
 
 	info, err := exec.Command("go", "get", "-tool", "gitlab.com/gorib/gorival/cmd/gorival@latest").CombinedOutput()
 	if err != nil {

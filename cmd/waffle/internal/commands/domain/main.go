@@ -68,6 +68,12 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 		if err != nil {
 			return fmt.Errorf("%v: %v", err, string(info))
 		}
+		if err := c.UncommentModule("gitlab.com/gorib/waffle/config/service/sql"); err != nil {
+			return err
+		}
+		if err := c.UncommentModule("gitlab.com/gorib/waffle/config/tools/migrate"); err != nil {
+			return err
+		}
 	}
 	info, err := exec.Command("make", ".tidy", "generate").CombinedOutput()
 	if err != nil {

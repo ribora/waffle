@@ -75,6 +75,21 @@ func (c *Command) write(source, target string, params any) error {
 	return tpl.Execute(fh, params)
 }
 
+func (c *Command) UncommentModule(modulePath string) error {
+	const file = "config/di/modules.go"
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return fmt.Errorf("uncomment %s: %w", modulePath, err)
+	}
+	commented := fmt.Sprintf("// _ %q", modulePath)
+	active := fmt.Sprintf("_ %q", modulePath)
+	out := strings.Replace(string(data), commented, active, 1)
+	if out == string(data) {
+		return nil
+	}
+	return os.WriteFile(file, []byte(out), 0644)
+}
+
 func (c *Command) FindProjectName() (string, error) {
 	cwd, err := os.Getwd()
 	if err != nil {

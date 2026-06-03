@@ -119,7 +119,7 @@ func (a *app) Run() error {
 
 	ctx, span := tracer.Start(ctx, "cmd."+cmd.Name(),
 		hilton.WithSpanKind(hilton.SpanKindInternal),
-		hilton.WithAttributes(hilton.StringAttr("cli.command", cmd.Name())),
+		hilton.WithAttributes(hilton.Attr("cli.command", cmd.Name())),
 	)
 	defer span.End()
 
@@ -134,12 +134,12 @@ func (a *app) Run() error {
 	took := time.Since(start).Seconds()
 
 	attrs := []hilton.Attribute{
-		hilton.StringAttr("cli.command", cmd.Name()),
+		hilton.Attr("cli.command", cmd.Name()),
 	}
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(hilton.StatusError, err.Error())
-		attrs = append(attrs, hilton.StringAttr("error.type", fmt.Sprintf("%T", err)))
+		attrs = append(attrs, hilton.Attr("error.type", fmt.Sprintf("%T", err)))
 	}
 	duration.Record(ctx, took, attrs...)
 

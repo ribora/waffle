@@ -160,7 +160,7 @@ package di
 import (
     _ "gitlab.com/gorib/waffle/config/app"
     _ "gitlab.com/gorib/waffle/config/service/pry"
-    _ "gitlab.com/gorib/waffle/config/service/hilton"
+    _ "gitlab.com/gorib/waffle/config/service/hilton/otel"
     _ "gitlab.com/gorib/waffle/config/tools/http"
     _ "gitlab.com/gorib/waffle/config/tools/grpc"
     _ "gitlab.com/gorib/waffle/config/tools/migrate"
