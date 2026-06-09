@@ -57,8 +57,6 @@ require (
 	github.com/rs/zerolog v1.34.0 // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
 	gitlab.com/gorib/criteria v1.0.1 // indirect
-	gitlab.com/gorib/goriscan v1.1.0 // indirect
-	gitlab.com/gorib/gorival v1.4.0 // indirect
 	gitlab.com/gorib/whisk v1.0.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.43.0 // indirect
@@ -92,7 +90,6 @@ require (
 tool (
 	github.com/jmattheis/goverter/cmd/goverter
 	gitlab.com/gorib/di/cmd/diogen
-	gitlab.com/gorib/goriscan/cmd/goriscan
-	gitlab.com/gorib/gorival/cmd/gorival
 	gitlab.com/gorib/sql/cmd/store
+	gitlab.com/gorib/whisk/cmd/whisk
 )

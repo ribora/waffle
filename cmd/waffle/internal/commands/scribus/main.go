@@ -67,7 +67,7 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 		return err
 	}
 
-	info, err := exec.Command("go", "get", "-tool", "gitlab.com/gorib/gorival/cmd/gorival@latest").CombinedOutput()
+	info, err := exec.Command("go", "get", "-tool", "gitlab.com/gorib/whisk/cmd/whisk@latest").CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%v: %v", err, string(info))
 	}

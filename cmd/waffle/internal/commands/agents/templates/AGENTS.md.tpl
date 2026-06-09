@@ -44,7 +44,7 @@ re-run any command safely.
 After any change (yours or human's), run **in this order**:
 
 ```sh
-make generate    # diogen, goverter, gorival, etc. — recompiles all codegen
+make generate    # diogen, goverter, whisk, etc. — recompiles all codegen
 make audit       # golangci-lint
 make             # tests + build
 ```

@@ -1,4 +1,4 @@
-//go:generate go tool gorival -input $GOFILE -storage pkg/validator
+//go:generate go tool whisk -validate.storage=pkg/validator $GOFILE
 
 package model
 
