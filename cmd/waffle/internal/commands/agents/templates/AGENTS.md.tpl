@@ -117,7 +117,13 @@ di.Tags[T](SomeTag)                              // collect all values tagged
 di.For[Consumer]()                               // scope binding to one consumer
 di.Args(map[string]any{...})                     // override constructor args
 di.Alias[OtherInterface]()                       // expose same instance under multiple ifaces
+di.Fallback()                                    // low-priority default; dropped if a normal/Override provider exists
+di.Override()                                    // win over normal/Fallback providers for the slot
 ```
+
+Provider priority per slot: `Fallback` < normal < `Override`. Two providers at
+the same tier for one slot (without `di.For` or mutually exclusive conditions)
+is a generation error, not last-wins.
 
 ### Anti-patterns
 

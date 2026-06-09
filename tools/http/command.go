@@ -10,51 +10,52 @@ import (
 
 	"github.com/pborman/getopt/v2"
 
-	http "gitlab.com/gorib/http/server"
+	"gitlab.com/gorib/http/server"
 	"gitlab.com/gorib/pry"
 	"gitlab.com/gorib/waffle/app"
 )
-
-type middlewareTag struct{}
-
-var MiddlewareTag = middlewareTag{}
 
 type HttpCommand interface {
 	app.Command
 }
 
-type Server interface {
-	Serve(ctx context.Context) error
-	Close() error
-}
-
-func NewHttpCommand(router http.Router, command app.BaseCommand, addr net.Addr, logger pry.Logger, middlewares []http.Middleware) *httpCommand {
+func NewHttpCommand(
+	mux server.Mux,
+	router server.Router,
+	command app.BaseCommand,
+	addr net.Addr,
+	logger pry.Logger,
+	opts ...server.Option,
+) *httpCommand {
 	return &httpCommand{
+		BaseCommand: command,
+		mux:         mux,
 		router:      router,
 		addr:        addr,
-		BaseCommand: command,
 		logger:      logger,
-		middlewares: middlewares,
+		opts:        opts,
 	}
 }
 
 type httpCommand struct {
-	router http.Router
-	addr   net.Addr
 	app.BaseCommand
-	connection  Server
-	logger      pry.Logger
-	middlewares []http.Middleware
+
+	mux    server.Mux
+	router server.Router
+	addr   net.Addr
+	logger pry.Logger
+	opts   []server.Option
+
+	server server.Server
 }
 
+// Run builds the server lazily so --listen from Usage can override addr.
 func (c *httpCommand) Run(ctx context.Context) error {
-	err := c.Usage(ctx)
-	if err != nil {
+	if err := c.Usage(ctx); err != nil {
 		return err
 	}
-
-	c.connection = http.NewServer(c.router, c.addr, c.logger, c.middlewares...)
-	return c.connection.Serve(ctx)
+	c.server = server.NewServer(c.mux, c.router, c.addr, c.logger, c.opts...)
+	return c.server.Serve(ctx)
 }
 
 func (c *httpCommand) Usage(ctx context.Context) error {
@@ -74,7 +75,7 @@ func (c *httpCommand) Usage(ctx context.Context) error {
 	if *listen != "" {
 		parts := strings.Split(*listen, ":")
 		if len(parts) > 2 {
-			return fmt.Errorf("Unsupported host format, expected host:port")
+			return fmt.Errorf("unsupported host format, expected host:port")
 		}
 		dest := parts[0]
 		var port uint64 = 80
@@ -85,10 +86,13 @@ func (c *httpCommand) Usage(ctx context.Context) error {
 				return err
 			}
 			if port == 0 {
-				return fmt.Errorf("Invalid port number")
+				return fmt.Errorf("invalid port number")
 			}
 		}
 		c.addr, err = net.ResolveTCPAddr("tcp", net.JoinHostPort(dest, strconv.Itoa(int(port))))
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -96,8 +100,8 @@ func (c *httpCommand) Usage(ctx context.Context) error {
 func (c *httpCommand) Daemon() {}
 
 func (c *httpCommand) Close() error {
-	if c.connection != nil {
-		_ = c.connection.Close()
+	if c.server != nil {
+		return c.server.Close()
 	}
 	return nil
 }

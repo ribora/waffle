@@ -12,5 +12,5 @@ func InitRedis() {
 		"port":     env.Value("REDIS_PORT", "6379"),
 		"password": env.Value("REDIS_PASSWORD", ""),
 		"dbIndex":  env.Value("REDIS_DB", 0),
-	}))
+	}), di.Fallback())
 }

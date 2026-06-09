@@ -1,30 +1,29 @@
 module gitlab.com/gorib/waffle
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/fatih/color v1.18.0
 	github.com/go-co-op/gocron/v2 v2.18.2
 	github.com/pborman/getopt/v2 v2.1.0
 	github.com/pressly/goose/v3 v3.24.1
-	gitlab.com/gorib/amqp v1.5.1
-	gitlab.com/gorib/di v1.5.1
-	gitlab.com/gorib/elastic v1.2.0
+	gitlab.com/gorib/amqp v1.5.2
+	gitlab.com/gorib/di v1.5.2
+	gitlab.com/gorib/elastic v1.2.1
 	gitlab.com/gorib/env v1.0.0
-	gitlab.com/gorib/failure v1.1.0
-	gitlab.com/gorib/grpc v1.4.0
+	gitlab.com/gorib/failure v1.1.1
+	gitlab.com/gorib/grpc v1.4.1
 	gitlab.com/gorib/hilton v1.1.0
-	gitlab.com/gorib/http v1.5.1
-	gitlab.com/gorib/pry v1.2.0
+	gitlab.com/gorib/http v1.6.0
+	gitlab.com/gorib/pry v1.2.1
 	gitlab.com/gorib/redis v1.2.0
-	gitlab.com/gorib/session v1.1.0
-	gitlab.com/gorib/sql v1.4.3
+	gitlab.com/gorib/session v1.1.1
+	gitlab.com/gorib/sql v1.4.4
 	google.golang.org/grpc v1.80.0
 )
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
-	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dave/jennifer v1.7.1 // indirect
@@ -33,10 +32,10 @@ require (
 	github.com/elastic/elastic-transport-go/v8 v8.11.0 // indirect
 	github.com/elastic/go-elasticsearch/v8 v8.19.6 // indirect
 	github.com/getsentry/sentry-go v0.31.1 // indirect
+	github.com/go-chi/chi/v5 v5.3.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-sql-driver/mysql v1.8.1 // indirect
-	github.com/gofiber/fiber/v2 v2.52.9 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 // indirect
 	github.com/iancoleman/strcase v0.3.0 // indirect
@@ -47,25 +46,20 @@ require (
 	github.com/jmattheis/goverter v1.9.4 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/jonboulle/clockwork v0.5.0 // indirect
-	github.com/klauspost/compress v1.18.1 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mfridman/interpolate v0.0.2 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
 	github.com/rabbitmq/amqp091-go v1.10.0 // indirect
 	github.com/redis/go-redis/v9 v9.7.1 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/rs/zerolog v1.34.0 // indirect
-	github.com/samber/lo v1.52.0 // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
-	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasthttp v1.68.0 // indirect
-	gitlab.com/gorib/criteria v1.0.0 // indirect
+	gitlab.com/gorib/criteria v1.0.1 // indirect
 	gitlab.com/gorib/goriscan v1.1.0 // indirect
 	gitlab.com/gorib/gorival v1.4.0 // indirect
+	gitlab.com/gorib/whisk v1.0.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.43.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.43.0 // indirect

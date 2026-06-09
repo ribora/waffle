@@ -51,8 +51,11 @@ di.Define(notificationService.NewNotificationManagement,
 | `di.Args(map[string]any{})` | Provide literal argument values instead of resolved types |
 | `di.Alias[I]()` | Expose the same concrete instance under an additional interface |
 | `di.Defaults(map[int]any{})` | Default values for positional arguments |
-| `di.Fallback()` | Mark as fallback — used only when no other registration matches |
+| `di.Fallback()` | Mark as a low-priority default — dropped from the container if any normal or `Override` provider targets the same slot |
+| `di.Override()` | Mark as the winning provider for a slot — overrides normal and `Fallback` registrations (e.g. to replace a default pulled in from a blank-imported module) |
 | _blank import_ `_ "path"` | Aggregate `di.Wire` / `di.Define` calls from another package (see below) |
+
+**Provider priority.** When several registrations target the same slot (same interface, optionally narrowed by `di.For`), Diogen resolves them by priority: `di.Fallback()` < normal < `di.Override()`. Only the highest tier present survives. Two providers at the same top tier whose conditions are not mutually exclusive are a **generation error** (ambiguous), not last-wins — disambiguate with `di.For`, mutually exclusive `if`/`else`, or by marking one `di.Override()` / the other `di.Fallback()`.
 
 ### Modules — aggregating registrations from another package
 
@@ -132,6 +135,8 @@ Each tool's documentation page shows both forms — the short blank-import line 
 ### Manual registration (alternative)
 
 If you need finer control — for example, swapping a tool's command name or wrapping its constructor — copy the registrations from `InitXxx()` directly into your `InitDi()` instead of blank-importing the module. Both styles are supported in the same setup; you can blank-import some tools and hand-write others.
+
+To replace a single provider while still blank-importing the rest of a module, keep the blank import and register your replacement with `di.Override()` — it wins over the module's registration for that slot. (Without `di.Override()`, blank-importing the module *and* wiring the same slot yourself is an ambiguity error.) This works for single-provider slots; tagged collections are additive and can't be overridden this way.
 
 ## Project layout
 

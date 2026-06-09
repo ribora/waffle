@@ -13,12 +13,22 @@ import (
 )
 
 func InitHttp() {
-	di.Define(middleware.NewCompressMW, di.Tag(http.MiddlewareTag))
-	di.Define(middleware.NewHealthMW, di.Tag(http.MiddlewareTag))
-	di.Define(middleware.NewSessionMW, di.Tag(http.MiddlewareTag))
-	di.Define(middleware.NewTracingMW, di.Tag(http.MiddlewareTag))
-	di.Define(middleware.NewLogMW, di.Tag(http.MiddlewareTag))
-	di.Define(middleware.NewRecoverMW, di.Tag(http.MiddlewareTag))
+	di.Wire[server.Mux](server.New)
+
+	// Fallbacks: a service can replace any of these by registering its own
+	// di.Wire[middleware.X] (no di.Fallback) — the default is then dropped.
+	di.Wire[middleware.Compress](middleware.NewCompress, di.Fallback())
+	di.Wire[middleware.Health](middleware.NewHealth, di.Args(map[string]any{
+		// Empty → NewHealth uses DefaultHealthPath.
+		"path": env.Value("HEALTH_PATH", ""),
+	}), di.Fallback())
+	di.Wire[middleware.Session](middleware.NewSession, di.Fallback())
+	di.Wire[middleware.Tracing](middleware.NewTracing, di.Fallback())
+	di.Wire[middleware.Log](middleware.NewLog, di.Fallback())
+	di.Wire[middleware.Error](middleware.NewErrorRenderer, di.Fallback())
+	di.Wire[middleware.Recover](middleware.NewRecover, di.Fallback())
+
+	di.Wire[*middleware.Standard](middleware.NewStandard)
 
 	di.Wire[net.Addr](net.ResolveTCPAddr, di.For[http.HttpCommand](), di.Args(map[string]any{
 		"network": "tcp",
@@ -28,8 +38,8 @@ func InitHttp() {
 		),
 	}))
 
-	di.Wire[app.BaseCommand](func() app.BaseCommand { return app.NewCommand("http", "Start web server") }, di.For[http.HttpCommand]())
-	di.Wire[http.HttpCommand](http.NewHttpCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
-		"middlewares": di.Tags[server.Middleware](http.MiddlewareTag),
-	}))
+	di.Wire[app.BaseCommand](func() app.BaseCommand {
+		return app.NewCommand("http", "Start web server")
+	}, di.For[http.HttpCommand]())
+	di.Wire[http.HttpCommand](http.NewHttpCommand, di.Tag(app.CommandTag))
 }

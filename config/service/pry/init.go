@@ -17,5 +17,5 @@ func InitPry() {
 			return nil, err
 		}
 		return pry.New(env.Value("LOGLEVEL", "info"), pry.ToChannels(sentry))
-	})
+	}, di.Fallback())
 }

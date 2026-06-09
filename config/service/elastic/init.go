@@ -12,5 +12,5 @@ func InitElastic() {
 		host := env.NeedValue[string]("ES_HOST")
 		index := env.Value("ES_INDEX", "")
 		return elastic.New(host, index, elastic.WithDebugLogger(logger))
-	})
+	}, di.Fallback())
 }

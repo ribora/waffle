@@ -48,7 +48,7 @@ Once on ctx, any I/O code path reads it via `hilton.ProviderFromContext(ctx)`. A
 | gRPC server | `Server` | `rpc.server.duration` |
 | gRPC client | `Client` | `rpc.client.duration` |
 | AMQP publisher | `Producer` | (span only) |
-| AMQP consumer | `Consumer` | `messaging.receive.duration`, `messaging.receive.messages` (counts individual messages in batches) |
+| AMQP consumer | `Consumer` | `messaging.process.duration`, `messaging.client.consumed.messages` (counts individual messages in batches) |
 | Redis | `Client` | `db.client.operation.duration` |
 | SQL | `Client` | `db.client.operation.duration` |
 | Elasticsearch | `Client` | `db.client.operation.duration` |
