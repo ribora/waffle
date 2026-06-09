@@ -10,6 +10,7 @@ import (
 
 	"github.com/pborman/getopt/v2"
 
+	"gitlab.com/gorib/amqp"
 	"gitlab.com/gorib/pry"
 	"gitlab.com/gorib/waffle/app"
 )
@@ -29,7 +30,7 @@ type ScribusCommand interface {
 }
 
 type Consumer interface {
-	SetHandler(handler func(ctx context.Context, keys []string, documents [][]byte) error) error
+	SetHandler(handler func(msgs []amqp.Source) error) error
 	SetDsn(dsn string) error
 	SetExchange(exchange string) error
 	SetQueue(queue string) error
@@ -43,10 +44,10 @@ type Consumer interface {
 type Middleware interface {
 	Name() string
 	Order() int
-	Wrap(next func(ctx context.Context, keys []string, documents [][]byte) error) func(ctx context.Context, keys []string, documents [][]byte) error
+	Wrap(next func(msgs []amqp.Source) error) func(msgs []amqp.Source) error
 }
 
-func applyMiddlewares(handler func(ctx context.Context, keys []string, documents [][]byte) error, middlewares []Middleware) func(ctx context.Context, keys []string, documents [][]byte) error {
+func applyMiddlewares(handler func(msgs []amqp.Source) error, middlewares []Middleware) func(msgs []amqp.Source) error {
 	sorted := append([]Middleware(nil), middlewares...)
 	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Order() < sorted[j].Order() })
 	for i := len(sorted) - 1; i >= 0; i-- {
@@ -56,12 +57,12 @@ func applyMiddlewares(handler func(ctx context.Context, keys []string, documents
 }
 
 type Handler interface {
-	Run(ctx context.Context, payload []byte) error
+	Run(src amqp.Source) error
 	Keys() []string
 }
 
 type BatchHandler interface {
-	Run(ctx context.Context, keys []string, payload [][]byte) error
+	Run(msgs []amqp.Source) error
 	Keys() []string
 }
 
@@ -84,11 +85,11 @@ func NewScribusCommand(
 			}
 		}
 	}
-	handler := func(ctx context.Context, keys []string, documents [][]byte) error {
-		for idx, key := range keys {
-			if h, found := cmd[key]; found {
-				logger.Trace(fmt.Sprintf("%s %s", keys[idx], string(documents[idx])))
-				if err := h.Run(ctx, documents[idx]); err != nil {
+	handler := func(msgs []amqp.Source) error {
+		for _, m := range msgs {
+			if h, found := cmd[m.RoutingKey()]; found {
+				logger.Trace(fmt.Sprintf("%s %s", m.RoutingKey(), string(m.Body())))
+				if err := h.Run(m); err != nil {
 					return err
 				}
 			}

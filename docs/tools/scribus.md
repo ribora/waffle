@@ -107,11 +107,11 @@ In single mode, each routing key dispatches to its own `Handler`.
 ```go
 type Handler interface {
     Keys() []string
-    Run(ctx context.Context, payload []byte) error
+    Run(src amqp.Source) error
 }
 ```
 
-`Keys()` returns the routing keys this handler subscribes to. `Run` is called for each incoming message.
+`Keys()` returns the routing keys this handler subscribes to. `Run` is called for each incoming message with an `amqp.Source` — body, routing key, headers and context. Parse it with `scan.Into[T](src)`.
 
 ### Message model
 
@@ -141,8 +141,9 @@ import (
 
     scribusModel "mymodule/domain/order/cmd/scribus/model"
     "mymodule/domain/order/model"
-    "mymodule/pkg/validator"
+    "gitlab.com/gorib/amqp"
     "gitlab.com/gorib/pry"
+    "gitlab.com/gorib/whisk/scan"
 )
 
 type OrderManagement interface {
@@ -162,19 +163,19 @@ func (h *orderCreatedHandler) Keys() []string {
     return []string{"order.created"}
 }
 
-func (h *orderCreatedHandler) Run(ctx context.Context, payload []byte) error {
-    msg, err := validator.Parse[scribusModel.OrderCreated](payload)
+func (h *orderCreatedHandler) Run(src amqp.Source) error {
+    msg, err := scan.Into[scribusModel.OrderCreated](src)
     if err != nil {
-        h.logger.Error("Cannot parse message", pry.Err(err), pry.Ctx(ctx))
+        h.logger.Error("Cannot parse message", pry.Err(err), pry.Ctx(src.Context()))
         return nil // ACK: malformed message, re-queuing won't help
     }
 
-    err = h.management.HandleOrderCreated(ctx, &model.Order{
+    err = h.management.HandleOrderCreated(src.Context(), &model.Order{
         Id:         msg.Id,
         CustomerId: msg.CustomerId,
     })
     if err != nil {
-        h.logger.Error("Cannot handle order.created", pry.Err(err), pry.Ctx(ctx))
+        h.logger.Error("Cannot handle order.created", pry.Err(err), pry.Ctx(src.Context()))
     }
     return nil // ACK: log the error and move on
 }
@@ -207,11 +208,11 @@ In batch mode, a single `BatchHandler` receives a slice of messages accumulated 
 ```go
 type BatchHandler interface {
     Keys() []string
-    Run(ctx context.Context, keys []string, payloads [][]byte) error
+    Run(msgs []amqp.Source) error
 }
 ```
 
-`Keys()` returns the routing keys this batch handler subscribes to — scribus auto-binds them on the queue at startup. `Run` is called with a slice of messages; `keys[i]` is the routing key of `payloads[i]`.
+`Keys()` returns the routing keys this batch handler subscribes to — scribus auto-binds them on the queue at startup. `Run` is called with a slice of `amqp.Source`; each carries its own body, routing key, headers and context.
 
 ### Implementing a batch handler
 
@@ -225,15 +226,15 @@ func NewOrderBatchHandler(management OrderManagement, logger pry.Logger) *orderB
     return &orderBatchHandler{management: management, logger: logger}
 }
 
-func (h *orderBatchHandler) Run(ctx context.Context, keys []string, payloads [][]byte) error {
-    for i, payload := range payloads {
-        msg, err := validator.Parse[scribusModel.OrderCreated](payload)
+func (h *orderBatchHandler) Run(msgs []amqp.Source) error {
+    for _, m := range msgs {
+        msg, err := scan.Into[scribusModel.OrderCreated](m)
         if err != nil {
-            h.logger.Error("Cannot parse message", pry.Err(err), pry.Ctx(ctx))
+            h.logger.Error("Cannot parse message", pry.Err(err), pry.Ctx(m.Context()))
             continue
         }
-        if err = h.management.HandleOrderCreated(ctx, &model.Order{Id: msg.Id}); err != nil {
-            h.logger.Error("Cannot handle "+keys[i], pry.Err(err), pry.Ctx(ctx))
+        if err = h.management.HandleOrderCreated(m.Context(), &model.Order{Id: msg.Id}); err != nil {
+            h.logger.Error("Cannot handle "+m.RoutingKey(), pry.Err(err), pry.Ctx(m.Context()))
         }
     }
     return nil

@@ -11,7 +11,7 @@ Tags are empty struct values used to group multiple values of the same interface
 | `grpc.MiddlewareTag` | `tools/grpc` | `di.Define(..., di.Tag(grpc.MiddlewareTag))` | `[]server.Interceptor` |
 | `grpc.StreamMiddlewareTag` | `tools/grpc` | `di.Define(..., di.Tag(grpc.StreamMiddlewareTag))` | `[]server.StreamInterceptor` |
 | `grpc.ErrorMapperTag` | `tools/grpc` | `di.Define(..., di.Tag(grpc.ErrorMapperTag))` | `[]server.ErrorMapper` |
-| `http.MiddlewareTag` | `tools/http` | `di.Define(..., di.Tag(http.MiddlewareTag))` | `[]Middleware` → `MiddlewareList` |
+| `scribus.MiddlewareTag` | `tools/scribus` | `di.Define(..., di.Tag(scribus.MiddlewareTag))` | `[]Middleware` |
 | `migrate.MigrationsTag` | `tools/migrate` | `di.Wire[domainMigrate.Migration](..., di.Tag(migrate.MigrationsTag))` | `[]fs.FS` |
 | `scribus.CommandTag` | `tools/scribus` | `di.Wire[scribus.Handler](..., di.Tag(scribus.CommandTag))` | `[]Handler` |
 
@@ -85,23 +85,19 @@ di.Define(domainErrors.NewMapper, di.Tag(grpcCommand.ErrorMapperTag))
 
 ---
 
-## http.MiddlewareTag
+## scribus.MiddlewareTag
 
-**Package:** `gitlab.com/gorib/waffle/tools/http`
+**Package:** `gitlab.com/gorib/waffle/tools/scribus`
 
-Collects `Middleware` implementations keyed by `Name()` into a `MiddlewareList`.
-
-```go
-di.Wire[http.Middleware](NewAuthMiddleware, di.Tag(http.MiddlewareTag))   // Name() = "auth"
-di.Wire[http.Middleware](NewCorsMiddleware, di.Tag(http.MiddlewareTag))   // Name() = "cors"
-```
-
-Look them up by name in the router:
+Collects `scribus.Middleware` interceptors — each wraps `func([]amqp.Source) error` — applied around the consumer's dispatch handler in `Order()` sequence.
 
 ```go
-app.Use(middlewares.Get("cors"))
-v1 := app.Group("/v1", middlewares.Get("auth"))
+di.Define(interceptor.NewTracing, di.Tag(scribus.MiddlewareTag))
+di.Define(interceptor.NewLog, di.Tag(scribus.MiddlewareTag))
+di.Define(interceptor.NewRecover, di.Tag(scribus.MiddlewareTag))
 ```
+
+(HTTP middleware is not tag-collected — it's a `server.Layer` applied via `mux.Use` in the router's `Setup`.)
 
 ---
 

@@ -103,13 +103,14 @@ For example, `config/tools/http/init.go`:
 
 ```go
 func InitHttp() {
+    di.Wire[server.Mux](server.New)
+    di.Wire[middleware.Session](middleware.NewSession, di.Fallback())
+    // ... the rest of the standard middlewares ...
+    di.Wire[*middleware.Standard](middleware.NewStandard)
     di.Wire[app.BaseCommand](
         func() app.BaseCommand { return app.NewCommand("http", "Start web server") },
         di.For[HttpCommand](),
     )
-    di.Wire[MiddlewareList](NewMiddlewareList, di.Args(map[string]any{
-        "middlewares": di.Tags[Middleware](MiddlewareTag),
-    }))
     di.Wire[HttpCommand](NewHttpCommand, di.Tag(app.CommandTag))
 }
 ```
@@ -255,8 +256,8 @@ di.Define(service.NewUserService,
 // Register a gRPC handler
 di.Define(usergrpc.NewUserGrpc, di.Tag(grpcCommand.ServiceTag))
 
-// Register an HTTP middleware
-di.Wire[http.Middleware](NewAuthMiddleware, di.Tag(http.MiddlewareTag))
+// Register a scribus interceptor
+di.Define(interceptor.NewTracing, di.Tag(scribusCommand.MiddlewareTag))
 ```
 
 ## Code generation

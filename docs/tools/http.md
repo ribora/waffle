@@ -1,6 +1,6 @@
 # HTTP Tool
 
-The HTTP tool wraps `gitlab.com/gorib/http` (Fiber) into a waffle `Command`. Blank-import its config package to register the `http` command.
+The HTTP tool wraps `gitlab.com/gorib/http/server` into a waffle `Command`. Blank-import its config package to register the `http` command.
 
 ## Setup
 
@@ -16,28 +16,7 @@ import (
 )
 ```
 
-This pulls in the registrations from [`config/tools/http/init.go`](../../config/tools/http/init.go), which is equivalent to writing them yourself:
-
-```go
-import (
-    "gitlab.com/gorib/di"
-    "gitlab.com/gorib/waffle/app"
-    whttp "gitlab.com/gorib/waffle/tools/http"
-)
-
-func InitDi() {
-    di.Wire[app.BaseCommand](
-        func() app.BaseCommand { return app.NewCommand("http", "Start web server") },
-        di.For[whttp.HttpCommand](),
-    )
-    di.Wire[whttp.MiddlewareList](whttp.NewMiddlewareList, di.Args(map[string]any{
-        "middlewares": di.Tags[whttp.Middleware](whttp.MiddlewareTag),
-    }))
-    di.Wire[whttp.HttpCommand](whttp.NewHttpCommand, di.Tag(app.CommandTag))
-}
-```
-
-Use the manual form when you need to override a registration (e.g. rename the command); otherwise prefer the blank import.
+This pulls in the registrations from [`config/tools/http/init.go`](../../config/tools/http/init.go): the `http` command, the listen address, the server mux, and the standard middleware chain (compress, health, session, tracing, log, error, recover). Use the manual form — copy those registrations into your `InitDi()` — only when you need to override one.
 
 Run `make generate`, then start the server:
 
@@ -48,18 +27,7 @@ Run `make generate`, then start the server:
 
 ## Listen address
 
-`NewHttpCommand` requires a `net.Addr` argument. You must wire it explicitly in `InitDi()`:
-
-```go
-import "net"
-
-// Inside InitDi():
-di.Wire[net.Addr](func() (net.Addr, error) {
-    return net.ResolveTCPAddr("tcp", env.Value[string]("...", ":8080"))
-}, di.For[whttp.HttpCommand]())
-```
-
-Override the address at runtime with the `--listen` / `-l` flag (takes precedence over the wired value):
+The address is wired automatically from `DAEMON_HOST` / `DAEMON_PORT` (see `config/tools/http`). Override it at runtime with the `--listen` / `-l` flag, which takes precedence:
 
 ```sh
 ./app http --listen 0.0.0.0:8080
@@ -67,113 +35,73 @@ Override the address at runtime with the `--listen` / `-l` flag (takes precedenc
 
 ## Registering routes
 
-Implement `server.Router` (from `gitlab.com/gorib/http/server`) and provide it via DI. The scaffolded `api/<service>/init.go` is the conventional place to do this:
+Implement `server.Router` — a single `Setup(mux server.Mux)` method. The scaffolded router under `domain/<x>/cmd/http` is the conventional place: it injects the standard middleware chain, applies it, then registers routes.
 
 ```go
-package api
+package http
 
 import (
-    "github.com/gofiber/fiber/v2"
-    "mymodule/domain/user/cmd/http/user"
+    "gitlab.com/gorib/http/server"
+    "gitlab.com/gorib/http/server/middleware"
 )
 
-type Router struct {
-    userHandler *user.UserHandler
+type router struct {
+    handler  *userHandler
+    standard *middleware.Standard
 }
 
-func NewRouter(userHandler *user.UserHandler) *Router {
-    return &Router{userHandler: userHandler}
-}
+func (r *router) Setup(mux server.Mux) {
+    mux.Use(r.standard.All()...) // global middleware chain
 
-func (r *Router) Setup(app *fiber.App) {
-    v1 := app.Group("/v1")
-    v1.Get("/users/:id", r.userHandler.Get)
-    v1.Post("/users", r.userHandler.Create)
+    mux.Get("/v1/users/{id}", server.Handle(r.handler.Get))
+    mux.Post("/v1/users", server.Handle(r.handler.Create))
 }
 ```
 
-Register it in DI:
+Route patterns use chi syntax — `{id}`, `{id:[0-9]+}`, trailing `/*` wildcard. Register the router in DI:
 
 ```go
-di.Define(api.NewRouter)
+di.Wire[server.Router](http.NewRouter)
 ```
 
 ## Middleware
 
-### Middleware interface
+Middleware is a `server.Layer`: `func(next server.Handler) server.Handler`. The framework ships a standard chain via `*middleware.Standard` — compress, health, session, tracing, log, error, recover — applied with `mux.Use(r.standard.All()...)`. Each layer in it is a replaceable default (`di.Fallback`): register your own, e.g. `di.Wire[middleware.Session](NewMySession)`, and it wins over the default.
+
+### Custom middleware
+
+Write a `server.Layer` and add it to the chain:
 
 ```go
-type Middleware interface {
-    Name() string
-    Run() fiber.Handler
-}
-```
-
-Implement this interface for any middleware you want to register:
-
-```go
-type AuthMiddleware struct {
-    secret string
-}
-
-func NewAuthMiddleware(cfg *config.Config) *AuthMiddleware {
-    return &AuthMiddleware{secret: cfg.JWTSecret}
-}
-
-func (m *AuthMiddleware) Name() string { return "auth" }
-
-func (m *AuthMiddleware) Run() fiber.Handler {
-    return func(c *fiber.Ctx) error {
-        // validate JWT
-        return c.Next()
+func NewAuthLayer(publicKey *ecdsa.PublicKey) server.Layer {
+    return func(next server.Handler) server.Handler {
+        return func(src server.Source) (server.Renderer, error) {
+            // validate the JWT from src.Header("Authorization")
+            return next(src)
+        }
     }
 }
 ```
 
-### Registering middleware
-
-Tag the middleware with `whttp.MiddlewareTag` (where `whttp` aliases `gitlab.com/gorib/waffle/tools/http`):
+Apply it globally in `Setup` (place cross-cutting concerns like auth/cors outermost — layers run outer→inner in registration order):
 
 ```go
-di.Wire[whttp.Middleware](NewAuthMiddleware, di.Tag(whttp.MiddlewareTag))
-```
-
-### Using middleware in routes
-
-The HTTP tool wires a `MiddlewareList` into the DI container. Inject it wherever you register routes and look up middleware by name:
-
-```go
-func NewRouter(middlewares whttp.MiddlewareList, userHandler *user.UserHandler) *Router {
-    return &Router{
-        middlewares: middlewares,
-        userHandler: userHandler,
-    }
-}
-
-func (r *Router) Setup(app *fiber.App) {
-    v1 := app.Group("/v1", r.middlewares.Get("auth"))
-    v1.Get("/users/:id", r.userHandler.Get)
+func (r *router) Setup(mux server.Mux) {
+    mux.Use(r.auth)              // outermost
+    mux.Use(r.standard.All()...)
+    // routes ...
 }
 ```
 
-`MiddlewareList.Get` panics if the named middleware was not registered, which surfaces misconfiguration at startup rather than at request time.
-
-## MiddlewareList
+or scope it to a route / group:
 
 ```go
-type MiddlewareList interface {
-    Get(name string) fiber.Handler
-}
+mux.Get("/admin/{id}", r.auth, server.Handle(r.handler.GetAdmin))
+
+admin := mux.Group("/admin", r.auth)
+admin.Get("/{id}", server.Handle(r.handler.GetAdmin))
 ```
-
-Constructed from all `Middleware` values tagged with `http.MiddlewareTag`. If no middlewares are registered, the list is empty and `Get` panics on any lookup.
-
-## DI tags
-
-| Tag | Collects |
-|-----|---------|
-| `http.MiddlewareTag` | All `Middleware` implementations |
 
 ## Graceful shutdown
 
-The HTTP server registers itself with the app closer automatically. When the app receives `SIGINT` or `SIGTERM`, Fiber's graceful shutdown is triggered and in-flight requests are allowed to complete.
+The HTTP server registers itself with the app closer. On `SIGINT` / `SIGTERM` the server's graceful shutdown is triggered and in-flight requests are allowed to complete, bounded by the configured shutdown timeout.

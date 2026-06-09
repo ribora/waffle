@@ -66,26 +66,7 @@ type HttpCommand interface {
 
 Marker interface for the HTTP server command. Registered under `app.CommandTag`.
 
-### Middleware
-
-```go
-type Middleware interface {
-    Name() string
-    Run() fiber.Handler
-}
-```
-
-An HTTP middleware. `Name()` is used as the lookup key in `MiddlewareList`. Implement and tag with `http.MiddlewareTag`.
-
-### MiddlewareList
-
-```go
-type MiddlewareList interface {
-    Get(name string) fiber.Handler
-}
-```
-
-A registry of named HTTP middlewares. Injected into the router constructor. `Get` panics if the name is not found.
+HTTP middleware is a `server.Layer` (`func(next server.Handler) server.Handler`), not a tool-specific interface. The standard chain ships as `*middleware.Standard` and is applied in the router's `Setup` via `mux.Use(standard.All()...)`; see [tools/http](../tools/http.md#middleware).
 
 ---
 
@@ -181,27 +162,28 @@ Marker interface for the RabbitMQ consumer command.
 ```go
 type Handler interface {
     Keys() []string
-    Run(ctx context.Context, payload []byte) error
+    Run(src amqp.Source) error
 }
 ```
 
-A single-mode message handler. `Keys()` declares which routing keys this handler subscribes to. Tag with `scribus.CommandTag`.
+A single-mode message handler. `Keys()` declares which routing keys this handler subscribes to. Tag with `scribus.CommandTag`. Parse the body with `scan.Into[T](src)`.
 
 ### BatchHandler
 
 ```go
 type BatchHandler interface {
-    Run(ctx context.Context, keys []string, payloads [][]byte) error
+    Keys() []string
+    Run(msgs []amqp.Source) error
 }
 ```
 
-A batch-mode message handler. Receives a slice of messages flushed together. Provide exactly one without a tag.
+A batch-mode message handler. Receives a slice of `amqp.Source` flushed together. Provide exactly one without a tag.
 
 ### Consumer
 
 ```go
 type Consumer interface {
-    SetHandler(handler func(ctx context.Context, keys []string, documents [][]byte) error) error
+    SetHandler(handler func(msgs []amqp.Source) error) error
     SetDsn(dsn string) error
     SetExchange(exchange string) error
     SetQueue(queue string) error

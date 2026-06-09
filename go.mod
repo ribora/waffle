@@ -7,7 +7,7 @@ require (
 	github.com/go-co-op/gocron/v2 v2.18.2
 	github.com/pborman/getopt/v2 v2.1.0
 	github.com/pressly/goose/v3 v3.24.1
-	gitlab.com/gorib/amqp v1.5.2
+	gitlab.com/gorib/amqp v1.6.0
 	gitlab.com/gorib/di v1.5.2
 	gitlab.com/gorib/elastic v1.2.1
 	gitlab.com/gorib/env v1.0.0

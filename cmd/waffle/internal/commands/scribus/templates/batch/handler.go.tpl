@@ -1,12 +1,11 @@
 package scribus
 
 import (
-	"context"
-
 	scribusModel "{{ .Project }}/domain/{{ .Domain }}/cmd/scribus/model"
-	"{{ .Project }}/pkg/validator"
 
+	"gitlab.com/gorib/amqp"
 	"gitlab.com/gorib/pry"
+	"gitlab.com/gorib/whisk/scan"
 )
 
 type {{ title .Domain }}Management interface {
@@ -28,11 +27,11 @@ type {{ .Event }}Command struct {
 	logger                   pry.Logger
 }
 
-func (c *{{ .Event }}Command) Run(ctx context.Context, keys []string, payload [][]byte) error {
-	for i, k := range keys {
-		event, err := validator.Parse[scribusModel.{{ title .Event }}](payload[i])
+func (c *{{ .Event }}Command) Run(msgs []amqp.Source) error {
+	for _, m := range msgs {
+		event, err := scan.Into[scribusModel.{{ title .Event }}](m)
 		if err != nil {
-			c.logger.Error("Failed to parse event", pry.Err(err), pry.Ctx(ctx), pry.Field("key", k))
+			c.logger.Error("Failed to parse event", pry.Err(err), pry.Ctx(m.Context()), pry.Field("key", m.RoutingKey()))
 			continue
 		}
 		_ = event

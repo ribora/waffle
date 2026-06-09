@@ -1,11 +1,9 @@
 package http
 
 import (
-	"github.com/gofiber/fiber/v2"
-
 	httpServer "gitlab.com/gorib/http/server"
+	"gitlab.com/gorib/http/server/middleware"
 	"gitlab.com/gorib/pry"
-	"gitlab.com/gorib/waffle/tools/http"
 )
 
 type {{ title .Domain }}Management interface {
@@ -14,19 +12,25 @@ type {{ title .Domain }}Management interface {
 
 func NewRouter(
 	{{ .Domain }}Management {{ title .Domain }}Management,
+	standard *middleware.Standard,
 	logger pry.Logger,
 ) httpServer.Router {
 	return &router{
 		{{ .Domain }}Management: {{ .Domain }}Management,
-		logger:                   logger,
+		standard:                standard,
+		logger:                  logger,
 	}
 }
 
 type router struct {
 	{{ .Domain }}Management {{ title .Domain }}Management
-	logger pry.Logger
+	standard                 *middleware.Standard
+	logger                   pry.Logger
 }
 
-func (r *router) Setup(app *fiber.App, mws http.Middlewares) {
-	// Register routes here.
+func (r *router) Setup(mux httpServer.Mux) {
+	mux.Use(r.standard.All()...)
+
+	// Register routes here, e.g.:
+	//   mux.Get("/{{ .Domain }}/{id}", httpServer.Handle(r.handler.Get))
 }

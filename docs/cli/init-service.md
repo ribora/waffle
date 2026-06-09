@@ -99,13 +99,14 @@ func InitDi() {
 Each tool page shows the exact block to copy inside `InitDi()` when you need manual control. Example for the HTTP tool:
 
 ```go
+di.Wire[server.Mux](server.New)
+di.Wire[middleware.Session](middleware.NewSession, di.Fallback())
+// ... the rest of the standard middlewares ...
+di.Wire[*middleware.Standard](middleware.NewStandard)
 di.Wire[app.BaseCommand](
     func() app.BaseCommand { return app.NewCommand("http", "Start web server") },
     di.For[whttp.HttpCommand](),
 )
-di.Wire[whttp.MiddlewareList](whttp.NewMiddlewareList, di.Args(map[string]any{
-    "middlewares": di.Tags[whttp.Middleware](whttp.MiddlewareTag),
-}))
 di.Wire[whttp.HttpCommand](whttp.NewHttpCommand, di.Tag(app.CommandTag))
 ```
 
