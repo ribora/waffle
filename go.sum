@@ -109,8 +109,6 @@ github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UV
 github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
-gitlab.com/gorib/amqp v1.5.2 h1:0AxH8lcEB+9sIgnNis7DifVipilBP0oF5Q9zHkobEoY=
-gitlab.com/gorib/amqp v1.5.2/go.mod h1:1nnD/fjWGi0p7Q6HW3vXyKSgGq6aeerfcTngwAOb0Ac=
 gitlab.com/gorib/amqp v1.6.0 h1:5+gkfd+jONRSd+rGuqpQK62LwfzNs6Ji6tCQufNxo30=
 gitlab.com/gorib/amqp v1.6.0/go.mod h1:uVC5n5VF237lgsFN0rvBmuUPj7qUz0d4rI9u9gYONo8=
 gitlab.com/gorib/criteria v1.0.1 h1:qteo0ifqcVdZmHLdVBX8Rbwuyxv2v59ofbflSV/z/BI=
