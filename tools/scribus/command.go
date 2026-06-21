@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/pborman/getopt/v2"
@@ -76,10 +77,28 @@ func NewScribusCommand(
 	if len(commands) == 0 {
 		return nil, errors.New("handlers list is empty")
 	}
-	cmd := make(map[string]Handler)
+	type wildcard struct {
+		pat string
+		h   Handler
+	}
+	var (
+		exact = make(map[string]Handler)
+		wild  []wildcard
+		keys  []string
+	)
 	for _, c := range commands {
 		for _, key := range c.Keys() {
-			cmd[key] = c
+			for _, prev := range keys {
+				if overlap(prev, key) {
+					return nil, fmt.Errorf("routing keys overlap: %q and %q — give them separate consumers", prev, key)
+				}
+			}
+			keys = append(keys, key)
+			if strings.ContainsAny(key, "*#") {
+				wild = append(wild, wildcard{pat: key, h: c})
+			} else {
+				exact[key] = c
+			}
 			if err := consumer.Bind(key); err != nil {
 				return nil, err
 			}
@@ -87,11 +106,22 @@ func NewScribusCommand(
 	}
 	handler := func(msgs []amqp.Source) error {
 		for _, m := range msgs {
-			if h, found := cmd[m.RoutingKey()]; found {
-				logger.Trace(fmt.Sprintf("%s %s", m.RoutingKey(), string(m.Body())))
-				if err := h.Run(m); err != nil {
-					return err
+			rk := m.RoutingKey()
+			h, found := exact[rk]
+			if !found {
+				for _, w := range wild {
+					if matchTopic(w.pat, rk) {
+						h, found = w.h, true
+						break
+					}
 				}
+			}
+			if !found {
+				continue
+			}
+			logger.Trace(fmt.Sprintf("%s %s", rk, string(m.Body())))
+			if err := h.Run(m); err != nil {
+				return err
 			}
 		}
 		return nil
