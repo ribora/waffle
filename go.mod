@@ -11,7 +11,7 @@ require (
 	gitlab.com/gorib/di v1.5.2
 	gitlab.com/gorib/elastic v1.2.1
 	gitlab.com/gorib/env v1.0.0
-	gitlab.com/gorib/failure v1.1.1
+	gitlab.com/gorib/failure v1.2.0
 	gitlab.com/gorib/grpc v1.4.2
 	gitlab.com/gorib/hilton v1.1.0
 	gitlab.com/gorib/http v1.8.3
