@@ -18,9 +18,10 @@ go install gitlab.com/gorib/waffle/cmd/waffle@latest
 | `waffle make:domain:http <name>` | Add an HTTP handler for an existing domain |
 | `waffle make:domain:scribus <name> <event>` | Add an AMQP consumer for an existing domain |
 | `waffle make:domain:migrate <name>` | Add database migrations for an existing domain |
-| `waffle make:domain:repository <name> <entity>` | Add a secondary repository |
+| `waffle make:domain:repository <type> <name> <entity>` | Add a secondary repository (`type` is currently only `sql`) |
 | `waffle make:domain:migration <name> <description>` | Add a new SQL migration |
 | `waffle make:domain:command <name> <command>` | Add a CLI subcommand scoped to a domain |
+| `waffle make:converter <path>` | Scaffold a goverter convert.go at the given path |
 | `waffle agents` | Regenerate `AGENTS.md` after a waffle upgrade ([details](agents.md)) |
 
 ## How it works
@@ -39,9 +40,9 @@ Each command ships embedded Go templates. When you run a command, waffle renders
 
 Some commands run additional steps after writing files:
 
-- `init:service` — runs `go get gitlab.com/gorib/digen` then `make .tidy generate`
-- `make:domain` — runs `go get gitlab.com/gorib/sql/cmd/store` then `make .tidy generate`
-- `make:domain:grpc` — runs `make .tidy generate`
+- `init:service` — runs `go get -tool gitlab.com/gorib/di/cmd/diogen@latest` then `make .tidy generate`
+- `make:domain` — runs `go get -tool gitlab.com/gorib/sql/cmd/store@latest` then `make .tidy generate`
+- `make:domain:grpc` — runs `go generate ./api/...` (skipped if `proto_dir` is outside the module) then `make .tidy generate`
 - `make:domain:migrate` — runs `make .tidy generate`
 
 The `make generate` step re-runs code generators (DI container, stored struct mappers) so the project compiles immediately after scaffolding.
@@ -54,6 +55,18 @@ Templates have access to two extra functions beyond the standard library:
 |----------|---------|
 | `plural` | `plural "user"` → `"users"` |
 | `title` | `title "user_profile"` → `"User_profile"` |
+
+## waffle.yaml
+
+Project-level conventions live in `waffle.yaml`, next to `go.mod`. `init:service` creates it with the defaults below; generators read it instead of hardcoding paths.
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `api_import` | `<module>/api/pb` | Import path prefix for generated proto stubs |
+| `proto_dir` | `api/proto` | Where `.proto` sources are written |
+| `mapper` | `"dto"` | `"dto"` scaffolds nothing extra (hand-written conversions); `"goverter"` scaffolds a goverter `convert/convert.go` |
+
+`<service>` is the last path segment of the module name. A missing `waffle.yaml`, or one missing some keys, behaves exactly like a file containing only the defaults above — the two are indistinguishable to every command. An unknown key (e.g. a typo) is a hard error, and an invalid `mapper` value (anything other than `dto` or `goverter`) is a hard error.
 
 ## Detailed pages
 

@@ -1,18 +1,11 @@
-package {{ .Domain }}
+package grpc
 
 import (
-	proto "{{ .Project }}/api/{{ .Service }}/pb/{{ .Domain }}"
+	proto "{{ .ApiImport }}/{{ .Domain }}"
 	"google.golang.org/grpc"
-
-	grpcCommand "gitlab.com/gorib/waffle/tools/grpc"
 )
 
 type {{ title .Domain }}Management interface {
-}
-
-type {{ title .Domain }}ServiceServer interface {
-	proto.{{ title .Domain }}ServiceServer
-	grpcCommand.ServiceHandler
 }
 
 func New{{ title .Domain }}Service({{ .Domain }}Management {{ title .Domain }}Management) *{{ .Domain }}Service {

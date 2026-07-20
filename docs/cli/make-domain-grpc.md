@@ -1,6 +1,6 @@
 # make:domain:grpc
 
-Adds a gRPC transport layer to an existing domain. Generates the proto definition, the gRPC service handler, and DI configuration.
+Adds a gRPC transport layer to an existing domain. Generates the proto definition, the gRPC service handler, an error mapper stub, and DI configuration.
 
 ## Usage
 
@@ -16,11 +16,23 @@ waffle make:domain:grpc user
 
 Run this after `waffle make:domain user`.
 
+## waffle.yaml
+
+Behavior is driven by the project's `waffle.yaml` (see [overview](overview.md#waffle.yaml)):
+
+| Key | Used for |
+|-----|----------|
+| `api_import` | Import path prefix for generated proto stubs (`{{ api_import }}/<domain>`) |
+| `proto_dir` | Where the `.proto` file is written (`<proto_dir>/<domain>/service.proto`) |
+| `mapper` | `"dto"` scaffolds nothing extra (write conversions by hand); `"goverter"` scaffolds a `convert/convert.go` |
+
+A missing `waffle.yaml` behaves exactly like one containing only the defaults.
+
 ## Generated files
 
 ### Proto definition
 
-**`api/<service>/proto/user/service.proto`**
+**`<proto_dir>/<domain>/service.proto`**
 
 A skeleton Protocol Buffer service definition:
 
@@ -28,21 +40,9 @@ A skeleton Protocol Buffer service definition:
 syntax = "proto3";
 
 package user;
-
-option go_package = "mymodule/api/myservice/proto/user";
+option go_package = "../pb/user";
 
 service UserService {
-    rpc Get(GetRequest) returns (GetResponse);
-}
-
-message GetRequest {
-    int64 id = 1;
-}
-
-message GetResponse {
-    int64  id    = 1;
-    string email = 2;
-    string name  = 3;
 }
 ```
 
@@ -50,86 +50,71 @@ Add your RPC methods here, then run `make generate` to compile the proto file in
 
 ### gRPC handler
 
-**`domain/user/cmd/grpc/user/service.go`**
+**`domain/user/cmd/grpc/service.go`**
 
-The gRPC service implementation. It satisfies the generated `UserServiceServer` interface and delegates to the domain service:
+The package is flat `grpc` (no per-domain subpackage). It embeds the generated `proto.UserServiceServer` interface directly — a deliberate fail-loud choice, not `UnimplementedUserServiceServer`: an unimplemented RPC panics instead of silently returning `codes.Unimplemented`, so a forgotten method surfaces immediately instead of at a caller's runtime.
 
 ```go
-package user
+package grpc
 
 import (
-    "context"
-    proto "mymodule/api/myservice/proto/user"
-    "mymodule/domain/user/service"
+    proto "mymodule/api/pb/user"
+    "google.golang.org/grpc"
 )
 
-type UserGrpc struct {
-    proto.UnimplementedUserServiceServer
-    service *service.UserService
+type UserManagement interface {
 }
 
-func NewUserGrpc(s *service.UserService) *UserGrpc {
-    return &UserGrpc{service: s}
+func NewUserService(userManagement UserManagement) *userService {
+    return &userService{userManagement: userManagement}
 }
 
-func (g *UserGrpc) Start(registrar grpc.ServiceRegistrar) {
-    proto.RegisterUserServiceServer(registrar, g)
+type userService struct {
+    proto.UserServiceServer
+    userManagement UserManagement
 }
 
-func (g *UserGrpc) Get(ctx context.Context, req *proto.GetRequest) (*proto.GetResponse, error) {
-    user, err := g.service.Get(ctx, int(req.Id))
-    if err != nil {
-        return nil, err
-    }
-    return &proto.GetResponse{
-        Id:    int64(user.Id),
-        Email: user.Email,
-        Name:  user.Name,
-    }, nil
+func (s *userService) Start(server grpc.ServiceRegistrar) {
+    proto.RegisterUserServiceServer(server, s)
 }
 ```
 
-### DI configuration
+Add your RPC methods to `userService`, declare what they need on `UserManagement`, and implement that interface on the domain service.
 
-Add the following inside `InitDi()` in `config/di/di.go`. Use `di.Define` (not `di.Wire[ServiceHandler]`) — gRPC handlers are concrete types collected by tag:
+### DTO conversion
+
+With `mapper: "dto"` (the default) nothing is generated for conversions — write them by hand in the `grpc` package (inline in `service.go` or in a `dto.go` you add).
+
+**`domain/user/cmd/grpc/convert/convert.go`** — generated only when `mapper` is `"goverter"` (scaffolded by this command; the goverter tool is added to `go.mod` if missing). See [dto-conversion.md](../conventions/dto-conversion.md).
+
+### Errors
+
+**`domain/user/cmd/grpc/errors.go`**
+
+An empty error mapper, registered under `grpcCommand.ErrorMapperTag`:
 
 ```go
+package grpc
+
 import (
-    grpcCommand "gitlab.com/gorib/waffle/tools/grpc"
-    usergrpc "mymodule/domain/user/cmd/grpc/user"
+    "google.golang.org/grpc/codes"
 )
 
-// Inside InitDi():
-di.Define(usergrpc.NewUserGrpc, di.Tag(grpcCommand.ServiceTag))
+func NewErrorHandler() *errorHandler {
+    return &errorHandler{}
+}
+
+type errorHandler struct{}
+
+func (h *errorHandler) Errors() map[error]codes.Code {
+    return map[error]codes.Code{}
+}
 ```
 
-## Post-generation steps
-
-```sh
-make .tidy generate
-```
-
-This runs the proto compiler (if configured in the Makefile) and regenerates the DI container.
-
-## Proto compilation
-
-Add a `protoc` invocation to your `Makefile`:
-
-```makefile
-proto:
-    protoc --go_out=. --go-grpc_out=. api/<service>/proto/user/service.proto
-```
-
-Or use `buf` if preferred. The generated Go files are committed alongside the proto source.
-
-## Error mapping
-
-To translate domain errors to gRPC status codes, implement `grpc.ErrorMapper` on the handler:
+Fill in the map as domain errors need specific gRPC status codes:
 
 ```go
-import "google.golang.org/grpc/codes"
-
-func (g *UserGrpc) Errors() map[error]codes.Code {
+func (h *errorHandler) Errors() map[error]codes.Code {
     return map[error]codes.Code{
         model.ErrUserNotFound: codes.NotFound,
         model.ErrUserConflict: codes.AlreadyExists,
@@ -137,4 +122,46 @@ func (g *UserGrpc) Errors() map[error]codes.Code {
 }
 ```
 
-The gRPC tool collects all error maps from all registered handlers and applies them via middleware. See [tools/grpc.md](../tools/grpc.md) for details.
+### DI configuration
+
+**`config/di/di_user_grpc.go`**
+
+```go
+package di
+
+import (
+    userGrpc "mymodule/domain/user/cmd/grpc"
+
+    "gitlab.com/gorib/di"
+    grpcCommand "gitlab.com/gorib/waffle/tools/grpc"
+)
+
+func InitUserGrpc() {
+    di.Define(userGrpc.NewUserService, di.Tag(grpcCommand.ServiceTag))
+    di.Define(userGrpc.NewErrorHandler, di.Tag(grpcCommand.ErrorMapperTag))
+
+    di.Wire[userGrpc.UserManagement](userManagementInstance)
+}
+```
+
+Both the service handler and the error mapper are concrete types collected by tag — use `di.Define`, not `di.Wire[ServiceHandler]`. Replace `userManagementInstance` with whatever provides `UserManagement` (typically the domain service, wired via `di.Alias[userGrpc.UserManagement]()`).
+
+Call `InitUserGrpc()` from `InitDi()` in `config/di/di.go`.
+
+## Post-generation steps
+
+```sh
+make .tidy generate
+```
+
+This regenerates the DI container.
+
+## Proto compilation
+
+When `proto_dir` resolves inside the current module (the default), `make:domain:grpc` runs `go generate ./api/...` itself before `make .tidy generate`, so `pb/user` exists locally and `go mod tidy` doesn't try to fetch it as a remote module.
+
+When `proto_dir` points outside the module (a centralized proto repo shared by several services, for example), the command skips that step and prints a note — run the proto generator for that repo separately, then `make .tidy generate` here.
+
+## Error mapping
+
+See [Errors](#errors) above for the per-domain map, and [tools/grpc.md](../tools/grpc.md) for how the gRPC tool aggregates all registered `ErrorMapper`s across domains.

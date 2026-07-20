@@ -31,6 +31,9 @@ Waffle is an opinionated meta-framework for building Go microservices on the Gol
 - [Overview](docs/di/overview.md) — How `digen` works, `InitXxx` convention, compile-time safety
 - [Tags](docs/di/tags.md) — Every DI tag with registration and collection examples
 
+### Conventions
+- [DTO Conversion](docs/conventions/dto-conversion.md) — goverter pattern, project-wide whitelist of conversion helpers
+
 ### Reference
 - [Interfaces](docs/reference/interfaces.md) — Full interface listing for all packages
 - [Environment Variables](docs/reference/environment.md) — All env vars read by waffle tools

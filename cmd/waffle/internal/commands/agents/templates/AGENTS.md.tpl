@@ -39,6 +39,10 @@ hand-write files when no command matches.
 Each command is idempotent — existing files are NEVER overwritten. You can
 re-run any command safely.
 
+Project conventions (API import path, proto directory, DTO mapper) live in
+`waffle.yaml` at the project root — generators follow it instead of
+hardcoded paths. See `waffle/docs/cli/overview.md#waffle.yaml`.
+
 ## Rule #2 — always run validation after edits
 
 After any change (yours or human's), run **in this order**:
@@ -58,7 +62,8 @@ duplicate alias). Skipping it leaves the service in a broken state.
 ## Project layout
 
 ```
-api/<service>/proto/<domain>/        Generated proto stubs (don't edit; edit .proto)
+api/proto/<domain>/service.proto     Proto contract — edit this (path from waffle.yaml proto_dir)
+api/pb/<domain>/                     Generated stubs — never edit (import path from api_import)
 cmd/app/main.go                      Entry point (don't touch beyond init)
 config/
   di/
@@ -74,22 +79,28 @@ domain/<x>/
     postgres/                        sql repository (uses stored<X> with Unwrap/Inserts)
     <name>.go                        Other outbound adapters (flat files in adapter/)
   cmd/
-    grpc/                            Inbound gRPC
-      <domain>/service.go            Handler
-      dto/convert.go                 goverter (see Rule #5)
+    grpc/                            Inbound gRPC (flat package, one per domain)
+      service.go                     Handler: struct, Start(), RPC methods
+      errors.go                      ErrorMapper (domain error → codes.Code)
+      convert/                       goverter converter — only with mapper: goverter (see Rule #5)
     http/                            Inbound HTTP
       main.go                        Routes
-      dto/convert.go                 goverter
-    scribus/                         AMQP consumer (one per event)
+      convert/                       goverter converter — only with mapper: goverter
+    scribus/                         AMQP consumer (one file per event)
       <event>.go                     Handler
       model/<event>.go               Event payload
-      dto/convert.go                 goverter (single dto/ shared across events of a domain)
+      convert/                       goverter converter — only with mapper: goverter (shared across a domain's events)
     migrate/                         Migrations source
       main.go                        NewMigrations() — embeds *.sql
       migrations/*.sql
 pkg/
   goverter/convert.go                Project-wide conversion whitelist (see Rule #5)
 ```
+
+The `mapper` key in `waffle.yaml` decides conversions. Default `dto`: no
+`convert/` package is scaffolded — write conversions by hand (inline in the
+handler, or a `dto.go` you add to its package). `goverter`: each transport
+gets a `convert/` package as shown above.
 
 ## Rule #3 — naming conventions (strict)
 
@@ -146,15 +157,20 @@ import (
 
 Then `make generate`. Don't `di.Include`. Don't touch `di.go` for waffle tools.
 
-## Rule #5 — DTO conversion (goverter)
+## Rule #5 — DTO conversion
 
-Every transport / adapter that converts between external and domain types
-uses goverter via a **single wildcard extend** pointing at the project-wide
-whitelist:
+Default (`mapper: dto`): conversions are **hand-written** where needed —
+trivially inline in the handler, or in a `dto.go` you add to its package.
+Most methods need none (build the proto request inline, return the response
+as-is); add a converter only for non-trivial mappings.
+
+With `mapper: goverter` (or a one-off `waffle make:converter <path>`) a
+`convert/` package is generated instead. It uses a **single wildcard extend**
+pointing at the project-wide whitelist:
 
 ```go
-// domain/<x>/cmd/grpc/dto/convert.go
-package dto
+// domain/<x>/cmd/grpc/convert/convert.go
+package convert
 
 //go:generate go tool goverter gen ./...
 
@@ -210,12 +226,12 @@ already exists as `_count` aggregate — don't add `db.client.operations` counte
 
 ### Add a new gRPC method to existing domain
 
-1. Edit `api/<service>/proto/<domain>/service.proto` — declare the RPC
-2. `make generate` — regenerates proto stubs
-3. Add method to `domain/<x>/cmd/grpc/<domain>/service.go`
+1. Edit `api/proto/<domain>/service.proto` — declare the RPC
+2. Regenerate proto stubs (see Rule #9 — in-module vs. central)
+3. Add method to `domain/<x>/cmd/grpc/service.go` (flat `grpc` package)
 4. Add Management interface method (if needed) — to the **handler's** interface
 5. Implement on service in `domain/<x>/service/...`
-6. Add DTO conversion in `domain/<x>/cmd/grpc/dto/convert.go`
+6. Add the proto ↔ domain conversion — by hand in the `grpc` package (default `mapper: dto`), or in `domain/<x>/cmd/grpc/convert/convert.go` (`mapper: goverter`)
 7. `make generate && make audit && make`
 
 ### Add a new database table
@@ -248,7 +264,7 @@ Then edit business logic in `domain/users/service/users.go`.
 
 ## Rule #9 — what NOT to do
 
-- ❌ `protoc` directly — `make generate` handles it via Buf
+- ❌ `protoc` directly — proto generation is driven by the project's proto step (in-module: `go generate ./api/...`; monorepo with `proto_dir` outside the module: a central step such as `make -C <api-dir>`)
 - ❌ Manual `go mod tidy` after every edit — `make .tidy` does it consistently
 - ❌ Add `replace` directives in `go.mod` — coordinate gorib version bumps instead
 - ❌ Touch `di_gen.go`, `convert_goverter_gen.go`, `*_goverter_gen.go`, `*_validation_gen.go`, `*_mock.go` — they're generated

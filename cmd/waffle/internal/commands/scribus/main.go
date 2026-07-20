@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 
+	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/converter"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
 )
 
@@ -39,6 +40,11 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 		return err
 	}
 
+	cfg, err := c.ProjectConfig(projectName)
+	if err != nil {
+		return err
+	}
+
 	params := map[string]string{
 		"Domain":  domain,
 		"Event":   event,
@@ -62,16 +68,20 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 	if err := c.Write(sources, params); err != nil {
 		return err
 	}
+	if cfg.Mapper == "goverter" {
+		if err := converter.Generate(filepath.Join(path, "cmd", "scribus", "convert"), projectName); err != nil {
+			return err
+		}
+	}
 
 	if err := c.UncommentModule(includeTool); err != nil {
 		return err
 	}
 
-	info, err := exec.Command("go", "get", "-tool", "gitlab.com/gorib/whisk/cmd/whisk@latest").CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%v: %v", err, string(info))
+	if err := c.EnsureTool("gitlab.com/gorib/whisk/cmd/whisk"); err != nil {
+		return err
 	}
-	info, err = exec.Command("make", ".tidy", "generate").CombinedOutput()
+	info, err := exec.Command("make", ".tidy", "generate").CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%v: %v", err, string(info))
 	}

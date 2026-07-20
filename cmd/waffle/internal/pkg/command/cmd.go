@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -90,40 +91,64 @@ func (c *Command) UncommentModule(modulePath string) error {
 	return os.WriteFile(file, []byte(out), 0644)
 }
 
-func (c *Command) FindProjectName() (string, error) {
+// EnsureTool adds module via `go get -tool` only if go.mod doesn't already
+// list it — safe (and network-free) to call on every scaffold.
+func (c *Command) EnsureTool(module string) error {
+	root, err := findModuleRoot()
+	if err != nil {
+		return err
+	}
+	data, err := os.ReadFile(filepath.Join(root, "go.mod"))
+	if err != nil {
+		return fmt.Errorf("failed to read go.mod: %w", err)
+	}
+	if strings.Contains(string(data), module) {
+		return nil
+	}
+	if info, err := exec.Command("go", "get", "-tool", module+"@latest").CombinedOutput(); err != nil {
+		return fmt.Errorf("go get -tool %s: %v: %s", module, err, string(info))
+	}
+	return nil
+}
+
+func findModuleRoot() (string, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return "", fmt.Errorf("failed to get current working directory: %w", err)
 	}
 	for {
-		entities, err := os.ReadDir(cwd)
-		if err != nil {
-			return "", fmt.Errorf("failed to read directory: %w", err)
-		}
-		for _, entity := range entities {
-			if entity.Name() == "go.mod" {
-				goMod, err := os.OpenFile(filepath.Join(cwd, "go.mod"), os.O_RDONLY, os.ModePerm)
-				if err != nil {
-					return "", fmt.Errorf("failed to open go.mod file: %w", err)
-				}
-				defer goMod.Close()
-
-				sc := bufio.NewScanner(goMod)
-				for sc.Scan() {
-					line := sc.Text()
-					if pkg, found := strings.CutPrefix(line, "module "); found {
-						return pkg, nil
-					}
-				}
-				if err := sc.Err(); err != nil {
-					return "", fmt.Errorf("failed to read go.mod file: %w", err)
-				}
-				return "", errors.New("go.mod is invalid")
-			}
+		if _, err := os.Stat(filepath.Join(cwd, "go.mod")); err == nil {
+			return cwd, nil
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return "", fmt.Errorf("failed to stat go.mod: %w", err)
 		}
 		if cwd == "/" {
 			return "", fmt.Errorf("failed to find go.mod")
 		}
 		cwd = filepath.Dir(cwd)
 	}
+}
+
+func (c *Command) FindProjectName() (string, error) {
+	root, err := findModuleRoot()
+	if err != nil {
+		return "", err
+	}
+	goMod, err := os.OpenFile(filepath.Join(root, "go.mod"), os.O_RDONLY, os.ModePerm)
+	if err != nil {
+		return "", fmt.Errorf("failed to open go.mod file: %w", err)
+	}
+	defer goMod.Close()
+
+	sc := bufio.NewScanner(goMod)
+	for sc.Scan() {
+		line := sc.Text()
+		if pkg, found := strings.CutPrefix(line, "module "); found {
+			return pkg, nil
+		}
+	}
+	if err := sc.Err(); err != nil {
+		return "", fmt.Errorf("failed to read go.mod file: %w", err)
+	}
+	return "", errors.New("go.mod is invalid")
 }

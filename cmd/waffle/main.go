@@ -6,9 +6,13 @@ import (
 	"iter"
 	"os"
 	"slices"
+	"strings"
+
+	"github.com/fatih/color"
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/agents"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/cmdcommand"
+	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/converter"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/domain"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/grpc"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/http"
@@ -69,6 +73,7 @@ func main() {
 	cmds.Add(migration.New())
 	cmds.Add(repository.New())
 	cmds.Add(cmdcommand.New())
+	cmds.Add(converter.New())
 	cmds.Add(agents.New())
 
 	if len(os.Args) < 2 {
@@ -89,9 +94,18 @@ func main() {
 	}
 }
 
+var itemColor = color.New(color.FgGreen)
+
 func usage(cmds commands) {
-	_, _ = fmt.Fprintf(os.Stderr, "Available commands:\n")
+	width := 0
+	for code := range cmds.cmds {
+		if len(code) > width {
+			width = len(code)
+		}
+	}
+	_, _ = fmt.Fprintln(os.Stderr, "Available commands:")
 	for code, command := range cmds.All() {
-		_, _ = fmt.Fprintf(os.Stderr, "\t%s\t%s\n", code, command.Description())
+		name := itemColor.Sprint(code) + strings.Repeat(" ", width+1-len(code))
+		_, _ = fmt.Fprintf(os.Stderr, "\t%s\t%s\n", name, command.Description())
 	}
 }

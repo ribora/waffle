@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/converter"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
 )
 
@@ -31,6 +32,11 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 		return err
 	}
 
+	cfg, err := c.ProjectConfig(projectName)
+	if err != nil {
+		return err
+	}
+
 	params := map[string]string{
 		"Domain":  domain,
 		"Project": projectName,
@@ -44,6 +50,11 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 
 	if err := c.Write(sources, params); err != nil {
 		return err
+	}
+	if cfg.Mapper == "goverter" {
+		if err := converter.Generate(filepath.Join(path, "cmd", "http", "convert"), projectName); err != nil {
+			return err
+		}
 	}
 
 	if err := c.UncommentModule("gitlab.com/gorib/waffle/config/tools/http"); err != nil {

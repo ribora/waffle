@@ -20,6 +20,7 @@ require (
 	gitlab.com/gorib/session v1.1.1
 	gitlab.com/gorib/sql v1.4.5
 	google.golang.org/grpc v1.80.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (

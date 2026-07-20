@@ -45,7 +45,7 @@ domain/<name>/
   adapter/postgres/      ← database adapters (stored structs + queries)
   cmd/grpc/<name>/       ← gRPC handler
   cmd/migrate/           ← migration runner
-api/<service>/           ← API initialization, proto definitions
+api/                     ← API initialization, proto definitions
 ```
 
 ### Commands

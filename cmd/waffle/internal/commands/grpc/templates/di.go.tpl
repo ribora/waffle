@@ -1,15 +1,15 @@
 package di
 
 import (
-    grpc{{ title .Domain }} "{{ .Project }}/domain/{{ .Domain }}/cmd/grpc/{{ .Domain }}"
+	{{ .Domain }}Grpc "{{ .Project }}/domain/{{ .Domain }}/cmd/grpc"
 
-    "gitlab.com/gorib/di"
-    grpcCommand "gitlab.com/gorib/waffle/tools/grpc"
+	"gitlab.com/gorib/di"
+	grpcCommand "gitlab.com/gorib/waffle/tools/grpc"
 )
 
 func Init{{ title .Domain }}Grpc() {
-    di.Wire[grpc{{ title .Domain }}.{{ title .Domain }}ServiceServer](grpc{{ title .Domain }}.New{{ title .Domain }}Service, di.Tag(grpcCommand.ServiceTag))
+	di.Define({{ .Domain }}Grpc.New{{ title .Domain }}Service, di.Tag(grpcCommand.ServiceTag))
+	di.Define({{ .Domain }}Grpc.NewErrorHandler, di.Tag(grpcCommand.ErrorMapperTag))
 
-    //di.Alias[grpc{{ title .Domain }}.{{ title .Domain }}Management](),
-    di.Wire[grpc{{ title .Domain }}.{{ title .Domain }}Management]({{ .Domain }}ManagementInstance)
+	di.Wire[{{ .Domain }}Grpc.{{ title .Domain }}Management]({{ .Domain }}ManagementInstance)
 }

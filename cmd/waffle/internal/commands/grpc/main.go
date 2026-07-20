@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
+	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/converter"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
 )
 
@@ -32,32 +34,57 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 	}
 	service := filepath.Base(projectName)
 
+	cfg, err := c.ProjectConfig(projectName)
+	if err != nil {
+		return err
+	}
+
 	params := map[string]string{
-		"Domain":  domain,
-		"Project": projectName,
-		"Service": service,
+		"Domain":    domain,
+		"Project":   projectName,
+		"Service":   service,
+		"ApiImport": cfg.ApiImport,
 	}
 
 	path := filepath.Join("domain", domain)
 	sources := map[string]string{
-		filepath.Join("templates", "api", "service", "proto", "entity", "service.proto.tpl"): filepath.Join("api", service, "proto", domain, "service.proto"),
-		filepath.Join("templates", "entity", "service.go.tpl"):                               filepath.Join(path, "cmd", "grpc", domain, "service.go"),
+		filepath.Join("templates", "api", "service", "proto", "entity", "service.proto.tpl"): filepath.Join(cfg.ProtoDir, domain, "service.proto"),
+		filepath.Join("templates", "service.go.tpl"):                                         filepath.Join(path, "cmd", "grpc", "service.go"),
+		filepath.Join("templates", "errors.go.tpl"):                                          filepath.Join(path, "cmd", "grpc", "errors.go"),
 		filepath.Join("templates", "di.go.tpl"):                                              filepath.Join("config", "di", "di_"+domain+"_grpc.go"),
 	}
 
-	err = c.Write(sources, params)
-	if err != nil {
+	if err := c.Write(sources, params); err != nil {
 		return err
+	}
+	if cfg.Mapper == "goverter" {
+		if err := converter.Generate(filepath.Join(path, "cmd", "grpc", "convert"), projectName); err != nil {
+			return err
+		}
 	}
 	if err := c.UncommentModule("gitlab.com/gorib/waffle/config/tools/grpc"); err != nil {
 		return err
 	}
-	// Proto-gen before tidy so pb/* exists locally — otherwise tidy tries to fetch it as a remote module.
+
+	if strings.HasPrefix(filepath.Clean(cfg.ProtoDir), "..") {
+		// pb is generated centrally (separate module) — can't build here, and
+		// `make .tidy` would try to fetch the scaffolded pb import remotely.
+		apiDir := filepath.Dir(filepath.Clean(cfg.ProtoDir))
+		fmt.Printf(`Scaffolded gRPC handler for %q.
+proto_dir (%s) is outside this module — pb is generated centrally, so this
+command can't build it. Finish manually, in order:
+  1. regenerate protobuf (e.g. make -C %s)
+  2. go mod tidy
+  3. go generate ./...
+`, domain, cfg.ProtoDir, apiDir)
+		return nil
+	}
+
+	// generate pb before tidy, else tidy fetches the not-yet-generated import remotely.
 	if info, err := exec.Command("go", "generate", "./api/...").CombinedOutput(); err != nil {
 		return fmt.Errorf("%v: %v", err, string(info))
 	}
-	info, err := exec.Command("make", ".tidy", "generate").CombinedOutput()
-	if err != nil {
+	if info, err := exec.Command("make", ".tidy", "generate").CombinedOutput(); err != nil {
 		return fmt.Errorf("%v: %v", err, string(info))
 	}
 	return nil
