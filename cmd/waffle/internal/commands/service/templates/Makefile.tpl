@@ -1,5 +1,4 @@
 all: .tidy generate build
-	@[ -d cmd ] && go build -ldflags "-w" -o bin/ ./cmd/...
 
 audit:
 	@which golangci-lint >/dev/null || (echo "Cannot run linters. Have you installed golangci-lint?" && false)
