@@ -2,8 +2,6 @@ module gitlab.com/gorib/waffle
 
 go 1.26.0
 
-replace gitlab.com/gorib/http => ../http
-
 require (
 	github.com/fatih/color v1.18.0
 	github.com/go-co-op/gocron/v2 v2.18.2
