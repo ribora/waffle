@@ -10,6 +10,7 @@ import (
 
 	"github.com/pborman/getopt/v2"
 
+	"gitlab.com/gorib/http/openapi"
 	"gitlab.com/gorib/http/server"
 	"gitlab.com/gorib/pry"
 	"gitlab.com/gorib/waffle/app"
@@ -40,18 +41,26 @@ func NewHttpCommand(
 type httpCommand struct {
 	app.BaseCommand
 
-	mux    server.Mux
-	router server.Router
-	addr   net.Addr
-	logger pry.Logger
-	opts   []server.Option
+	mux         server.Mux
+	router      server.Router
+	addr        net.Addr
+	logger      pry.Logger
+	opts        []server.Option
+	openapiPath string
 
 	server server.Server
 }
 
-// Run builds the server lazily so --listen from Usage can override addr.
 func (c *httpCommand) Run(ctx context.Context) error {
 	if err := c.Usage(ctx); err != nil {
+		return err
+	}
+	if c.openapiPath != "" {
+		c.router.Setup(c.mux)
+		warns, err := openapi.Reconcile(c.mux.Routes(), c.openapiPath, c.Name())
+		for _, w := range warns {
+			_, _ = fmt.Fprintln(os.Stderr, "openapi:", w)
+		}
 		return err
 	}
 	c.server = server.NewServer(c.mux, c.router, c.addr, c.logger, c.opts...)
@@ -63,9 +72,11 @@ func (c *httpCommand) Usage(ctx context.Context) error {
 	var help bool
 	opts.FlagLong(&help, "help", 'h', "Display this help message")
 	listen := opts.StringLong("listen", 'l', "", "Listen for incoming connections on [host:port]", "host:port")
+	docs := opts.StringLong("openapi", 0, "", "Generate the OpenAPI spec to <path> and exit (does not serve)", "path")
 	if err := opts.Getopt(app.Args(ctx), nil); err != nil {
 		return err
 	}
+	c.openapiPath = *docs
 	if help {
 		opts.SetParameters("")
 		_, _ = os.Stderr.WriteString(c.Description())
