@@ -59,7 +59,7 @@ func (c *httpCommand) Run(ctx context.Context) error {
 		c.router.Setup(c.mux)
 		warns, err := openapi.Reconcile(c.mux.Routes(), c.openapiPath, c.Name())
 		for _, w := range warns {
-			c.logger.Warn(fmt.Sprintf("openapi: %w", w))
+			c.logger.Warn(fmt.Sprintf("openapi: %s", w))
 		}
 		return err
 	}
