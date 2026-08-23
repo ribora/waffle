@@ -111,6 +111,7 @@ func scanEnvVars() []string {
 			if err != nil {
 				return nil
 			}
+			//nolint:errcheck
 			defer f.Close()
 			sc := bufio.NewScanner(f)
 			for sc.Scan() {

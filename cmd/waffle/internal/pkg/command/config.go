@@ -26,6 +26,7 @@ func (c *Command) ProjectConfig(projectName string) (Config, error) {
 	var cfg Config
 	fh, err := os.Open(filepath.Join(root, "waffle.yaml"))
 	if err == nil {
+		//nolint:errcheck
 		defer fh.Close()
 		dec := yaml.NewDecoder(fh)
 		dec.KnownFields(true)

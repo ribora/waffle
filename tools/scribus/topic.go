@@ -48,7 +48,7 @@ func overlap(a, b string) bool {
 		if v, ok := memo[key]; ok {
 			return v
 		}
-		res := false
+		var res bool
 		if i < len(pa) && pa[i] == "#" && rec(i+1, j) {
 			res = true
 		}

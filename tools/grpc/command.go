@@ -110,6 +110,7 @@ func (c *grpcCommand) Usage(ctx context.Context) error {
 	if *listen != "" {
 		parts := strings.Split(*listen, ":")
 		if len(parts) > 2 {
+			//nolint:staticcheck
 			return fmt.Errorf("Unsupported host format, expected host:port")
 		}
 		dest := parts[0]
@@ -121,10 +122,14 @@ func (c *grpcCommand) Usage(ctx context.Context) error {
 				return err
 			}
 			if port == 0 {
+				//nolint:staticcheck
 				return fmt.Errorf("Invalid port number")
 			}
 		}
 		c.addr, err = net.ResolveTCPAddr("tcp", net.JoinHostPort(dest, strconv.Itoa(int(port))))
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

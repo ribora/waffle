@@ -167,7 +167,6 @@ func NewBatchScribusCommand(
 type scribusCommand struct {
 	app.BaseCommand
 	consumer Consumer
-	commands map[string]Handler
 	logger   pry.Logger
 }
 

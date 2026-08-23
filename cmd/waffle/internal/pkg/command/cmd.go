@@ -72,6 +72,7 @@ func (c *Command) write(source, target string, params any) error {
 	if err != nil {
 		return fmt.Errorf("failed to create %s: %w", target, err)
 	}
+	//nolint:errcheck
 	defer fh.Close()
 	return tpl.Execute(fh, params)
 }
@@ -138,6 +139,7 @@ func (c *Command) FindProjectName() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to open go.mod file: %w", err)
 	}
+	//nolint:errcheck
 	defer goMod.Close()
 
 	sc := bufio.NewScanner(goMod)
