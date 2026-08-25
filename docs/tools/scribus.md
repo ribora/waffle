@@ -119,14 +119,19 @@ Define a local struct for the message payload in `cmd/scribus/model/`. It is sep
 
 ```go
 // cmd/scribus/model/order.go
+
+//go:generate go tool whisk $GOFILE
+
 package model
 
 type OrderCreated struct {
-    Id         int            `json:"id"`
-    CustomerId int            `json:"customerId"`
-    Items      []OrderItem    `json:"items"`
+    Id         int         `json:"id"`
+    CustomerId int         `json:"customerId"`
+    Items      []OrderItem `json:"items"`
 }
 ```
+
+`scan.Into` needs the `Parse` method whisk generates, so the message model carries the same `//go:generate` directive as an HTTP request DTO — it is the same mechanism over a different source. AMQP contributes the scopes `header`, `routing-key` and `exchange`; validation tags, hooks and custom validators are described in [conventions/input-parsing.md](../conventions/input-parsing.md).
 
 ### Implementing a handler
 

@@ -24,11 +24,11 @@ Waffle orchestrates these gorib packages:
 | `gitlab.com/gorib/failure` | Typed, structured errors |
 | `gitlab.com/gorib/session` | Request/command context |
 | `gitlab.com/gorib/env` | Type-safe environment variable reading |
-| `gitlab.com/gorib/http` | Fiber-based HTTP router |
+| `gitlab.com/gorib/http` | chi-based HTTP server, typed handlers, OpenAPI generation |
 | `gitlab.com/gorib/grpc` | gRPC server helpers |
+| `gitlab.com/gorib/whisk` | Codegen for reading and validating input from any source — HTTP, AMQP, raw bytes (see [conventions/input-parsing](conventions/input-parsing.md)) |
 | `gitlab.com/gorib/sql` | SQL query builder and repository |
 | `gitlab.com/gorib/amqp` | RabbitMQ consumer |
-| `gitlab.com/gorib/try` | Panic recovery |
 | `gitlab.com/gorib/hilton` | Distributed tracing & metrics abstraction (see [tools/hilton](tools/hilton.md)) |
 
 ## Architecture

@@ -34,7 +34,16 @@ if err != nil {
 
 The error (malformed body or failed validation) propagates to the error middleware, which renders it — you don't translate it in the handler. `Into` requires `*createRequest` to have a whisk-generated `Parse(scan.Source) error`, so a DTO without codegen won't compile.
 
-For a typed handler that receives the parsed `*Req` directly (no manual `Into` call), register it with `server.Bind` instead of `server.Handle`.
+For a typed handler that receives the parsed `*Req` directly (no manual `Into` call), register it with `server.Bind` instead of `server.Handle`:
+
+```go
+func (h *userHandler) Create(ctx context.Context, req *createRequest) (*server.Response[userResponse], error)
+
+// in Setup:
+mux.Post("/v1/users", server.Bind(r.handler.Create))
+```
+
+`Bind` also records the request and response types on the route, and that record is what the OpenAPI generator reads. A route registered with `Handle` carries no types and stays out of the specification — see [OpenAPI](http.md#openapi).
 
 ## Response helpers
 
@@ -59,7 +68,7 @@ Both take a pointer to the payload (status from `net/http`). For JSON the payloa
 Request and response structs with `json` tags live in the `cmd/http` layer — never in `model/`. They are local to the transport:
 
 ```go
-//go:generate go tool whisk -validate.storage=pkg/validator $GOFILE
+//go:generate go tool whisk $GOFILE
 
 package http
 
@@ -75,7 +84,14 @@ type userResponse struct {
 }
 ```
 
-`whisk` generates `Parse(scan.Source) error` and `Validate() error` on the request structs; `-validate.storage` points at the package holding any custom `Is<Tag>` validators (absent dir → no custom validators).
+`whisk` generates `Parse(scan.Source) error` and `Validate() error` on the request structs. It is not HTTP-specific — the same tags bind a queue message or a file — so the tag surface, the hooks and adding your own validator live in [conventions/input-parsing.md](../conventions/input-parsing.md). What HTTP contributes are the scopes: `path`, `query`, `header`, `cookie`, `form`.
+
+```go
+type getRequest struct {
+    Id     int    `scan:"path=id"`
+    Expand string `scan:"query=expand"`
+}
+```
 
 ## Full handler example
 

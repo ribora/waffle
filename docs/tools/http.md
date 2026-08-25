@@ -64,6 +64,78 @@ Route patterns use chi syntax — `{id}`, `{id:[0-9]+}`, trailing `/*` wildcard.
 di.Wire[server.Router](http.NewRouter)
 ```
 
+## OpenAPI
+
+The `--openapi` flag derives an OpenAPI 3.1 document from the registered routes, writes it to the given path and exits without serving:
+
+```sh
+./app http --openapi api/openapi.yaml
+```
+
+The flag runs the real wiring — the router and everything it depends on is constructed — so the spec describes the same routes the server would serve.
+
+Only routes registered with `server.Bind` reach the spec: `Bind` captures the request and response types, `server.Handle` has nothing to capture. A `Handle` route is invisible to the generator; if you documented one by hand it stays in the file and is reported as doc-only.
+
+```go
+func (r *router) Setup(mux server.Mux) {
+    mux.Use(r.standard.All()...)
+
+    mux.Get("/v1/users/{id}", server.Bind(r.handler.Get))
+    mux.Post("/v1/users", server.Bind(r.handler.Create))
+}
+```
+
+A `Bind` handler takes the parsed request and returns a typed response:
+
+```go
+func (h *userHandler) Get(ctx context.Context, req *getRequest) (*server.Response[userResponse], error)
+```
+
+### Code owns structure, you own prose
+
+The first run writes a fresh file. Every later run merges into the existing one:
+
+| | |
+|---|---|
+| **Added** when the code has it and the file doesn't | schemas, fields, parameters, operations — each marked `TODO(openapi)`, so unfinished prose is greppable |
+| **Kept in sync** on every run | `required`, nullability, `operationId` |
+| **Left alone** | `summary`, `description`, examples, extra responses, `format` on existing fields, and everything outside `paths` and `components` |
+| **Warned** | anything in the file the code doesn't produce — a hand-written operation, or something stale after a rename |
+| **Error** | a field or parameter whose type contradicts the code, or a field the code no longer has |
+
+Warnings are logged and the command still succeeds. Structural conflicts make it exit non-zero; the merged file is written first, so you can open it and see what disagreed.
+
+### What the DTO contributes
+
+The request type registered with `Bind` supplies both the parameters and the body schema; the response type supplies the 200 schema.
+
+| In the DTO | In the spec |
+|---|---|
+| `scan:"path=id"`, `scan:"query=limit"`, `scan:"header=X-Request-Id"` | a parameter in that location; `path` is always required |
+| `scan:"embed"` | the embedded struct's fields are inlined |
+| `json:"email"`, or a protobuf `json=` name | a body property; a field with neither tag is skipped |
+| `validate:"required"` | listed in `required` |
+| `validate:"email"`, `uuid`, `url`, `hostname`, `datetime` | `format` |
+| `validate:"oneof=new used"` | `enum` |
+| `validate:"min=2,max=64"` | `minLength`/`maxLength`, `minimum`/`maximum` or `minItems`/`maxItems`, by type |
+| any other `validate` rule | appended to the description as `Constraints: …` |
+| a pointer field that isn't required | nullable — `type: [string, "null"]`, or `anyOf` for a `$ref` |
+| a type with a `Values() []string` method | `enum` |
+| `time.Time`, `uuid.UUID`, protobuf well-known types | their standard formats |
+
+Parameters that share a name across requests share one component when their location, type and requiredness agree. When they disagree, the generator splits them into `pkg.ReqType.name` components and warns, rather than merging two different contracts under one name.
+
+`operationId` is derived from the handler — its method name, extended with the package, the path and the HTTP method only as far as uniqueness requires. Rename a handler and the id follows on the next run.
+
+### In CI
+
+```sh
+./app http --openapi api/openapi.yaml
+git diff --exit-code api/openapi.yaml
+```
+
+The first command fails on a structural conflict, the second on drift — code changed and nobody regenerated. The app boots to build the router, so give the step whatever config the service needs, even though it never listens. Expect one noisy commit when adopting this on a hand-written file: the merge round-trips the YAML.
+
 ## Middleware
 
 Middleware is a `server.Layer`: `func(next server.Handler) server.Handler`. The framework ships a standard chain via `*middleware.Standard` — compress, health, session, tracing, log, error, recover — applied with `mux.Use(r.standard.All()...)`. Each layer in it is a replaceable default (`di.Fallback`): register your own, e.g. `di.Wire[middleware.Session](NewMySession)`, and it wins over the default.

@@ -98,6 +98,34 @@ waffle make:domain user
 
 This creates the model, service, postgres adapter, and DI configuration for a `user` domain. See [make:domain](cli/make-domain.md) for details.
 
+## Read and validate input
+
+Anything a service accepts — an HTTP body, a queue message, a file — is parsed by generated code rather than by hand. Put the tags on the struct, add one directive, run `make generate`:
+
+```go
+//go:generate go tool whisk $GOFILE
+
+type createUser struct {
+    Email string `json:"email" validate:"required,email"`
+    Code  string `json:"code"  validate:"required,passcode"`
+}
+```
+
+`passcode` is not a built-in — it is a tag added by dropping one file into `pkg/validate`, named after the tag:
+
+```go
+// pkg/validate/passcode.go
+package validate
+
+func IsPasscode(value string, args ...string) bool {
+    return len(value) == 6
+}
+```
+
+No registration, no flag, no fork: the file name is the tag. The same convention covers everything the generator can't express on its own — a `validate()` method for cross-field rules, a `parse()` method for fields it can't convert, and a custom decoder for body formats beyond JSON and XML. A custom tag that shadows a built-in one wins, so even the defaults are replaceable.
+
+See [conventions/input-parsing.md](conventions/input-parsing.md).
+
 ## Upgrading waffle
 
 When you bump waffle to a newer version, refresh the AI-agent instructions:
@@ -123,6 +151,7 @@ patterns from the previous waffle version. See [agents](cli/agents.md).
 | Writing commands | [core/commands.md](core/commands.md) |
 | HTTP server setup | [tools/http.md](tools/http.md) |
 | HTTP handler pattern | [tools/http-handler.md](tools/http-handler.md) |
+| Input parsing and validation | [conventions/input-parsing.md](conventions/input-parsing.md) |
 | gRPC server setup | [tools/grpc.md](tools/grpc.md) |
 | gRPC handler pattern | [tools/grpc-handler.md](tools/grpc-handler.md) |
 | Database migrations | [tools/migrate.md](tools/migrate.md) |
