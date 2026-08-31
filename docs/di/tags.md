@@ -2,6 +2,18 @@
 
 Tags are empty struct values used to group multiple values of the same interface into a collected slice. Each waffle tool defines its own tags. You register your implementations under those tags; the tool's `InitXxx` registrations collect them using `di.Tags[Interface](tag)`.
 
+**A tagged registration is a collection member and nothing else.** It never competes for a slot, and it cannot satisfy a plain constructor argument either: a parameter of type `server.Interceptor` will not be filled with one of the interceptors you tagged, because picking one of several would be an arbitrary choice. Diogen refuses to generate instead:
+
+```
+dependency for mw (server.Interceptor) in *pkg.Thing is provided only by tagged
+registrations (pkg.NewTracing, pkg.NewLogging): a di.Tag registration is a
+collection member — collect them with di.Tags, or drop the tag to wire it directly
+```
+
+If you need the same implementation both in a collection and as a direct dependency, take `[]I` and pick from it. Registering the same constructor twice does not work: both registrations would be built and would claim the same container field, and Diogen refuses to generate (`is registered twice and both registrations are built`).
+
+Tagged registrations also have no `Replacements` entry, since replacing one member cannot change the membership of the collection. See [Testing with the container](overview.md#testing-with-the-container).
+
 ## Quick reference
 
 | Tag | Package | Register with | Interface collected |

@@ -25,12 +25,12 @@ hand-write files when no command matches.
 
 | Want to do | Command |
 |---|---|
-| New service | `waffle init service <name>` |
+| New service | `waffle init:service` (prompts for the name) |
 | New domain (model + service + repository + migrations) | `waffle make:domain <domain>` |
 | Add inbound gRPC | `waffle make:domain:grpc <domain>` |
 | Add inbound HTTP | `waffle make:domain:http <domain>` |
 | Add AMQP consumer | `waffle make:domain:scribus <domain> <event>` |
-| Add secondary repository | `waffle make:domain:repository <domain> <entity>` |
+| Add secondary repository | `waffle make:domain:repository <type> <name> <entity>` (`type` is `sql`) |
 | Add migration | `waffle make:domain:migration <domain> <name>` |
 | Add CLI subcommand | `waffle make:domain:command <domain> <name>` |
 | Add DTO converter (any path) | `waffle make:converter <path>` |
@@ -82,7 +82,7 @@ domain/<x>/
     grpc/                            Inbound gRPC (flat package, one per domain)
       service.go                     Handler: struct, Start(), RPC methods
       errors.go                      ErrorMapper (domain error → codes.Code)
-      convert/                       goverter converter — only with mapper: goverter (see Rule #5)
+      convert/                       goverter converter — only with mapper: goverter (see Rule #6)
     http/                            Inbound HTTP
       main.go                        Routes
       convert/                       goverter converter — only with mapper: goverter
@@ -94,7 +94,7 @@ domain/<x>/
       main.go                        NewMigrations() — embeds *.sql
       migrations/*.sql
 pkg/
-  goverter/convert.go                Project-wide conversion whitelist (see Rule #5)
+  goverter/convert.go                Project-wide conversion whitelist (see Rule #6)
 ```
 
 The `mapper` key in `waffle.yaml` decides conversions. Default `dto`: no
@@ -142,6 +142,56 @@ is a generation error, not last-wins.
 - ❌ `func init()` for DI registration (use `di.Wire` in `InitDi()`)
 - ❌ Adding entries to `di.go` for waffle tools — use **blank import** in `modules.go`
 - ❌ `di.Include("path")` — DEPRECATED, use blank imports
+- ❌ Taking a tagged type as a plain constructor argument. A `di.Tag`
+  registration is a collection member and nothing else: it never fills a slot
+  and never answers a single-value dependency. Collect with `di.Tags[T](tag)`,
+  or drop the tag from the registration you meant to wire directly
+- ❌ `di.Wire[T](someVar)` where `someVar` is a local. Only the value returned by
+  `di.Define` is a handle — the generator cannot copy a local of `InitDi()` into
+  the container. Register the constructor, or bind a handle first:
+  `h := di.Define(NewT)`
+- ❌ Registering the same constructor twice while both registrations are built
+  (typically once with `di.Tag`, once without). Field names come from the type,
+  and the constructor is the last thing left to tell two registrations apart —
+  so there is no name for the second one
+
+Each of these is a **generation error**, not a lint. They exist because the
+output would otherwise compile and be wrong: a nil type assertion at startup, an
+arbitrary member of a collection passed as a single dependency, or a constructor
+run twice with the second value overwriting the first.
+
+### Component tests — `Replacements`
+
+The generated container has a second entry point for tests:
+
+```go
+func InitApp() (*Application, error)                        // = InitAppWith(Replacements{})
+func InitAppWith(replacements Replacements) (*Application, error)
+```
+
+`Replacements` has one field per replaceable seam. Supply a value and the
+constructor that would have produced it is never called:
+
+```go
+app, err := diogen.InitAppWith(diogen.Replacements{
+    PostgresUserRepository: fakeUserRepository{},
+})
+```
+
+The field's type is the interface the value is wired as, so a fake that stops
+satisfying it fails to compile at the line that supplies it.
+
+- ✅ Use `InitAppWith` for component tests that need the real graph and a few fakes
+- ❌ Do **not** add `if env.Value("APP_ENV") == "test"` branches to `InitDi()` —
+  that puts test knowledge into production wiring
+- ❌ Do **not** use `di.Override()` to inject a mock — it is a build-time
+  directive, so the mock has to be importable from production code
+
+Not every registration has a field. A seam exists only when every type the
+registration is exposed as is an interface: `di.Define(NewServer)` exposes the
+concrete `*Server` and gets none, and `di.Tag` members get none because the
+membership of a collection is fixed at generation time — replace the consumer
+that collects them instead.
 
 ### Adding a waffle module
 
@@ -157,7 +207,60 @@ import (
 
 Then `make generate`. Don't `di.Include`. Don't touch `di.go` for waffle tools.
 
-## Rule #5 — DTO conversion
+## Rule #5 — input parsing (whisk)
+
+Anything the service accepts — HTTP body, query, header, AMQP delivery, a file —
+is parsed by generated code. Put the tags on the struct, add one directive:
+
+```go
+//go:generate go tool whisk $GOFILE
+
+type createOrder struct {
+    Currency string   `scan:"query=currency" validate:"required,currency"`
+    Email    string   `json:"email"          validate:"required,email"`
+    Items    []string `json:"items"          validate:"required,unique,dive,required"`
+}
+```
+
+A field with a `scan` tag comes from that scope; a field without one comes from
+the body. Read it with `server.Into[T](src)`, or register the handler with
+`server.Bind` to receive the parsed `*T` directly.
+
+### Custom validators are a convention, not configuration
+
+Drop a file named after the tag into `pkg/validate` at the module root. The
+function is `Is` + the tag in PascalCase:
+
+```go
+// pkg/validate/passcode.go
+package validate
+
+func IsPasscode(value string, args ...string) bool { return len(value) == 6 }
+```
+
+No registration, no flag. A custom tag that shadows a built-in one wins.
+
+### Escape hatches
+
+Reaching for one is normal, not a failure of the generator:
+
+| When | Hatch |
+|---|---|
+| A rule tags can't express — cross-field, business state | `func (s T) validate() error` |
+| A field whisk can't convert, a derived value, a default | `func (s *T) parse(src scan.Source) error` |
+| A body format that isn't JSON or XML | `Unmarshal<Format>` in `pkg/scan`, with `-format=<name>` |
+
+Both hooks are lowercase methods you write by hand; whisk finds them.
+
+### Anti-patterns
+
+- ❌ Reading `src.Body()` and unmarshalling by hand in a handler
+- ❌ Validating in the handler what a `validate` tag already expresses
+- ❌ Registering a route with `server.Handle` when the DTO is typed — `Bind`
+  captures the request and response types, and that record is what the OpenAPI
+  generator reads; a `Handle` route stays out of the specification
+
+## Rule #6 — DTO conversion
 
 Default (`mapper: dto`): conversions are **hand-written** where needed —
 trivially inline in the handler, or in a `dto.go` you add to its package.
@@ -199,13 +302,13 @@ type Convert interface {
 - ❌ Trying to embed interfaces — goverter rejects `method must have one name`
 - ❌ Hand-written convert.go when struct has ≥5 fields or nested types
 
-## Rule #6 — errors
+## Rule #7 — errors
 
 - `failure.Wrap(format, ...args)` / `failure.New(format, ...args)` — for errors that **cross service boundaries** (gRPC, AMQP, HTTP response bodies). Stable JSON wire format
 - `errors.New("...")` / `fmt.Errorf("%w: ...", parent, ...)` — internal errors that don't leave the process
 - Domain-level sentinel errors: `var ErrNotFound = errors.New("not found")`
 
-## Rule #7 — observability
+## Rule #8 — observability
 
 `hilton.Provider` is in ctx automatically — propagated by transport middleware
 (`http.server/middleware`, `grpc.server/interceptor`, `amqp/interceptor`).
@@ -222,12 +325,12 @@ defer span.End()
 Metrics: histogram only, no separate counters. `db.client.operation.duration_count`
 already exists as `_count` aggregate — don't add `db.client.operations` counter.
 
-## Rule #8 — common patterns by task
+## Rule #9 — common patterns by task
 
 ### Add a new gRPC method to existing domain
 
 1. Edit `api/proto/<domain>/service.proto` — declare the RPC
-2. Regenerate proto stubs (see Rule #9 — in-module vs. central)
+2. Regenerate proto stubs (see Rule #10 — in-module vs. central)
 3. Add method to `domain/<x>/cmd/grpc/service.go` (flat `grpc` package)
 4. Add Management interface method (if needed) — to the **handler's** interface
 5. Implement on service in `domain/<x>/service/...`
@@ -262,12 +365,12 @@ waffle make:domain:scribus users foo   # if it consumes AMQP events
 
 Then edit business logic in `domain/users/service/users.go`.
 
-## Rule #9 — what NOT to do
+## Rule #10 — what NOT to do
 
 - ❌ `protoc` directly — proto generation is driven by the project's proto step (in-module: `go generate ./api/...`; monorepo with `proto_dir` outside the module: a central step such as `make -C <api-dir>`)
 - ❌ Manual `go mod tidy` after every edit — `make .tidy` does it consistently
 - ❌ Add `replace` directives in `go.mod` — coordinate gorib version bumps instead
-- ❌ Touch `di_gen.go`, `convert_goverter_gen.go`, `*_goverter_gen.go`, `*_validation_gen.go`, `*_mock.go` — they're generated
+- ❌ Touch `di_gen.go`, `*_goverter_gen.go`, `*_whisk_gen.go`, `*_store_gen.go`, `*_mock.go` — they're generated
 - ❌ Wrap stdlib types in custom abstractions inside `domain/<x>/model/` — model stays pure Go types
 - ❌ Pass `context.Background()` deeper than the entrypoint — propagate ctx from caller
 - ❌ `panic(err)` outside `try.Catch`-wrapped blocks (and try is deprecated — prefer explicit error returns)

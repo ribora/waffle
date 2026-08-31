@@ -74,3 +74,14 @@ Project-level conventions live in `waffle.yaml`, next to `go.mod`. `init:service
 - [make:domain](make-domain.md)
 - [make:domain:grpc](make-domain-grpc.md)
 - [make:domain:migrate](make-domain-migrate.md)
+- [agents](agents.md)
+
+The remaining commands — `make:domain:http`, `make:domain:scribus`,
+`make:domain:repository`, `make:domain:migration`, `make:domain:command` and
+`make:converter` — have no page of their own. They follow the same rules as the
+ones above (project root detection, idempotent writes, `make generate`
+afterwards); what they produce is described where the produced thing is
+documented: [tools/http-handler](../tools/http-handler.md),
+[tools/scribus](../tools/scribus.md), [tools/migrate](../tools/migrate.md),
+[core/commands](../core/commands.md) and
+[conventions/dto-conversion](../conventions/dto-conversion.md).

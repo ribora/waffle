@@ -16,7 +16,7 @@ never overwritten.
 
 | Situation | Action |
 |---|---|
-| `waffle init service` runs it automatically | nothing to do — file is fresh |
+| `waffle init:service` runs it automatically | nothing to do — file is fresh |
 | **You bumped waffle to a new version** (`go get gitlab.com/gorib/waffle@latest`) | **run `waffle agents`** — conventions may have changed |
 | You added a new domain / waffle module / env var and want AGENTS.md to reflect it | run `waffle agents` |
 | You changed business logic only | not required (auto-detected context unchanged) |

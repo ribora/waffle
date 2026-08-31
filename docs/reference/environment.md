@@ -72,4 +72,4 @@ func NewConfig() *Config {
 
 `NeedValue` panics at startup if the variable is missing, which surfaces misconfiguration immediately rather than at the first request. `Value` accepts a fallback for optional settings.
 
-See the [env package documentation](../../env/README.md) for the full API reference.
+See the [env package documentation](https://gitlab.com/gorib/env) for the full API reference.

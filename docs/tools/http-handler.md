@@ -45,6 +45,65 @@ mux.Post("/v1/users", server.Bind(r.handler.Create))
 
 `Bind` also records the request and response types on the route, and that record is what the OpenAPI generator reads. A route registered with `Handle` carries no types and stays out of the specification — see [OpenAPI](http.md#openapi).
 
+## Without the framework
+
+The same route, written against `net/http` directly, so the trade is visible:
+
+```go
+func (h *userHandler) Create(w http.ResponseWriter, r *http.Request) {
+    ctx := r.Context()
+
+    req, err := parseCreateRequest(r)          // see conventions/input-parsing.md
+    if err != nil {
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusBadRequest)
+        _ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+        return
+    }
+
+    user, err := h.service.Create(ctx, req.Email)
+    if err != nil {
+        status := http.StatusInternalServerError        // and every domain error
+        if errors.Is(err, model.ErrAlreadyExists) {     // mapped again, here,
+            status = http.StatusConflict                // in every handler
+        }
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(status)
+        _ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusCreated)
+    _ = json.NewEncoder(w).Encode(userResponse{Id: user.Id})
+}
+```
+
+The framework version:
+
+```go
+func (h *userHandler) Create(ctx context.Context, req *createRequest) (*server.Response[userResponse], error) {
+    user, err := h.service.Create(ctx, req.Email)
+    if err != nil {
+        return nil, err
+    }
+    return server.NewJsonResponse(http.StatusCreated, &userResponse{Id: user.Id}), nil
+}
+```
+
+The difference is not length. It is **where decisions live**:
+
+| Decision | Without | With |
+|---|---|---|
+| Which status a domain error maps to | in every handler that can return it | once, in the error middleware |
+| The shape of an error body | in every handler | once, in the error middleware |
+| Content type and encoding | in every handler | in the response helper |
+| Whether the request is valid before the service is called | wherever you remember to check | the signature — `req` cannot be unparsed |
+
+The last row is the one that matters: the handler receives a `*createRequest`
+that exists only if parsing and validation succeeded, so there is no path
+through it where an invalid request reaches the service.
+
 ## Response helpers
 
 ```go

@@ -89,6 +89,88 @@ Codegen covers the shape most DTOs have. Everything else has a hook, and reachin
 
 Both hooks are lowercase methods you write by hand; whisk detects them and calls them from the generated code.
 
+## Without whisk
+
+The generator is optional — this is the same handler with the codegen removed,
+so the trade is visible rather than asserted.
+
+**With whisk.** Two tags per field and one directive; `Into` runs the generated
+`Parse`, then `Validate`:
+
+```go
+//go:generate go tool whisk $GOFILE
+
+type createOrder struct {
+    Currency string   `scan:"query=currency" validate:"required,currency"`
+    Email    string   `json:"email"          validate:"required,email"`
+    Items    []string `json:"items"          validate:"required,unique,dive,required"`
+}
+
+req, err := server.Into[createOrder](src)
+```
+
+**Without it**, the same contract in the handler:
+
+```go
+type createOrder struct {
+    Currency string
+    Email    string
+    Items    []string
+}
+
+func parseCreateOrder(src server.Source) (*createOrder, error) {
+    var body struct {
+        Email string   `json:"email"`
+        Items []string `json:"items"`
+    }
+    if err := json.Unmarshal(src.Body(), &body); err != nil {
+        return nil, failure.BadRequest("malformed body")
+    }
+
+    out := &createOrder{Email: body.Email, Items: body.Items}
+    out.Currency = src.Lookup("query", "currency")
+
+    if out.Currency == "" {
+        return nil, failure.BadRequest("currency is required")
+    }
+    if !validate.IsCurrency(out.Currency) {
+        return nil, failure.BadRequest("currency is not a currency")
+    }
+    if out.Email == "" {
+        return nil, failure.BadRequest("email is required")
+    }
+    if !validate.IsEmail(out.Email) {
+        return nil, failure.BadRequest("email is not an email")
+    }
+    if len(out.Items) == 0 {
+        return nil, failure.BadRequest("items is required")
+    }
+    seen := make(map[string]bool, len(out.Items))
+    for _, item := range out.Items {
+        if item == "" {
+            return nil, failure.BadRequest("items contains an empty value")
+        }
+        if seen[item] {
+            return nil, failure.BadRequest("items must be unique")
+        }
+        seen[item] = true
+    }
+    return out, nil
+}
+```
+
+Three fields. The version without codegen is longer than the struct it fills,
+and every rule is a place to forget a check, return the wrong status, or word
+the message differently from the handler next door.
+
+Then the same payload arrives from a queue, and `src.Body()` is the only line
+that still applies — the query lookup has to become a header lookup, by hand,
+in a second function.
+
+What you give up by skipping whisk is listed in
+[What is optional](../opting-out.md#whisk): the OpenAPI document is derived from
+the types `server.Bind` captures, and a hand-parsed handler has none.
+
 ## Where this shows up
 
 | Context | Page |

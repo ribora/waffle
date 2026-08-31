@@ -174,7 +174,7 @@ Standard targets:
 After writing all files, `init:service` runs:
 
 ```sh
-go get gitlab.com/gorib/digen
+go get -tool gitlab.com/gorib/di/cmd/diogen@latest
 make .tidy generate
 ```
 

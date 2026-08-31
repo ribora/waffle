@@ -62,7 +62,7 @@ func (c *commands) All() iter.Seq2[string, Command] {
 	}
 }
 
-func main() {
+func newCommands() commands {
 	var cmds commands
 	cmds.Add(service.New())
 	cmds.Add(domain.New())
@@ -75,6 +75,11 @@ func main() {
 	cmds.Add(cmdcommand.New())
 	cmds.Add(converter.New())
 	cmds.Add(agents.New())
+	return cmds
+}
+
+func main() {
+	cmds := newCommands()
 
 	if len(os.Args) < 2 {
 		usage(cmds)

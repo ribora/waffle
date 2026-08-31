@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Go 1.22 or later
+- Go 1.27 or later
 - `make`
 - Access to the gorib module proxy / repository
 
@@ -81,6 +81,8 @@ import (
 `config/di/di.go` stays empty for now — service-specific `di.Wire` / `di.Define` calls go there later.
 
 See [tools/http.md](tools/http.md) for what the HTTP module expands to and how to override individual registrations.
+
+Every module expects something in `.env`, and some expect infrastructure to be running — the HTTP tool needs `DAEMON_HOST` and `DAEMON_PORT`. See [Running locally](reference/running-locally.md) for the full list per module.
 
 Run `make generate` to regenerate the DI container, then start the HTTP server:
 

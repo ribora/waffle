@@ -179,8 +179,9 @@ file is a no-op.
 
 `make:domain:repository` (postgres) does *not* scaffold a goverter convert
 — the sql adapter uses a hand-written `stored<X>` struct with `Unwrap()`
-and `Inserts()` methods instead. See [repository conventions](repository.md)
-if you need to mix the two.
+and `Inserts()` methods instead. See
+[make:domain](../cli/make-domain.md#domainuseradapterpostgresstored_usergo) for
+that convention if you need to mix the two.
 
 ## Why not interface embedding?
 
