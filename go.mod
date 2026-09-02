@@ -7,19 +7,19 @@ require (
 	github.com/go-co-op/gocron/v2 v2.22.0
 	github.com/pborman/getopt/v2 v2.2.0
 	github.com/pressly/goose/v3 v3.27.3
-	gitlab.com/gorib/amqp v1.7.1
+	gitlab.com/gorib/amqp v1.7.2
 	gitlab.com/gorib/di v1.6.1
 	gitlab.com/gorib/elastic v1.2.6
 	gitlab.com/gorib/env v1.0.1
 	gitlab.com/gorib/failure v1.2.2
 	gitlab.com/gorib/grpc v1.4.7
 	gitlab.com/gorib/hilton v1.2.0
-	gitlab.com/gorib/http v1.11.8
+	gitlab.com/gorib/http v1.11.7
 	gitlab.com/gorib/pry v1.2.7
 	gitlab.com/gorib/redis v1.2.4
 	gitlab.com/gorib/session v1.1.2
 	gitlab.com/gorib/sql v1.4.8
-	gitlab.com/gorib/whisk v1.2.0
+	gitlab.com/gorib/whisk v1.2.1
 	google.golang.org/grpc v1.83.1
 	gopkg.in/yaml.v3 v3.0.1
 )

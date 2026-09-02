@@ -38,10 +38,6 @@ func InitHttp() {
 		),
 	}))
 
-	// JSON alone unless the service says otherwise, which it does by registering
-	// its own without di.Fallback().
-	di.Wire[http.OpenapiOptions](func() http.OpenapiOptions { return nil }, di.Fallback())
-
 	di.Wire[app.BaseCommand](func() app.BaseCommand {
 		return app.NewCommand("http", "Start web server")
 	}, di.For[http.HttpCommand]())

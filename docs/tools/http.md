@@ -138,22 +138,16 @@ The first command fails on a structural conflict, the second on drift — code c
 
 ### Media types
 
-The document declares `application/json` unless the service says otherwise. It is
-a service-wide decision — the same one whisk makes when it generates `Parse` — so
-it is wired rather than passed on the command line, where one forgotten Makefile
-target would produce a document in a format nobody serves:
+The document describes a JSON API, and there is no option to change it. The
+error renderer is why: its body is an open map, and `encoding/xml` cannot
+marshal a map, so a document declaring XML could never be honest about the error
+responses of the same route.
 
-```go
-di.Wire[whttp.OpenapiOptions](func() whttp.OpenapiOptions {
-    return whttp.OpenapiOptions{
-        openapi.WithFormats(model.ContentTypeJson, model.ContentTypeXml),
-    }
-})
-```
-
-The `config/tools/http` module registers an empty default with `di.Fallback()`, so
-a registration without `di.Fallback()` replaces it. Several media types share one
-schema: a media type says how a body is framed, not what shape it has.
+The success format is a decision in the handler — `server.OK` writes JSON,
+`server.XML` writes XML — and nothing in the generator can read that back. A
+route that answers something else edits its own `content` in the document by
+hand: `Reconcile` only ever adds `application/json` and leaves every other media
+type alone.
 
 ### Or as a test
 

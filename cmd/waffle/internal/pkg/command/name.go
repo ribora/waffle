@@ -1,0 +1,89 @@
+package command
+
+import (
+	"fmt"
+	"go/token"
+	"path/filepath"
+	"regexp"
+	"strings"
+)
+
+// Lowercase-first because the templates use the name both unexported and,
+// through `title`, exported.
+var nameShape = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+
+// Refused before a file is written: the name reaches the templates as a Go
+// identifier.
+func ValidateName(kind, name string) error {
+	switch {
+	case name == "":
+		return fmt.Errorf("%s is empty", kind)
+	case !nameShape.MatchString(name):
+		return fmt.Errorf("%s %q must be a lowercase Go identifier: a letter, then letters, digits or underscores", kind, name)
+	case token.IsKeyword(name):
+		return fmt.Errorf("%s %q is a Go keyword", kind, name)
+	}
+	return nil
+}
+
+// Called once a command has taken the flags it knows, so an unrecognised flag
+// fails instead of becoming a positional.
+func RejectFlags(args []string) error {
+	for _, a := range args {
+		if strings.HasPrefix(a, "-") {
+			return fmt.Errorf("unknown flag %q", a)
+		}
+	}
+	return nil
+}
+
+// For an operand that becomes one path segment, not a path.
+func ValidateFileName(kind, name string) error {
+	switch {
+	case name == "":
+		return fmt.Errorf("%s is empty", kind)
+	case strings.ContainsAny(name, `/\`):
+		return fmt.Errorf("%s %q must be a single name, not a path", kind, name)
+	case name == "." || name == "..":
+		return fmt.Errorf("%s %q is not a name", kind, name)
+	}
+	return nil
+}
+
+// For an operand that becomes a directory to write into: the generators resolve
+// it against the project root.
+func ValidatePath(kind, p string) error {
+	switch {
+	case p == "":
+		return fmt.Errorf("%s is empty", kind)
+	case filepath.IsAbs(p):
+		return fmt.Errorf("%s %q must be relative to the project root", kind, p)
+	}
+	for _, seg := range strings.Split(filepath.ToSlash(p), "/") {
+		if seg == ".." {
+			return fmt.Errorf("%s %q must stay inside the project", kind, p)
+		}
+	}
+	return nil
+}
+
+// Deliberately thin: the broker owns the grammar, this only rejects literals
+// that would not survive being written into Keys().
+func ValidateRoutingKey(key string) error {
+	switch {
+	case key == "":
+		return fmt.Errorf("routing key is empty")
+	case strings.ContainsAny(key, " \t\n\""):
+		return fmt.Errorf("routing key %q contains whitespace or a quote", key)
+	}
+	return nil
+}
+
+func IsHelp(args []string) bool {
+	for _, a := range args {
+		if a == "-h" || a == "--help" {
+			return true
+		}
+	}
+	return false
+}

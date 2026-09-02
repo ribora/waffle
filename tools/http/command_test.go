@@ -9,7 +9,6 @@ import (
 
 	"gitlab.com/gorib/hilton"
 	"gitlab.com/gorib/http/model"
-	"gitlab.com/gorib/http/openapi"
 	"gitlab.com/gorib/http/server"
 	"gitlab.com/gorib/pry"
 	"gitlab.com/gorib/waffle/app"
@@ -34,7 +33,7 @@ func (probeRouter) Setup(mux server.Mux) {
 }
 
 // The command is the platform's only caller of Reconcile.
-func documentFrom(t *testing.T, docs OpenapiOptions) string {
+func documentFrom(t *testing.T) string {
 	t.Helper()
 
 	logger, err := pry.New("error")
@@ -49,7 +48,6 @@ func documentFrom(t *testing.T, docs OpenapiOptions) string {
 		app.NewCommand("http", "test"),
 		nil,
 		logger,
-		docs,
 	)
 
 	// The command name leads, as it does when app.Run hands the rest to getopt.
@@ -64,24 +62,11 @@ func documentFrom(t *testing.T, docs OpenapiOptions) string {
 	return string(out)
 }
 
-func TestDeclaredFormatsReachTheDocument(t *testing.T) {
-	got := documentFrom(t, OpenapiOptions{
-		openapi.WithFormats(model.ContentTypeJson, model.ContentTypeXml),
-	})
-	for _, want := range []string{model.ContentTypeJson, model.ContentTypeXml} {
+func TestOpenapiFlagWritesTheDocument(t *testing.T) {
+	got := documentFrom(t)
+	for _, want := range []string{"openapi: 3.1.0", "/things", model.ContentTypeJson} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q:\n%s", want, got)
 		}
-	}
-}
-
-// Declaring nothing is the common case.
-func TestNoDeclaredFormatsIsJSON(t *testing.T) {
-	got := documentFrom(t, nil)
-	if !strings.Contains(got, model.ContentTypeJson) {
-		t.Errorf("missing the default media type:\n%s", got)
-	}
-	if strings.Contains(got, model.ContentTypeXml) {
-		t.Errorf("nothing asked for xml:\n%s", got)
 	}
 }
