@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/converter"
+	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/whisk"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
 )
 
@@ -58,6 +59,12 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 	}
 
 	if err := c.UncommentModule("gitlab.com/gorib/waffle/config/tools/http"); err != nil {
+		return err
+	}
+
+	// Request DTOs in cmd/http are whisk-generated, and the author writes the
+	// go:generate line by hand — so the tool has to be in place before they do.
+	if err := whisk.Ensure(c.Command); err != nil {
 		return err
 	}
 

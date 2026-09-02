@@ -115,7 +115,12 @@ func (a *app) Run() error {
 	tracer := a.provider.Tracer(instrumentationName)
 	meter := a.provider.Meter(instrumentationName)
 
-	duration := meter.Histogram("cli.command.duration", hilton.WithDescription("Duration of CLI commands"), hilton.WithUnit("s"))
+	// Not WithSecondsBoundaries: commands run for minutes, not milliseconds.
+	duration := meter.Histogram("cli.command.duration",
+		hilton.WithDescription("Duration of CLI commands"),
+		hilton.WithUnit("s"),
+		hilton.WithBoundaries(0.1, 0.5, 1, 5, 10, 30, 60, 300, 900),
+	)
 
 	ctx, span := tracer.Start(ctx, "cmd."+cmd.Name(),
 		hilton.WithSpanKind(hilton.SpanKindInternal),

@@ -50,7 +50,6 @@ di.Define(notificationService.NewNotificationManagement,
 | `di.For[I]()` | Scope a registration to a specific interface (disambiguates when multiple `Wire` calls target the same interface) |
 | `di.Args(map[string]any{})` | Provide literal argument values instead of resolved types |
 | `di.Alias[I]()` | Expose the same concrete instance under an additional interface |
-| `di.Defaults(map[int]any{})` | Default values for positional arguments |
 | `di.Fallback()` | Mark as a low-priority default — dropped from the container if any normal or `Override` provider targets the same slot |
 | `di.Override()` | Mark as the winning provider for a slot — overrides normal and `Fallback` registrations (e.g. to replace a default pulled in from a blank-imported module) |
 | _blank import_ `_ "path"` | Aggregate `di.Wire` / `di.Define` calls from another package (see below) |
@@ -356,6 +355,12 @@ or quietly, with the wrong value in a slice. No other layer would catch them.
 
 That is the line the generator draws: output that does not compile is the
 compiler's problem, output that compiles and is wrong is the generator's.
+
+The full list of generator errors, each with the registrations that produce it,
+is in the [diogen README](https://gitlab.com/gorib/di/-/blob/master/README.md#8-troubleshooting).
+For the other two generators on the path see
+[input parsing](../conventions/input-parsing.md#troubleshooting-generation) (whisk)
+and [make:domain](../cli/make-domain.md#troubleshooting-store) (store).
 
 ## Compile-time safety
 

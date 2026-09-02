@@ -11,4 +11,6 @@ func InitDb() {
 		"driver": env.NeedValue[string]("DB_DRIVER"),
 		"dsn":    env.NeedValue[string]("DB_DSN"),
 	}), di.Fallback())
+
+	di.Wire[*sql.PoolTracing](sql.NewPoolTracing, di.Fallback())
 }

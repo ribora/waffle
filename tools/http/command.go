@@ -20,12 +20,17 @@ type HttpCommand interface {
 	app.Command
 }
 
+// Wired rather than a flag: the format is a property of the service, and a flag
+// left off one Makefile target would document a format nobody serves.
+type OpenapiOptions []openapi.Option
+
 func NewHttpCommand(
 	mux server.Mux,
 	router server.Router,
 	command app.BaseCommand,
 	addr net.Addr,
 	logger pry.Logger,
+	docs OpenapiOptions,
 	opts ...server.Option,
 ) *httpCommand {
 	return &httpCommand{
@@ -34,6 +39,7 @@ func NewHttpCommand(
 		router:      router,
 		addr:        addr,
 		logger:      logger,
+		docs:        docs,
 		opts:        opts,
 	}
 }
@@ -46,6 +52,7 @@ type httpCommand struct {
 	addr        net.Addr
 	logger      pry.Logger
 	opts        []server.Option
+	docs        OpenapiOptions
 	openapiPath string
 
 	server server.Server
@@ -57,7 +64,7 @@ func (c *httpCommand) Run(ctx context.Context) error {
 	}
 	if c.openapiPath != "" {
 		c.router.Setup(c.mux)
-		warns, err := openapi.Reconcile(c.mux.Routes(), c.openapiPath, c.Name())
+		warns, err := openapi.Reconcile(c.mux.Routes(), c.openapiPath, c.Name(), c.docs...)
 		for _, w := range warns {
 			c.logger.Warn(fmt.Sprintf("openapi: %s", w))
 		}

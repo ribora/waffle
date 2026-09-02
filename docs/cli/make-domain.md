@@ -133,7 +133,27 @@ type storedUser struct {
 }
 ```
 
-After `make generate`, a companion file with all generated methods is created alongside this file.
+After `make generate`, a companion file with all generated methods is created alongside this file. It is named after the struct, not the source file: `storedUser` produces `stored_user_gen.go`.
+
+The blank `_ *model.User` field is what marks a struct as a stored struct — it names the domain type `new<X>()` accepts and `Unwrap()` returns, and it can sit anywhere in the struct. A `db` tag puts a field in the column list; `store:"-"` keeps it out.
+
+#### Troubleshooting `store`
+
+Unlike `diogen` and `whisk`, `store` reads the file with `go/ast` alone and never type-checks it. That means it regenerates fine in a package that does not currently compile — and equally that a wrong mapping is reported by the compiler, in `_gen.go`, rather than by the generator. It also never deletes its previous output.
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `the _ field must name the model type` | the `_` field is something else — a map, a function type | name the model |
+| `an embedded field cannot carry a db tag` | an embed has no name to map, so the tag went nowhere | name the field, or drop the tag |
+| `fields sharing one db tag would map to one column` | `Left, Right int \`db:"side"\`` — the second name was dropped in silence | give each field its own tag |
+| a syntax error in the file | reported with the parser's own message | fix the syntax first |
+| no `_gen.go` appeared | the struct has no `_` field | add `_ *model.X` |
+| `m.Foo undefined (type model.User has no field or method Foo)` in `_gen.go` | `store:"Foo"` names a model field that does not exist, or the field was renamed on the model | match the model field name |
+| `cannot use m.X (variable of type A) as B value` in `_gen.go` | the stored field and the model field have different types | align them, or add a `convert:` |
+| a column silently missing from `Scan()`/`Inserts()` | the field has no `db` tag | add one — this compiles and fails at query time |
+| a model field silently zero after `Unwrap()` | the field exists on the model but not on the stored struct | add it to the stored struct |
+| `Updates()` writes a column you meant to keep | only `readonly` fields are excluded | add `store:",readonly"` |
+| stale `_gen.go` for a struct you renamed or deleted | `store` only writes, never cleans up | delete the file by hand |
 
 ### DI configuration
 

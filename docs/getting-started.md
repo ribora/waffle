@@ -113,10 +113,10 @@ type createUser struct {
 }
 ```
 
-`passcode` is not a built-in — it is a tag added by dropping one file into `pkg/validate`, named after the tag:
+`passcode` is not a built-in — it is a tag added by writing one function in `pkg/validate`:
 
 ```go
-// pkg/validate/passcode.go
+// pkg/validate/rules.go
 package validate
 
 func IsPasscode(value string, args ...string) bool {
@@ -124,7 +124,7 @@ func IsPasscode(value string, args ...string) bool {
 }
 ```
 
-No registration, no flag, no fork: the file name is the tag. The same convention covers everything the generator can't express on its own — a `validate()` method for cross-field rules, a `parse()` method for fields it can't convert, and a custom decoder for body formats beyond JSON and XML. A custom tag that shadows a built-in one wins, so even the defaults are replaceable.
+No registration, no flag, no fork: the func name is the tag, in any file of that directory. The same convention covers everything the generator can't express on its own — a `validate()` method for cross-field rules, a `parse()` method for fields it can't convert, and a custom decoder for body formats beyond JSON and XML. A custom tag that shadows a built-in one wins, so even the defaults are replaceable.
 
 See [conventions/input-parsing.md](conventions/input-parsing.md).
 

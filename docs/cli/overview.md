@@ -16,7 +16,7 @@ go install gitlab.com/gorib/waffle/cmd/waffle@latest
 | `waffle make:domain <name>` | Add a domain (model, service, postgres adapter) |
 | `waffle make:domain:grpc <name>` | Add a gRPC handler for an existing domain |
 | `waffle make:domain:http <name>` | Add an HTTP handler for an existing domain |
-| `waffle make:domain:scribus <name> <event>` | Add an AMQP consumer for an existing domain |
+| `waffle make:domain:scribus [--batch] <name> <event>` | Add an AMQP consumer for an existing domain; `--batch` scaffolds a `BatchHandler` instead of a per-message `Handler` |
 | `waffle make:domain:migrate <name>` | Add database migrations for an existing domain |
 | `waffle make:domain:repository <type> <name> <entity>` | Add a secondary repository (`type` is currently only `sql`) |
 | `waffle make:domain:migration <name> <description>` | Add a new SQL migration |
@@ -67,6 +67,8 @@ Project-level conventions live in `waffle.yaml`, next to `go.mod`. `init:service
 | `mapper` | `"dto"` | `"dto"` scaffolds nothing extra (hand-written conversions); `"goverter"` scaffolds a goverter `convert/convert.go` |
 
 `<service>` is the last path segment of the module name. A missing `waffle.yaml`, or one missing some keys, behaves exactly like a file containing only the defaults above — the two are indistinguishable to every command. An unknown key (e.g. a typo) is a hard error, and an invalid `mapper` value (anything other than `dto` or `goverter`) is a hard error.
+
+The whisk generator keeps its own `whisk.yaml` beside it, on the same missing-is-defaults rule. `make:domain:http` and `make:domain:scribus` write it the first time they pull whisk in, and never overwrite one you have edited; the keys are documented in [whisk's README](https://gitlab.com/gorib/whisk#whiskyaml).
 
 ## Detailed pages
 

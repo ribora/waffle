@@ -1,6 +1,12 @@
 # Waffle Documentation
 
-Waffle is an opinionated meta-framework for building Go microservices on the Golden Path.
+**Waffle gives a Go microservice one way to do each thing.**
+
+A meta-framework that connects compile-time DI, input codegen, HTTP/gRPC, migrations and messaging, so a service written by one person reads like a service written by another.
+
+That one way is about the **path**, not the tools on it. The entry point takes three things — a logger, a tracing provider and a list of commands. Everything else is a blank import you can leave out: bring your own query layer, your own transport, your own validator.
+
+And leaving is as cheap as arriving. Delete a `//go:generate` line and the file it produced stays where it is, as ordinary Go you keep editing by hand — no generated container imports `gitlab.com/gorib/di` at all, and dropping whisk costs copying two small files. Waffle itself goes the same way: write your own `main`, build the container, keep whatever architecture and layout you like. See [What is optional](docs/opting-out.md) for what each tool replaces, what skipping it costs, and how to walk back out.
 
 ## Contents
 

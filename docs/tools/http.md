@@ -93,7 +93,7 @@ func (h *userHandler) Get(ctx context.Context, req *getRequest) (*server.Respons
 
 ### Code owns structure, you own prose
 
-The first run writes a fresh file. Every later run merges into the existing one:
+Every run merges, including the first — it merges into an empty document, so everything in a brand-new file arrives marked. That is deliberate: the file where nothing has been described yet is the one that needs every marker.
 
 | | |
 |---|---|
@@ -135,6 +135,46 @@ git diff --exit-code api/openapi.yaml
 ```
 
 The first command fails on a structural conflict, the second on drift — code changed and nobody regenerated. The app boots to build the router, so give the step whatever config the service needs, even though it never listens. Expect one noisy commit when adopting this on a hand-written file: the merge round-trips the YAML.
+
+### Media types
+
+The document declares `application/json` unless the service says otherwise. It is
+a service-wide decision — the same one whisk makes when it generates `Parse` — so
+it is wired rather than passed on the command line, where one forgotten Makefile
+target would produce a document in a format nobody serves:
+
+```go
+di.Wire[whttp.OpenapiOptions](func() whttp.OpenapiOptions {
+    return whttp.OpenapiOptions{
+        openapi.WithFormats(model.ContentTypeJson, model.ContentTypeXml),
+    }
+})
+```
+
+The `config/tools/http` module registers an empty default with `di.Fallback()`, so
+a registration without `di.Fallback()` replaces it. Several media types share one
+schema: a media type says how a body is framed, not what shape it has.
+
+### Or as a test
+
+The config the step above needs is the reason to consider the other option: do it in a test, where the config is `t.Setenv` next to the assertion instead of pipeline setup.
+
+```go
+func TestOpenAPIIsUpToDate(t *testing.T) {
+    mux := server.New()
+    router.Setup(mux)
+
+    openapitest.AssertUpToDate(t, mux.Routes(), "api/openapi.yaml", "My API")
+}
+```
+
+`go test` checks, `go test -openapi.update` refreshes — the same shape as every other golden here. `Reconcile` is idempotent, so an up-to-date document compares equal. The helper reconciles into a copy, so a run that reports drift does not erase what drifted, and it fails on a leftover `TODO(openapi)` marker too — the build goes red when somebody added an endpoint and described nothing.
+
+`waffle` does not scaffold this test, and deliberately: what it contains is a decision, not something derivable. Which fakes stand in for the leaves, which routers to walk, which file each one writes — none of that follows from the code.
+
+One `server.New()` per document. Routes accumulate in a slice shared with every group derived from a mux, so one mux walked by two routers merges two specifications into one file. A service with a command per audience — `http:customer` and `http:admin`, say — loops once per router.
+
+How many documents to keep follows where the **prose** differs, not where the configuration does. Two platforms that share most of their handlers are one document: the generator would write both for free, a person would maintain the same descriptions twice. The day they diverge, the merge says `operation X: in doc, not in code` — so the decision arrives as a warning rather than as a surprise.
 
 ## Middleware
 

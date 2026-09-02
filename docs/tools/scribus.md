@@ -83,7 +83,7 @@ Routing keys are **not** a CLI argument — they come from each registered `Hand
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--flush-timeout` | `-t` | `0` (use default) | Flush every [n] seconds |
-| `--page` | `-p` | `0` (use default) | Number of items for bulk processing |
+| `--page` | `-p` | `0` (use default) | Messages per page; above 1 requires batch mode — see [Page size and settlement](#page-size-and-settlement) |
 | `--reconnect-timeout` | `-r` | `0` (use default) | Reconnect every [n] seconds |
 
 ## Environment variables
@@ -259,8 +259,21 @@ On startup the scribus command:
 1. Collects every registered handler's `Keys()` and calls `consumer.Bind(key)` for each — the broker is told to deliver only those keys.
 2. (Optional) overrides DSN/exchange/queue from CLI positional args.
 3. Opens the consumer; for each incoming message reads its routing key from the AMQP delivery.
-4. In single mode: looks up the handler by key and calls `Run`.
-5. In batch mode: accumulates messages until `--page` is reached or `--flush-timeout` expires, then calls `BatchHandler.Run` with the batch.
+4. Accumulates messages until `--page` is reached or `--flush-timeout` expires — both modes go through the same accumulator.
+5. In single mode: for each message in the page, looks up the handler by key and calls `Run`. In batch mode: calls `BatchHandler.Run` once with the whole page.
+
+## Page size and settlement
+
+A page is acknowledged as one unit: `Ack`/`Nack` carry AMQP's `multiple` flag as soon as it holds more than one message. So the page size, not the mode, decides how much is at stake per failure — and one failure nacks the page with requeue.
+
+`config/tools/scribus` pins the size to 1 for both modes, so out of the box every message settles on its own. `--page` raises it, and the two modes treat that differently:
+
+| | `--page` unset or 1 | `--page` above 1 |
+|---|---|---|
+| **single** | per-message settlement, which is the point of the mode | **refused at startup** — the handler is called per message but the page settles together, so one failure requeues its neighbours and skips the rest |
+| **batch** | legal, warns: the handler is handed one message at a time | the intended configuration |
+
+The refusal covers the flag. A service that registers its own `scribus.Consumer` with a larger page size bypasses it, because by then nothing knows which mode was wired.
 
 ## DI tags
 

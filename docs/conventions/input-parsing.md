@@ -50,10 +50,10 @@ req, err := scan.Into[createOrder](src)
 
 ## Add your own tag in a minute
 
-Custom validators are a convention, not a configuration step. Drop a file named after the tag into `pkg/validate` at the module root:
+Custom validators are a convention, not a configuration step. Export `Is<Tag>` from any file in `pkg/validate` at the module root:
 
 ```go
-// pkg/validate/passcode.go
+// pkg/validate/rules.go
 package validate
 
 func IsPasscode(value string, args ...string) bool {
@@ -69,16 +69,17 @@ type auth struct {
 }
 ```
 
-Run `make generate`. That's the whole mechanism: the file is named after the tag, the function is `Is` + the tag in PascalCase, and no flag has to point at anything — `pkg/validate` is the default, and a missing directory simply means no custom validators.
+Run `make generate`. That's the whole mechanism: the function is `Is` + the tag in PascalCase, the file it lives in doesn't matter, and no flag has to point at anything — `pkg/validate` is the default, written out in `whisk.yaml` when `make:domain:http` or `make:domain:scribus` first pulls whisk in. A missing directory simply means no custom validators.
 
-Two things worth knowing:
+Three things worth knowing:
 
 - Return `(bool, error)` instead of `bool` when the failure has detail worth keeping; the error is stashed in `ValidationError.Err` for the caller to unwrap.
-- **A custom validator whose name collides with a built-in wins.** Your `email` rule replaces whisk's without forking anything.
+- **A custom validator whose name collides with a built-in wins.** Your `email` rule replaces whisk's without forking anything — and whisk warns when it does, since that's the one case where the model doesn't show which check runs.
+- Moving the directory is a `validate.storage` line in `whisk.yaml`, or `-validate.storage` on a single `go:generate` line.
 
 ## Escape hatches
 
-Codegen covers the shape most DTOs have. Everything else has a hook, and reaching for one is normal — not an admission that the generator failed.
+Codegen covers the shape most DTOs have. Everything else has a hook; hooks are part of the design, not a workaround.
 
 | When | Hatch |
 |---|---|
@@ -91,8 +92,8 @@ Both hooks are lowercase methods you write by hand; whisk detects them and calls
 
 ## Without whisk
 
-The generator is optional — this is the same handler with the codegen removed,
-so the trade is visible rather than asserted.
+The generator is optional. Below is the same handler with the codegen removed,
+so the trade-off can be read off the code.
 
 **With whisk.** Two tags per field and one directive; `Into` runs the generated
 `Parse`, then `Validate`:
@@ -170,6 +171,68 @@ in a second function.
 What you give up by skipping whisk is listed in
 [What is optional](../opting-out.md#whisk): the OpenAPI document is derived from
 the types `server.Bind` captures, and a hand-parsed handler has none.
+
+## Troubleshooting generation
+
+Every generated file opens with `//go:build !whisk`, and whisk type-checks the
+package with `-tags whisk`. Its own output is therefore invisible to it: no
+`*_whisk_gen.go` in the directory — the one being replaced or any other — can
+block the run that would fix it. Renaming a field and regenerating always works;
+there is nothing to clean up first. The corollary is that `whisk` is a reserved
+build tag: never pass it to your own builds, or the `Parse` and `Validate`
+methods disappear.
+
+whisk still needs the rest of the package to type-check, so a genuine compile
+error in your hand-written code surfaces as the compiler's own message:
+
+```
+mymodule/domain/order/cmd/http: order.go:14:9: undefined: model.Currency
+```
+
+### Generation errors
+
+| Message | Cause | Fix |
+|---|---|---|
+| `T.F: unknown validator tag "passcode": … no func IsPasscode in pkg/validate (…)` | the tag is not built in and the storage dir has no `IsPasscode` | add the validator (see above), correct the tag name, or point `validate.storage` at the right directory — the message says what it found there |
+| `T.F: scan tag "…" must be "-", "embed", or "<scope>=<key>[,opt...]"` | a `scan` tag with no `=` | write `scan:"query=status"` |
+| `T.F: scan tag "…" has empty scope` / `has empty key` | `scan:"=status"` / `scan:"query="` | fill both sides |
+| `T.F: unknown scan option "x" (allowed: repeated)` | third comma-separated part of the tag | `repeated` is the only option |
+| `T.F: scan option "repeated" requires a slice field, got string` | `repeated` maps to `LookupAll` | make the field a slice |
+| `T.F: type X has scan tags but is not marked scan:"embed"` | a nested struct's `scan` tags are dead — the field is bound from the body | add `scan:"embed"`, or drop the inner tags |
+| `T.F: scan:"embed" cannot be used on a slice/map field` | embed delegates to one `Parse` call | use a `parse()` hook for per-element binding |
+| `T.F: scan:"embed" on a pointer field is not supported` | nothing allocates the pointee | embed by value, or allocate in a `parse()` hook |
+| `T.F: scan:"embed" requires a named struct type` | there is no `Parse` method to delegate to | give the anonymous struct a name |
+| `required tag doesn't make sense for bool field "F", use equal instead` | `required` would reject a legitimate `false` | `validate:"equal=true"` |
+| `unique=G: cannot specify field on slice of non-struct type "X"` | `unique=Field` only applies to `[]struct` | drop the field name |
+| `unique=G: anonymous struct in slice "F" has no field "G"` | typo in the field name | match the element's field |
+| `wrong comparison for field F` | an ordering comparison, or a value other than `true`/`false`, on a bool field | `validate:"equal=true"` |
+| `eq doesn't make sense for time field "F", an instant is bounded with gte/lte rather than matched` | equality against a `time.Time` | bound it with `gte`/`lte` |
+| `T.parse must take scan.Source` / `T.validate must return error` | hook signature | `func (s *T) parse(src scan.Source) error`, `func (s T) validate() error` |
+| `unknown format "yaml": no builtin preset, and no func UnmarshalYaml in pkg/scan/yaml.go` | `-format=yaml` with nothing behind it | add the function, or drop the flag |
+
+### Silent outcomes
+
+**No file appeared.** whisk generates for every named struct declared in the
+target file and writes nothing if the file declares none. Check that
+`//go:generate go tool whisk $GOFILE` is in the file that declares the DTO, not
+in a neighbour.
+
+**`// TODO whisk: cannot convert string to X for F — handle in parse(src) hook`.**
+A scoped field whose type is not a string, bool or numeric kind. The generated
+file still compiles and the field stays zero, so grep for `TODO whisk` after
+generating and fill it in a `parse(src)` hook.
+
+**`whisk: warning: … embedded field F uses scan:"embed"`.** An *anonymous* embed
+promotes the embedded type's generated `Parse` into the outer method set, where
+it can shadow the outer one. Give the field a name.
+
+### The generated file does not compile
+
+| Symptom | Cause |
+|---|---|
+| `method T.Parse already declared` | the struct already has a hand-written `Parse`, and whisk generates for every struct in the file — move the DTO to its own file, or rename the hand-written method |
+| `s.F.Parse undefined` | `scan:"embed"` on a type whose own package was never generated — add the `//go:generate` directive there too |
+| `undefined: validate.IsX` | stale output: a custom validator was renamed or deleted while the tag stayed. Regenerating turns this into `unsupported validator tag` |
 
 ## Where this shows up
 

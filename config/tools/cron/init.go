@@ -1,8 +1,6 @@
 package cron
 
 import (
-	"github.com/google/uuid"
-
 	"gitlab.com/gorib/di"
 	"gitlab.com/gorib/env"
 	"gitlab.com/gorib/waffle/app"
@@ -17,5 +15,4 @@ func InitCron() {
 		"schedule": env.Value("CRON_SCHEDULE", ""),
 		"timezone": env.Value("TZ", "UTC"),
 	}))
-	uuid.New()
 }

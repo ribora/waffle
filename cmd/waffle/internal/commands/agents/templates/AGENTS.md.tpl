@@ -228,17 +228,18 @@ the body. Read it with `server.Into[T](src)`, or register the handler with
 
 ### Custom validators are a convention, not configuration
 
-Drop a file named after the tag into `pkg/validate` at the module root. The
-function is `Is` + the tag in PascalCase:
+Write `Is` + the tag in PascalCase in any file under `pkg/validate` at the module
+root — the lookup is by func name, not by file name:
 
 ```go
-// pkg/validate/passcode.go
+// pkg/validate/rules.go
 package validate
 
 func IsPasscode(value string, args ...string) bool { return len(value) == 6 }
 ```
 
-No registration, no flag. A custom tag that shadows a built-in one wins.
+No registration, no flag. A custom tag that shadows a built-in one wins, and
+whisk warns when it does. The directory is `validate.storage` in `whisk.yaml`.
 
 ### Escape hatches
 

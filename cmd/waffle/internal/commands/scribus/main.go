@@ -9,6 +9,7 @@ import (
 	"slices"
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/converter"
+	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/whisk"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
 )
 
@@ -78,7 +79,7 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 		return err
 	}
 
-	if err := c.EnsureTool("gitlab.com/gorib/whisk/cmd/whisk"); err != nil {
+	if err := whisk.Ensure(c.Command); err != nil {
 		return err
 	}
 	info, err := exec.Command("make", ".tidy", "generate").CombinedOutput()

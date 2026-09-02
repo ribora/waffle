@@ -1,0 +1,402 @@
+package main
+
+import (
+	"os"
+	"path/filepath"
+	"regexp"
+	"slices"
+	"sort"
+	"strconv"
+	"strings"
+	"testing"
+)
+
+// Documentation drifts silently: nothing refuses to build when a page names a
+// router that was replaced or a command that was renamed. These checks are the
+// missing failure.
+
+func repoRoot(t *testing.T) string {
+	t.Helper()
+	root, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return root
+}
+
+func markdownFiles(t *testing.T) []string {
+	t.Helper()
+	root := repoRoot(t)
+
+	var files []string
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() || !strings.HasSuffix(path, ".md") {
+			return err
+		}
+		files = append(files, path)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return files
+}
+
+func read(t *testing.T, path string) string {
+	t.Helper()
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(body)
+}
+
+var relativeLink = regexp.MustCompile(`\]\((?:\./)?([^):#]+\.md)(#[^)]*)?\)`)
+
+func TestDocsLinksResolve(t *testing.T) {
+	root := repoRoot(t)
+	for _, file := range markdownFiles(t) {
+		for _, m := range relativeLink.FindAllStringSubmatch(read(t, file), -1) {
+			if strings.HasPrefix(m[1], "http") {
+				continue
+			}
+			target := filepath.Join(filepath.Dir(file), m[1])
+			if _, err := os.Stat(target); err != nil {
+				rel, _ := filepath.Rel(root, file)
+				t.Errorf("%s links to %s, which does not exist", rel, m[1])
+			}
+		}
+	}
+}
+
+func TestReadmeListsEveryPage(t *testing.T) {
+	root := repoRoot(t)
+	readme := read(t, filepath.Join(root, "README.md"))
+
+	listed := map[string]bool{}
+	for _, m := range regexp.MustCompile(`\]\(docs/([^)]+\.md)\)`).FindAllStringSubmatch(readme, -1) {
+		listed[m[1]] = true
+	}
+
+	for _, file := range markdownFiles(t) {
+		rel, err := filepath.Rel(filepath.Join(root, "docs"), file)
+		if err != nil || strings.HasPrefix(rel, "..") {
+			continue
+		}
+		if !listed[rel] {
+			t.Errorf("docs/%s exists but README.md does not link it — a page nobody can find", rel)
+		}
+	}
+}
+
+const agentsTemplate = "internal/commands/agents/templates/AGENTS.md.tpl"
+
+func TestAgentsTemplateRuleNumbering(t *testing.T) {
+	body := read(t, filepath.Join(repoRoot(t), "cmd/waffle", agentsTemplate))
+
+	var rules []int
+	for _, m := range regexp.MustCompile(`(?m)^## Rule #(\d+)`).FindAllStringSubmatch(body, -1) {
+		n, _ := strconv.Atoi(m[1])
+		rules = append(rules, n)
+	}
+	if len(rules) == 0 {
+		t.Fatal("no rules found — the template lost its structure")
+	}
+	for i, n := range rules {
+		if n != i+1 {
+			t.Errorf("rule #%d appears in position %d — numbering is not sequential", n, i+1)
+		}
+	}
+
+	for _, m := range regexp.MustCompile(`see Rule #(\d+)`).FindAllStringSubmatch(body, -1) {
+		n, _ := strconv.Atoi(m[1])
+		if !slices.Contains(rules, n) {
+			t.Errorf("a cross-reference points at Rule #%d, which does not exist", n)
+		}
+	}
+}
+
+// `waffle <code>` inside backticks, so prose about "waffle conventions" is ignored.
+var citedCommand = regexp.MustCompile("`waffle ([a-z][a-z:]*)")
+
+func TestDocsCiteRealCommands(t *testing.T) {
+	root := repoRoot(t)
+	cmds := newCommands()
+
+	files := append(markdownFiles(t), filepath.Join(root, "cmd/waffle", agentsTemplate))
+	for _, file := range files {
+		seen := map[string]bool{}
+		for _, m := range citedCommand.FindAllStringSubmatch(read(t, file), -1) {
+			code := m[1]
+			if seen[code] || cmds.Get(code) != nil {
+				continue
+			}
+			seen[code] = true
+			rel, _ := filepath.Rel(root, file)
+			t.Errorf("%s documents `waffle %s`, which is not a registered command (have: %s)",
+				rel, code, strings.Join(registered(cmds), ", "))
+		}
+	}
+}
+
+func registered(cmds commands) []string {
+	var codes []string
+	for code := range cmds.All() {
+		codes = append(codes, code)
+	}
+	sort.Strings(codes)
+	return codes
+}
+
+// A module's environment is what its own package reads plus what it pulls in by
+// blank import — the same rule diogen follows for registrations. running-locally.md
+// is the only place that answers "why won't it start", so it has to match.
+
+var (
+	needValue    = regexp.MustCompile(`env\.NeedValue(?:\[[^\]]+\])?\(\s*"([A-Z0-9_]+)"`)
+	optValue     = regexp.MustCompile(`env\.Value(?:\[[^\]]+\])?\(\s*"([A-Z0-9_]+)"`)
+	configImport = regexp.MustCompile(`_ "gitlab\.com/gorib/waffle/(config/[a-z0-9/]+)"`)
+	parenthesis  = regexp.MustCompile(`\([^)]*\)`)
+	backticked   = regexp.MustCompile("`([A-Z][A-Z0-9_]*)`")
+	docModule    = regexp.MustCompile("`(config/[a-z0-9/]+)`")
+)
+
+type moduleEnv struct {
+	required map[string]bool
+	optional map[string]bool
+	includes []string
+}
+
+func scanConfigPackages(t *testing.T) map[string]*moduleEnv {
+	t.Helper()
+	root := repoRoot(t)
+
+	modules := map[string]*moduleEnv{}
+	err := filepath.Walk(filepath.Join(root, "config"), func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() || !strings.HasSuffix(path, ".go") {
+			return err
+		}
+		rel, err := filepath.Rel(root, filepath.Dir(path))
+		if err != nil {
+			return err
+		}
+		mod, known := modules[rel]
+		if !known {
+			mod = &moduleEnv{required: map[string]bool{}, optional: map[string]bool{}}
+			modules[rel] = mod
+		}
+		body := read(t, path)
+		for _, m := range needValue.FindAllStringSubmatch(body, -1) {
+			mod.required[m[1]] = true
+		}
+		for _, m := range optValue.FindAllStringSubmatch(body, -1) {
+			mod.optional[m[1]] = true
+		}
+		for _, m := range configImport.FindAllStringSubmatch(body, -1) {
+			mod.includes = append(mod.includes, m[1])
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return modules
+}
+
+func (m *moduleEnv) resolve(all map[string]*moduleEnv, seen map[string]bool) (req, opt map[string]bool) {
+	req, opt = map[string]bool{}, map[string]bool{}
+	for k := range m.required {
+		req[k] = true
+	}
+	for k := range m.optional {
+		opt[k] = true
+	}
+	for _, include := range m.includes {
+		if seen[include] {
+			continue
+		}
+		seen[include] = true
+		included, known := all[include]
+		if !known {
+			continue
+		}
+		ireq, iopt := included.resolve(all, seen)
+		for k := range ireq {
+			req[k] = true
+		}
+		for k := range iopt {
+			opt[k] = true
+		}
+	}
+	return req, opt
+}
+
+func cellVars(cell string) map[string]bool {
+	out := map[string]bool{}
+	for _, m := range backticked.FindAllStringSubmatch(parenthesis.ReplaceAllString(cell, ""), -1) {
+		out[m[1]] = true
+	}
+	return out
+}
+
+func TestRunningLocallyMatchesTheCode(t *testing.T) {
+	root := repoRoot(t)
+	modules := scanConfigPackages(t)
+
+	rows := 0
+	for _, line := range strings.Split(read(t, filepath.Join(root, "docs/reference/running-locally.md")), "\n") {
+		cells := strings.Split(line, "|")
+		if len(cells) < 6 {
+			continue
+		}
+		listed := docModule.FindAllStringSubmatch(cells[1], -1)
+		if len(listed) == 0 {
+			continue
+		}
+		rows++
+
+		documentedRequired := cellVars(cells[3])
+		documentedOptional := cellVars(cells[4])
+
+		for _, m := range listed {
+			mod, known := modules[m[1]]
+			if !known {
+				t.Errorf("running-locally.md lists %s, which is not a package under config/", m[1])
+				continue
+			}
+			req, opt := mod.resolve(modules, map[string]bool{})
+			compare(t, m[1], "required", req, documentedRequired)
+			compare(t, m[1], "optional", opt, documentedOptional)
+		}
+	}
+	if rows == 0 {
+		t.Fatal("no module rows found — the table lost its shape")
+	}
+}
+
+func compare(t *testing.T, module, kind string, inCode, inDocs map[string]bool) {
+	t.Helper()
+	for name := range inCode {
+		if !inDocs[name] {
+			t.Errorf("%s reads %s %s, running-locally.md does not list it", module, kind, name)
+		}
+	}
+	for name := range inDocs {
+		if !inCode[name] {
+			t.Errorf("running-locally.md lists %s as %s for %s, the code does not read it", name, kind, module)
+		}
+	}
+}
+
+// Enabling a module writes its variables into .env, either from an env fragment
+// (modules a command turns on) or from the scaffolded .env itself (modules that
+// are on from the start). Whichever it is, it has to match what the code reads.
+
+const (
+	envFragmentDir = "cmd/waffle/internal/pkg/command/env"
+	scaffoldedEnv  = "cmd/waffle/internal/commands/service/templates/env.tpl"
+	modulesTpl     = "cmd/waffle/internal/commands/service/templates/config/modules.go.tpl"
+)
+
+var (
+	activeImport    = regexp.MustCompile(`(?m)^\s*_ "gitlab\.com/gorib/waffle/(config/[a-z0-9/]+)"`)
+	commentedImport = regexp.MustCompile(`(?m)^\s*// _ "gitlab\.com/gorib/waffle/(config/[a-z0-9/]+)"`)
+	envKey          = regexp.MustCompile(`(?m)^([A-Z][A-Z0-9_]*)=`)
+)
+
+func envKeys(body string) map[string]bool {
+	out := map[string]bool{}
+	for _, m := range envKey.FindAllStringSubmatch(body, -1) {
+		out[m[1]] = true
+	}
+	return out
+}
+
+func TestEnvFragmentsMatchTheCode(t *testing.T) {
+	root := repoRoot(t)
+	modules := scanConfigPackages(t)
+	tpl := read(t, filepath.Join(root, modulesTpl))
+
+	// modules that are on from the first build are covered by the scaffolded .env
+	fromScaffold := envKeys(read(t, filepath.Join(root, scaffoldedEnv)))
+	for _, m := range activeImport.FindAllStringSubmatch(tpl, -1) {
+		mod, known := modules[m[1]]
+		if !known {
+			t.Errorf("modules.go.tpl enables %s, which is not a package under config/", m[1])
+			continue
+		}
+		req, opt := mod.resolve(modules, map[string]bool{})
+		for name := range req {
+			if !fromScaffold[name] {
+				t.Errorf("%s is enabled by default and requires %s, missing from the scaffolded .env", m[1], name)
+			}
+		}
+		for name := range opt {
+			if !fromScaffold[name] {
+				t.Errorf("%s is enabled by default and reads %s, missing from the scaffolded .env", m[1], name)
+			}
+		}
+	}
+
+	// modules a command turns on are covered by an env fragment
+	for _, m := range commentedImport.FindAllStringSubmatch(tpl, -1) {
+		mod, known := modules[m[1]]
+		if !known {
+			t.Errorf("modules.go.tpl offers %s, which is not a package under config/", m[1])
+			continue
+		}
+		req, opt := mod.resolve(modules, map[string]bool{})
+		if len(req) == 0 && len(opt) == 0 {
+			continue
+		}
+
+		path := filepath.Join(root, envFragmentDir, m[1]+".env")
+		body, err := os.ReadFile(path)
+		if err != nil {
+			t.Errorf("%s reads environment variables but has no fragment at %s/%s.env",
+				m[1], envFragmentDir, m[1])
+			continue
+		}
+		keys := envKeys(string(body))
+
+		for name := range req {
+			if !keys[name] {
+				t.Errorf("%s requires %s, its env fragment does not list it", m[1], name)
+			}
+		}
+		for name := range opt {
+			if !keys[name] {
+				t.Errorf("%s reads %s, its env fragment does not list it", m[1], name)
+			}
+		}
+		for name := range keys {
+			if !req[name] && !opt[name] {
+				t.Errorf("the env fragment for %s lists %s, the code does not read it", m[1], name)
+			}
+		}
+	}
+}
+
+func TestEveryEnvFragmentBelongsToAModule(t *testing.T) {
+	root := repoRoot(t)
+	modules := scanConfigPackages(t)
+
+	err := filepath.Walk(filepath.Join(root, envFragmentDir), func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() || !strings.HasSuffix(path, ".env") {
+			return err
+		}
+		rel, err := filepath.Rel(filepath.Join(root, envFragmentDir), path)
+		if err != nil {
+			return err
+		}
+		module := strings.TrimSuffix(rel, ".env")
+		if _, known := modules[module]; !known {
+			t.Errorf("%s.env has no module — config/%s does not exist",
+				module, strings.TrimPrefix(module, "config/"))
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}

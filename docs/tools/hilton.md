@@ -43,17 +43,28 @@ Once on ctx, any I/O code path reads it via `hilton.ProviderFromContext(ctx)`. A
 
 | Layer | Span kind | Metrics |
 |-------|-----------|---------|
-| HTTP server | `Server` | `http.server.request.duration` |
+| HTTP server | `Server` | `http.server.request.duration`, `http.server.active_requests` |
 | HTTP client | `Client` | `http.client.request.duration` |
-| gRPC server | `Server` | `rpc.server.duration` |
+| gRPC server | `Server` | `rpc.server.duration`, `rpc.server.active_calls` |
 | gRPC client | `Client` | `rpc.client.duration` |
 | AMQP publisher | `Producer` | (span only) |
-| AMQP consumer | `Consumer` | `messaging.process.duration`, `messaging.client.consumed.messages` (counts individual messages in batches) |
-| Redis | `Client` | `db.client.operation.duration` |
-| SQL | `Client` | `db.client.operation.duration` |
+| AMQP consumer | `Consumer` | `messaging.process.duration`, `messaging.process.active`, `messaging.client.consumed.messages` (counts individual messages in batches) |
+| Redis | `Client` | `db.client.operation.duration`, `db.client.connection.count`, `db.client.connection.pending_requests` |
+| SQL | `Client` | `db.client.operation.duration`, `db.client.connection.count` |
 | Elasticsearch | `Client` | `db.client.operation.duration` |
+| CLI command | `Internal` | `cli.command.duration` |
 
-W3C `traceparent` is propagated across all boundaries via the active `hilton.Propagator`.
+Every duration is in seconds and carries explicit bucket boundaries — the SDK
+default is millisecond-scaled and would put every request in one bucket.
+
+Pool gauges are wired separately from the pool itself (`sql.NewPoolTracing`,
+`redis.NewPoolTracing`): they are read at collection time, so they need a
+provider for the pool's lifetime rather than the per-operation one from the
+context. Both are `io.Closer`, so the container unregisters them on shutdown.
+
+W3C `traceparent` is propagated across all boundaries via the active
+`hilton.Propagator`. A batch AMQP consumer takes its parent from one message and
+links to the rest, so no message's trace loses the connection.
 
 ## Custom instrumentation
 

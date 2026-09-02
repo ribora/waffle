@@ -1,6 +1,6 @@
 # Introduction
 
-Waffle is an opinionated meta-framework for building Go microservices. It does not replace any individual tool — instead it connects specialized gorib packages into a coherent, predictable developer experience with almost no wiring code.
+Waffle is a meta-framework for building Go microservices: one way to do each thing, and one place to look for it. It replaces no individual tool — it connects specialized gorib packages into a predictable shape with almost no wiring code, and every tool on the path is something you opt into.
 
 ## The Golden Path
 
@@ -28,8 +28,21 @@ Waffle orchestrates these gorib packages:
 | `gitlab.com/gorib/grpc` | gRPC server helpers |
 | `gitlab.com/gorib/whisk` | Codegen for reading and validating input from any source — HTTP, AMQP, raw bytes (see [conventions/input-parsing](conventions/input-parsing.md)) |
 | `gitlab.com/gorib/sql` | SQL query builder and repository |
-| `gitlab.com/gorib/amqp` | RabbitMQ consumer |
+| `gitlab.com/gorib/amqp` | RabbitMQ consumer and publisher (see [tools/scribus](tools/scribus.md)) |
 | `gitlab.com/gorib/hilton` | Distributed tracing & metrics abstraction (see [tools/hilton](tools/hilton.md)) |
+| `gitlab.com/gorib/redis` | Redis client with command tracing and pool gauges |
+| `gitlab.com/gorib/elastic` | Elasticsearch client with tracing |
+
+`redis` and `elastic` are registered the same way as `sql`, `pry` and `hilton` — a blank import of the matching `config/service/…` module. See [reference/environment](reference/environment.md) for the variables each of them reads.
+
+These are not orchestrated by waffle, but a service on the Golden Path usually pulls them in directly:
+
+| Package | Role |
+|---------|------|
+| `gitlab.com/gorib/criteria` | Filter expressions — the `and`/`or` trees `sql` turns into a `WHERE` clause |
+| `gitlab.com/gorib/convert` | Conversion helpers for goverter `extend` directives (see [conventions/dto-conversion](conventions/dto-conversion.md)) |
+| `gitlab.com/gorib/dispatcher` | In-process typed event dispatch, no broker |
+| `gitlab.com/gorib/delay` | Saga helper — steps with compensations, rolled back in reverse |
 
 ## Architecture
 

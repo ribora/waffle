@@ -130,17 +130,21 @@ type Convert interface {
 
 ### Per-field
 
-Use goverter's `| custom` map syntax:
+`map [SOURCE] TARGET | [PACKAGE:]FUNC` is stock goverter, not a gorib addition —
+see [the `map` reference](https://goverter.jmattheis.de/reference/map). The
+package and the function are separated by a **colon**; a dotted selector
+(`temporal.TimeToStringNano`) is not resolved and fails with
+`"temporal.TimeToStringNano" does not exist in package …`. Omit the package to
+name a function declared in the converter's own package.
 
 ```go
 type Convert interface {
-    // goverter:map CreatedAt CreatedAt | temporal.TimeToStringNano
+    // goverter:map CreatedAt CreatedAt | gitlab.com/gorib/convert/temporal:TimeToStringNano
     Foo(*X) *Y
 }
 ```
 
-The `|` syntax overrides conversion for a single field without changing the
-whitelist.
+This overrides conversion for a single field without changing the whitelist.
 
 ## Adding a project-wide helper
 
@@ -159,7 +163,7 @@ The pattern is supported by waffle commands:
 |---|---|
 | `waffle make:domain:grpc <domain>` | with `mapper: goverter` — `domain/<x>/cmd/grpc/convert/convert.go` + ensures `pkg/goverter/convert.go`; with `mapper: dto` (default) — nothing extra |
 | `waffle make:domain:http <domain>` | with `mapper: goverter` — `domain/<x>/cmd/http/convert/convert.go` + ensures `pkg/goverter/convert.go`; with `mapper: dto` — nothing extra |
-| `waffle make:domain:scribus <domain> <event>` | with `mapper: goverter` — `domain/<x>/cmd/scribus/convert/convert.go` + ensures `pkg/goverter/convert.go`; with `mapper: dto` — nothing extra |
+| `waffle make:domain:scribus [--batch] <domain> <event>` | with `mapper: goverter` — `domain/<x>/cmd/scribus/convert/convert.go` + ensures `pkg/goverter/convert.go`; with `mapper: dto` — nothing extra |
 | `waffle make:converter <path>` | `<path>/convert.go` + ensures `pkg/goverter/convert.go` |
 
 `make:converter <path>` is the one-off opt-in: it adds a goverter converter

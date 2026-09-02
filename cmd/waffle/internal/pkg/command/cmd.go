@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"text/template"
 
@@ -48,33 +49,60 @@ func (c *Command) Description() string {
 }
 
 func (c *Command) Write(sources map[string]string, params any) error {
+	type pair struct{ source, target string }
+
+	pairs := make([]pair, 0, len(sources))
 	for source, target := range sources {
-		if err := c.write(source, target, params); err != nil {
+		pairs = append(pairs, pair{source, target})
+	}
+	// Map order would shuffle the report between runs, and a report that reshuffles
+	// is one nobody reads twice.
+	slices.SortFunc(pairs, func(a, b pair) int { return strings.Compare(a.target, b.target) })
+
+	var created, kept []string
+	for _, p := range pairs {
+		wrote, err := c.write(p.source, p.target, params)
+		if err != nil {
 			return err
 		}
+		if wrote {
+			created = append(created, p.target)
+		} else {
+			kept = append(kept, p.target)
+		}
 	}
+	reportCreated(created)
+	reportKept(kept)
 	return nil
 }
 
-func (c *Command) write(source, target string, params any) error {
+func (c *Command) write(source, target string, params any) (created bool, err error) {
+	// An unreadable target used to count as "already there" and was skipped in
+	// silence, which is the one case where skipping is wrong.
+	switch _, err := os.Stat(target); {
+	case err == nil:
+		return false, nil
+	case !errors.Is(err, os.ErrNotExist):
+		return false, fmt.Errorf("failed to stat %s: %w", target, err)
+	}
+
 	tpl, err := template.New(filepath.Base(source)).Funcs(c.funcs).ParseFS(c.templates, source)
 	if err != nil {
-		return fmt.Errorf("failed to parse template %s: %w", source, err)
+		return false, fmt.Errorf("failed to parse template %s: %w", source, err)
 	}
-	if _, err = os.Stat(target); !errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
-	err = os.MkdirAll(filepath.Dir(target), os.ModePerm)
-	if err != nil {
-		return fmt.Errorf("failed to create directory %s: %w", filepath.Dir(target), err)
+	if err = os.MkdirAll(filepath.Dir(target), os.ModePerm); err != nil {
+		return false, fmt.Errorf("failed to create directory %s: %w", filepath.Dir(target), err)
 	}
 	fh, err := os.Create(target)
 	if err != nil {
-		return fmt.Errorf("failed to create %s: %w", target, err)
+		return false, fmt.Errorf("failed to create %s: %w", target, err)
 	}
 	//nolint:errcheck
 	defer fh.Close()
-	return tpl.Execute(fh, params)
+	if err = tpl.Execute(fh, params); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (c *Command) UncommentModule(modulePath string) error {
@@ -85,13 +113,16 @@ func (c *Command) UncommentModule(modulePath string) error {
 	}
 	commented := fmt.Sprintf("// _ %q", modulePath)
 	active := fmt.Sprintf("_ %q", modulePath)
-	out := strings.Replace(string(data), commented, active, 1)
-	if out == string(data) {
-		return nil
+	enabled := strings.Replace(string(data), commented, active, 1)
+	if enabled != string(data) {
+		if err := os.WriteFile(file, []byte(enabled), 0644); err != nil {
+			return err
+		}
+		reportAction("enabled module " + modulePath)
 	}
-	if err := os.WriteFile(file, []byte(out), 0644); err != nil {
-		return err
-	}
+	// The import may have been uncommented by hand, and then nothing is replaced
+	// here and the variables were never added. Checking is cheap, and only what is
+	// missing is ever written.
 	return appendEnv(modulePath)
 }
 
@@ -121,17 +152,18 @@ func appendEnv(modulePath string) error {
 		}
 	}
 
-	var add []string
-	adds := false
+	var add, keys []string
 	for _, line := range strings.Split(strings.TrimRight(string(fragment), "\n"), "\n") {
 		key, ok := assignment(line)
 		if ok && present[key] {
 			continue
 		}
-		adds = adds || ok
+		if ok {
+			keys = append(keys, key)
+		}
 		add = append(add, line)
 	}
-	if !adds {
+	if len(keys) == 0 {
 		return nil
 	}
 
@@ -140,7 +172,11 @@ func appendEnv(modulePath string) error {
 		body += "\n"
 	}
 	body += "\n" + strings.Join(add, "\n") + "\n"
-	return os.WriteFile(file, []byte(body), 0644)
+	if err := os.WriteFile(file, []byte(body), 0644); err != nil {
+		return err
+	}
+	reportAction("added to .env: " + strings.Join(keys, ", "))
+	return nil
 }
 
 // A comment may well contain an "=" — "# to override: DAEMON_PORT=9090" is not
@@ -174,6 +210,7 @@ func (c *Command) EnsureTool(module string) error {
 	if info, err := exec.Command("go", "get", "-tool", module+"@latest").CombinedOutput(); err != nil {
 		return fmt.Errorf("go get -tool %s: %v: %s", module, err, string(info))
 	}
+	reportAction("added tool " + module)
 	return nil
 }
 
