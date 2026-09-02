@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -17,7 +18,8 @@ import (
 var templates embed.FS
 
 func New() *cmd {
-	return &cmd{command.New("make:domain", "Make domain with entity, repository and management", templates, nil)}
+	return &cmd{command.New("make:domain", "Make domain with entity, repository and management", templates, nil).
+		WithUsage("[--no-storage] <domain>")}
 }
 
 type cmd struct {
@@ -31,13 +33,26 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 		args = append(args[:i], args[i+1:]...)
 	}
 
+	if err := command.RejectFlags(args); err != nil {
+		return fmt.Errorf("%w\n%s", err, c.Usage())
+	}
 	if len(args) == 0 {
-		return fmt.Errorf("usage: waffle %s [--no-storage] <domain>", c.Code())
+		return errors.New(c.Usage())
 	}
 	domain := args[0]
+	if err := command.ValidateName("domain", domain); err != nil {
+		return err
+	}
 	projectName, err := c.FindProjectName()
 	if err != nil {
 		return err
+	}
+	// Before the first write: eleven files and a go.mod edit stand between here
+	// and UncommentModule.
+	if !noStorage {
+		if err := c.RequireModules(); err != nil {
+			return err
+		}
 	}
 
 	params := map[string]any{

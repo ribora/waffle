@@ -28,7 +28,7 @@ type {{ .Event }}Command struct {
 }
 
 func (c *{{ .Event }}Command) Keys() []string {
-	return []string{"{{ .Event }}"}
+	return []string{"{{ .Key }}"}
 }
 
 func (c *{{ .Event }}Command) Run(src amqp.Source) error {

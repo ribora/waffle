@@ -1,7 +1,7 @@
 -- +goose Up
 do $create$
     begin
-        create function update_tost_updated_at()
+        create function update_updated_at()
             returns trigger as $trigger$
         begin
             new.updated_at = now();

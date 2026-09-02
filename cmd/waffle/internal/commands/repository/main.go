@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 
@@ -9,7 +10,8 @@ import (
 )
 
 func New() *cmd {
-	return &cmd{command.New("make:domain:repository", "Add a repository to an existing domain (only sql is supported)", templates, nil)}
+	return &cmd{command.New("make:domain:repository", "Add a repository to an existing domain (only sql is supported)", templates, nil).
+		WithUsage("<type> <domain> <entity>")}
 }
 
 type cmd struct {
@@ -17,8 +19,17 @@ type cmd struct {
 }
 
 func (c *cmd) Run(ctx context.Context, args ...string) error {
+	if err := command.RejectFlags(args); err != nil {
+		return fmt.Errorf("%w\n%s", err, c.Usage())
+	}
 	if len(args) < 3 {
-		return fmt.Errorf("usage: waffle %s <type> <domain> <entity>", c.Code())
+		return errors.New(c.Usage())
+	}
+	if err := command.ValidateName("domain", args[1]); err != nil {
+		return err
+	}
+	if err := command.ValidateName("entity", args[2]); err != nil {
+		return err
 	}
 	storage := args[0]
 	if storage != "sql" {

@@ -36,8 +36,15 @@ func New(name, description string, templates embed.FS, funcs template.FuncMap) *
 type Command struct {
 	name        string
 	description string
+	operands    string
 	templates   embed.FS
 	funcs       template.FuncMap
+}
+
+// One string, so a bad invocation and --help cannot disagree.
+func (c *Command) WithUsage(operands string) *Command {
+	c.operands = operands
+	return c
 }
 
 func (c *Command) Code() string {
@@ -46,6 +53,23 @@ func (c *Command) Code() string {
 
 func (c *Command) Description() string {
 	return c.description
+}
+
+func (c *Command) Usage() string {
+	if c.operands == "" {
+		return "usage: waffle " + c.name
+	}
+	return "usage: waffle " + c.name + " " + c.operands
+}
+
+// Called before the first write: UncommentModule needs this file, and reaching
+// it last leaves a half-scaffolded domain behind.
+func (c *Command) RequireModules() error {
+	path := filepath.Join("config", "di", "modules.go")
+	if _, err := os.Stat(path); err != nil {
+		return fmt.Errorf("%s is missing — run this from the root of a waffle service", path)
+	}
+	return nil
 }
 
 func (c *Command) Write(sources map[string]string, params any) error {

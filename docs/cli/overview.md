@@ -16,13 +16,49 @@ go install gitlab.com/gorib/waffle/cmd/waffle@latest
 | `waffle make:domain <name>` | Add a domain (model, service, postgres adapter) |
 | `waffle make:domain:grpc <name>` | Add a gRPC handler for an existing domain |
 | `waffle make:domain:http <name>` | Add an HTTP handler for an existing domain |
-| `waffle make:domain:scribus [--batch] <name> <event>` | Add an AMQP consumer for an existing domain; `--batch` scaffolds a `BatchHandler` instead of a per-message `Handler` |
+| `waffle make:domain:scribus [--batch] <name> <event> [routing-key]` | Add an AMQP consumer for an existing domain; `--batch` scaffolds a `BatchHandler` instead of a per-message `Handler` |
 | `waffle make:domain:migrate <name>` | Add database migrations for an existing domain |
 | `waffle make:domain:repository <type> <name> <entity>` | Add a secondary repository (`type` is currently only `sql`) |
 | `waffle make:domain:migration <name> <description>` | Add a new SQL migration |
 | `waffle make:domain:command <name> <command>` | Add a CLI subcommand scoped to a domain |
 | `waffle make:converter <path>` | Scaffold a goverter convert.go at the given path |
 | `waffle agents` | Regenerate `AGENTS.md` after a waffle upgrade ([details](agents.md)) |
+
+`--help` on any of them prints its description and operands. A failing command
+exits non-zero, so a `make` target that calls one stops.
+
+### Names
+
+A domain, entity, event or command name becomes a Go identifier — the domain
+generator emits `var <name>ManagementInstance` and `Init<Name>Domain` — as well as
+a directory and, for migrations, part of a SQL identifier. So it has to be a
+lowercase Go identifier: a letter, then letters, digits or underscores, and not a
+Go keyword. `user`, `order_item` and `user2` are fine; `user-profile`, `2fa`,
+`User` and `type` are refused.
+
+The check runs before anything is written, together with the check that
+`config/di/modules.go` exists. A command that cannot finish leaves no files
+behind — `waffle make:domain --help` used to scaffold a domain called `--help`
+and stop halfway through.
+
+Two operands are not identifiers and follow their own rules: the `<path>` of
+`make:converter` has to stay inside the project, and the `<description>` of
+`make:domain:migration` is one file-name segment, so it may hold dashes and dots
+but not a separator.
+
+### Routing keys
+
+`make:domain:scribus` takes the routing key after the event, because the event
+names the generated Go type and keys are usually dotted:
+
+```sh
+waffle make:domain:scribus user order_paid order.paid
+```
+
+The key defaults to the event, so `waffle make:domain:scribus user ping` binds
+`ping` — which is why the event alone is enough when it happens to fit both jobs.
+Give a dotted event with no key and the command says so rather than emitting a
+type called `order.paidCommand`.
 
 ## How it works
 

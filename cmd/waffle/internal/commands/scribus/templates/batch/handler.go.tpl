@@ -27,6 +27,10 @@ type {{ .Event }}Command struct {
 	logger                   pry.Logger
 }
 
+func (c *{{ .Event }}Command) Keys() []string {
+	return []string{"{{ .Key }}"}
+}
+
 func (c *{{ .Event }}Command) Run(msgs []amqp.Source) error {
 	for _, m := range msgs {
 		event, err := scan.Into[scribusModel.{{ title .Event }}](m)

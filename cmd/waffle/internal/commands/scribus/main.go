@@ -3,6 +3,7 @@ package scribus
 import (
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -17,7 +18,9 @@ import (
 var templates embed.FS
 
 func New() *cmd {
-	return &cmd{command.New("make:domain:scribus", "Make scribus handler for the specified domain (use --batch for BatchHandler)", templates, nil)}
+	return &cmd{command.New("make:domain:scribus", "Make scribus handler for the specified domain (use --batch for BatchHandler)", templates, nil).
+		WithUsage("[--batch] <domain> <event> [routing-key]\n" +
+			"  routing-key defaults to <event>; give it when the key is dotted, e.g. order_paid order.paid")}
 }
 
 type cmd struct {
@@ -31,11 +34,35 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 		args = append(args[:i], args[i+1:]...)
 	}
 
+	if err := command.RejectFlags(args); err != nil {
+		return fmt.Errorf("%w\n%s", err, c.Usage())
+	}
 	if len(args) < 2 {
-		return fmt.Errorf("usage: waffle %s [--batch] <domain> <event>", c.Code())
+		return errors.New(c.Usage())
+	}
+	if err := command.ValidateName("domain", args[0]); err != nil {
+		return err
 	}
 	domain := args[0]
 	event := args[1]
+
+	// Its own operand because routing keys are dotted and the event has to stay
+	// an identifier; the fallback only works when one value fits both jobs.
+	key := event
+	if len(args) > 2 {
+		key = args[2]
+	}
+	if err := command.ValidateName("event", event); err != nil {
+		if len(args) > 2 {
+			return fmt.Errorf("%w — it names the generated type, the routing key is the operand after it", err)
+		}
+		return fmt.Errorf("%w — it names the generated type and, with no key given, doubles as the routing key.\n"+
+			"Give both: waffle %s %s <event> %s", err, c.Code(), domain, event)
+	}
+	if err := command.ValidateRoutingKey(key); err != nil {
+		return err
+	}
+
 	projectName, err := c.FindProjectName()
 	if err != nil {
 		return err
@@ -49,6 +76,7 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 	params := map[string]string{
 		"Domain":  domain,
 		"Event":   event,
+		"Key":     key,
 		"Project": projectName,
 	}
 

@@ -76,7 +76,7 @@ With no positional arguments, transport config is taken from DI (env-bound `RABB
 ./app scribus amqp://guest:guest@localhost:5672 events local-debug
 ```
 
-Routing keys are **not** a CLI argument — they come from each registered `Handler.Keys()` / `BatchHandler.Keys()`. The CLI only overrides the transport (DSN/exchange/queue), never the bindings.
+Routing keys are **not** an argument of the running command — they come from each registered `Handler.Keys()` / `BatchHandler.Keys()`, and this CLI only overrides the transport (DSN/exchange/queue), never the bindings. The scaffolder does take one, as the value it writes into that `Keys()`: `waffle make:domain:scribus user order_paid order.paid`.
 
 ### Flags
 

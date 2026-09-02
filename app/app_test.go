@@ -202,7 +202,7 @@ func TestTheCommandContextIsFurnished(t *testing.T) {
 }
 
 // ProviderFromContext falls back to a noop, so only a recording provider tells
-// "wired" apart from "absent" — and only it produces a real traceparent.
+// "wired" apart from "absent".
 func TestTheSpanReachesTheSession(t *testing.T) {
 	provider, err := otel.NewProvider("waffle-test", "test", nil, nil)
 	if err != nil {
@@ -236,8 +236,7 @@ func TestStopWithoutACloser(t *testing.T) {
 	}
 }
 
-// Watch is what turns a SIGTERM into a graceful shutdown; both of its exits have
-// to reach the closer, and a failing closer has to be reported rather than lost.
+// Both exits have to reach the closer, and a failing closer has to be reported.
 func TestWatch(t *testing.T) {
 	t.Run("context cancel", func(t *testing.T) {
 		a := application(t)

@@ -24,6 +24,7 @@ type cmd struct {
 
 func (c *cmd) Code() string        { return c.base.Code() }
 func (c *cmd) Description() string { return c.base.Description() }
+func (c *cmd) Usage() string       { return c.base.Usage() }
 
 func (c *cmd) Run(ctx context.Context, args ...string) error {
 	projectName, err := c.base.FindProjectName()

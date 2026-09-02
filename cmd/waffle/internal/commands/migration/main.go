@@ -3,6 +3,7 @@ package migration
 import (
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"time"
@@ -14,7 +15,8 @@ import (
 var templates embed.FS
 
 func New() *cmd {
-	return &cmd{command.New("make:domain:migration", "Add a new .sql migration to an existing domain", templates, nil)}
+	return &cmd{command.New("make:domain:migration", "Add a new .sql migration to an existing domain", templates, nil).
+		WithUsage("<domain> <name>")}
 }
 
 type cmd struct {
@@ -22,8 +24,18 @@ type cmd struct {
 }
 
 func (c *cmd) Run(ctx context.Context, args ...string) error {
+	if err := command.RejectFlags(args); err != nil {
+		return fmt.Errorf("%w\n%s", err, c.Usage())
+	}
 	if len(args) < 2 {
-		return fmt.Errorf("usage: waffle %s <domain> <name>", c.Code())
+		return errors.New(c.Usage())
+	}
+	if err := command.ValidateName("domain", args[0]); err != nil {
+		return err
+	}
+	// Only ever a file name, so dashes and dots are fine and a separator is not.
+	if err := command.ValidateFileName("description", args[1]); err != nil {
+		return err
 	}
 	domain := args[0]
 	name := args[1]

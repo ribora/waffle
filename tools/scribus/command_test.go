@@ -87,8 +87,7 @@ func usage(t *testing.T, cmd *scribusCommand, args ...string) error {
 	return cmd.Usage(ctx)
 }
 
-// A page settles as one unit, and only a BatchHandler is written for that. The
-// combination compiles and runs, which is why it has to be refused here.
+// The combination compiles and runs, which is why it has to be refused here.
 func TestPageAboveOneNeedsABatchHandler(t *testing.T) {
 	consumer := &fakeConsumer{}
 	err := usage(t, single(t, consumer), "--page", "50")
@@ -115,8 +114,7 @@ func TestPageAboveOneIsFineInBatchMode(t *testing.T) {
 	}
 }
 
-// Per-message settlement is the whole point of single mode, so the sizes that
-// give it have to stay usable.
+// The sizes that give per-message settlement have to stay usable.
 func TestSingleModeAcceptsPerMessagePages(t *testing.T) {
 	for _, args := range [][]string{{}, {"--page", "1"}} {
 		consumer := &fakeConsumer{}
@@ -137,8 +135,7 @@ func TestAbsentPageLeavesTheConfiguredSize(t *testing.T) {
 	}
 }
 
-// Overlapping keys are refused while the container is built — before any
-// connection — so this failure must not drift into flag parsing.
+// Refused while the container is built, so it must not drift into flag parsing.
 func TestOverlappingKeysFailAtConstruction(t *testing.T) {
 	_, err := NewScribusCommand(
 		[]Handler{oneKeyHandler{key: "order.*"}, oneKeyHandler{key: "order.created"}}, nil,

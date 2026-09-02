@@ -3,6 +3,7 @@ package converter
 import (
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -18,7 +19,9 @@ func New() *cmd {
 	return &cmd{
 		base: command.New("make:converter",
 			"Scaffold a goverter dto/convert.go at the given path (creates pkg/goverter/convert.go too if missing)",
-			noTemplates, nil),
+			noTemplates, nil).
+			WithUsage("<path>\n  e.g. waffle make:converter domain/users/cmd/grpc/convert\n" +
+				"       waffle make:converter domain/orders/adapter/external-api/dto"),
 	}
 }
 
@@ -28,11 +31,18 @@ type cmd struct {
 
 func (c *cmd) Code() string        { return c.base.Code() }
 func (c *cmd) Description() string { return c.base.Description() }
+func (c *cmd) Usage() string       { return c.base.Usage() }
 
 func (c *cmd) Run(ctx context.Context, args ...string) error {
+	if err := command.RejectFlags(args); err != nil {
+		return fmt.Errorf("%w\n%s", err, c.Usage())
+	}
 	if len(args) == 0 {
-		return fmt.Errorf("usage: waffle %s <path>\n  e.g. waffle %s domain/users/cmd/grpc/convert\n       waffle %s domain/orders/adapter/external-api/dto",
-			c.Code(), c.Code(), c.Code())
+		return errors.New(c.Usage())
+	}
+	// A path, not an identifier, so the path rule applies instead of ValidateName.
+	if err := command.ValidatePath("path", args[0]); err != nil {
+		return err
 	}
 	targetDir := strings.TrimRight(args[0], string(filepath.Separator))
 

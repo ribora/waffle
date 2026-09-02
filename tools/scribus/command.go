@@ -169,8 +169,7 @@ type scribusCommand struct {
 	app.BaseCommand
 	consumer Consumer
 	logger   pry.Logger
-	// Which constructor built it. --page settles messages in groups, and only a
-	// BatchHandler is written to expect that, so the flag has to agree.
+	// Set by the constructor, so Usage can refuse a --page the mode cannot honour.
 	batch bool
 }
 
@@ -210,17 +209,14 @@ func (c *scribusCommand) Usage(ctx context.Context) error {
 			return err
 		}
 	}
-	// A page settles as one unit: Ack/Nack carry `multiple` once it holds more
-	// than one message. A single-mode Handler is called per message and reads as
-	// if it settled per message too, so the combination requeues the neighbours
-	// of whatever failed and skips the rest of the page. Refused rather than
-	// documented.
+	// A page settles as one unit, so in single mode one failure requeues the
+	// neighbours of the message that failed. Refused rather than documented.
 	if *page > 1 && !c.batch {
 		return fmt.Errorf("--page %d needs a BatchHandler: single mode calls the handler once per message, "+
 			"but %d of them settle together, so one failure requeues the others", *page, *page)
 	}
-	// Only the explicit 1: an absent flag leaves the size to the container, and
-	// this function cannot read it back to know whether it is worth mentioning.
+	// Only the explicit 1: an absent flag leaves the size to the container, which
+	// this function cannot read back.
 	if *page == 1 && c.batch {
 		c.logger.Warn("--page 1 hands the batch handler one message at a time")
 	}

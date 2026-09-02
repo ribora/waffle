@@ -16,8 +16,7 @@ func TestArgsOnAContextThatHasNone(t *testing.T) {
 	}
 }
 
-// cron re-invokes another command, so it has to hand that command a different
-// argument list than the process was started with.
+// cron re-invokes another command with an argv the process never got.
 func TestWithArgsReplacesTheList(t *testing.T) {
 	base := NewContextWithCommand("cron", []string{"cron"}, hilton.Noop(), logger(t))
 	want := []string{"serve", "--once"}
@@ -45,8 +44,7 @@ func TestPrintList(t *testing.T) {
 	}
 }
 
-// Every command delegates -h to this, and it has to stop the run rather than
-// print help and carry on.
+// Every command delegates -h here, so it has to stop the run, not just print.
 func TestBaseCommandUsage(t *testing.T) {
 	cmd := NewCommand("serve", "run it")
 	ctx := func(args ...string) context.Context {

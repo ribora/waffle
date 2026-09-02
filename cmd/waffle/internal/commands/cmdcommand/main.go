@@ -3,6 +3,7 @@ package cmdcommand
 import (
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -14,7 +15,8 @@ import (
 var templates embed.FS
 
 func New() *cmd {
-	return &cmd{command.New("make:domain:command", "Add a CLI command (app.Command) scoped to a domain", templates, nil)}
+	return &cmd{command.New("make:domain:command", "Add a CLI command (app.Command) scoped to a domain", templates, nil).
+		WithUsage("<domain> <command>")}
 }
 
 type cmd struct {
@@ -22,8 +24,17 @@ type cmd struct {
 }
 
 func (c *cmd) Run(ctx context.Context, args ...string) error {
+	if err := command.RejectFlags(args); err != nil {
+		return fmt.Errorf("%w\n%s", err, c.Usage())
+	}
 	if len(args) < 2 {
-		return fmt.Errorf("usage: waffle %s <domain> <command>", c.Code())
+		return errors.New(c.Usage())
+	}
+	if err := command.ValidateName("domain", args[0]); err != nil {
+		return err
+	}
+	if err := command.ValidateName("command", args[1]); err != nil {
+		return err
 	}
 	domain := args[0]
 	cmdName := args[1]

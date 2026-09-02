@@ -21,11 +21,13 @@ import (
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/repository"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/scribus"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/service"
+	cmdpkg "gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
 )
 
 type Command interface {
 	Code() string
 	Description() string
+	Usage() string
 	Run(ctx context.Context, args ...string) error
 }
 
@@ -93,9 +95,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	err := command.Run(context.Background(), os.Args[2:]...)
-	if err != nil {
+	args := os.Args[2:]
+	// Before Run, or the flag reaches a command as a positional and becomes a name.
+	if cmdpkg.IsHelp(args) {
+		_, _ = fmt.Fprintf(os.Stderr, "%s\n%s\n", command.Description(), command.Usage())
+		return
+	}
+
+	if err := command.Run(context.Background(), args...); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
 	}
 }
 

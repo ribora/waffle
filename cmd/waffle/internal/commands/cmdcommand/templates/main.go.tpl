@@ -29,23 +29,27 @@ type {{ .Command }}Command struct {
 }
 
 func (c *{{ .Command }}Command) Run(ctx context.Context) error {
-	if err := c.Usage(); err != nil {
+	if err := c.Usage(ctx); err != nil {
 		return err
 	}
 	// TODO: implement
-	_ = ctx
 	return nil
 }
 
-func (c *{{ .Command }}Command) Usage() error {
-	help := getopt.BoolLong("help", 'h', "Show this message")
-	getopt.Parse()
-
-	if help != nil && *help {
-		getopt.PrintUsage(os.Stderr)
-		os.Exit(2)
+// Own option set, and argv from the context rather than os.Args: cron runs
+// commands inside this same binary, and the global flag set is shared.
+func (c *{{ .Command }}Command) Usage(ctx context.Context) error {
+	opts := getopt.New()
+	var help bool
+	opts.FlagLong(&help, "help", 'h', "Display this help message")
+	if err := opts.Getopt(app.Args(ctx), nil); err != nil {
+		return err
 	}
-
-	_ = fmt.Sprintf
+	if help {
+		opts.SetParameters("")
+		_, _ = fmt.Fprintf(os.Stderr, "%s\n", c.Description())
+		opts.PrintUsage(os.Stderr)
+		return app.ErrUsage
+	}
 	return nil
 }
