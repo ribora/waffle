@@ -13,6 +13,4 @@ func InitRedis() {
 		"password": env.Value("REDIS_PASSWORD", ""),
 		"dbIndex":  env.Value("REDIS_DB", 0),
 	}), di.Fallback())
-
-	di.Wire[*redis.PoolTracing](redis.NewPoolTracing, di.Fallback())
 }

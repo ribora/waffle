@@ -49,18 +49,13 @@ Once on ctx, any I/O code path reads it via `hilton.ProviderFromContext(ctx)`. A
 | gRPC client | `Client` | `rpc.client.duration` |
 | AMQP publisher | `Producer` | (span only) |
 | AMQP consumer | `Consumer` | `messaging.process.duration`, `messaging.process.active`, `messaging.client.consumed.messages` (counts individual messages in batches) |
-| Redis | `Client` | `db.client.operation.duration`, `db.client.connection.count`, `db.client.connection.pending_requests` |
-| SQL | `Client` | `db.client.operation.duration`, `db.client.connection.count` |
+| Redis | `Client` | `db.client.operation.duration` |
+| SQL | `Client` | `db.client.operation.duration` |
 | Elasticsearch | `Client` | `db.client.operation.duration` |
 | CLI command | `Internal` | `cli.command.duration` |
 
 Every duration is in seconds and carries explicit bucket boundaries — the SDK
 default is millisecond-scaled and would put every request in one bucket.
-
-Pool gauges are wired separately from the pool itself (`sql.NewPoolTracing`,
-`redis.NewPoolTracing`): they are read at collection time, so they need a
-provider for the pool's lifetime rather than the per-operation one from the
-context. Both are `io.Closer`, so the container unregisters them on shutdown.
 
 W3C `traceparent` is propagated across all boundaries via the active
 `hilton.Propagator`. A batch AMQP consumer takes its parent from one message and
