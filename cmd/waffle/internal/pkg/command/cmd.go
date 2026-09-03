@@ -280,3 +280,9 @@ func (c *Command) FindProjectName() (string, error) {
 	}
 	return "", errors.New("go.mod is invalid")
 }
+
+// ModuleRoot is the directory holding go.mod, for a command that reads or writes
+// a file at the root rather than one relative to the working directory.
+func ModuleRoot() (string, error) {
+	return findModuleRoot()
+}

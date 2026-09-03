@@ -24,7 +24,7 @@ Behavior is driven by the project's `waffle.yaml` (see [overview](overview.md#wa
 |-----|----------|
 | `api_import` | Import path prefix for generated proto stubs (`{{ api_import }}/<domain>`) |
 | `proto_dir` | Where the `.proto` file is written (`<proto_dir>/<domain>/service.proto`) |
-| `mapper` | `"dto"` scaffolds nothing extra (write conversions by hand); `"goverter"` scaffolds a `convert/convert.go` |
+| `mapper` | `"goverter"` (the default) scaffolds a `convert/convert.go`; `"dto"` scaffolds nothing extra (write conversions by hand) |
 
 A missing `waffle.yaml` behaves exactly like one containing only the defaults.
 
@@ -83,9 +83,9 @@ Add your RPC methods to `userService`, declare what they need on `UserManagement
 
 ### DTO conversion
 
-With `mapper: "dto"` (the default) nothing is generated for conversions — write them by hand in the `grpc` package (inline in `service.go` or in a `dto.go` you add).
+**`domain/user/cmd/grpc/convert/convert.go`** — scaffolded with `mapper: "goverter"`, the default (the goverter tool is added to `go.mod` if missing). See [dto-conversion.md](../conventions/dto-conversion.md).
 
-**`domain/user/cmd/grpc/convert/convert.go`** — generated only when `mapper` is `"goverter"` (scaffolded by this command; the goverter tool is added to `go.mod` if missing). See [dto-conversion.md](../conventions/dto-conversion.md).
+With `mapper: "dto"` nothing is generated for conversions — write them by hand in the `grpc` package (inline in `service.go` or in a `dto.go` you add), and accept that a field added to the model will not fail anything when the conversion forgets it.
 
 ### Errors
 

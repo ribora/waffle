@@ -9,6 +9,8 @@ api_import: {{ .Project }}/api/pb
 # (e.g. ../api/proto in a monorepo) skips local proto generation.
 proto_dir: api/proto
 
-# dto — handwritten dto.go next to the handler (default);
-# goverter — generated convert package in cmd/<transport>/convert.
-mapper: dto
+# goverter — generated convert package in cmd/<transport>/convert (default);
+# it refuses to generate on a field it cannot map, so a field added to a model
+# cannot silently stop reaching the wire.
+# dto — handwritten dto.go next to the handler. Loses that check.
+mapper: goverter

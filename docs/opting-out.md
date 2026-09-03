@@ -42,7 +42,7 @@ Everything else in the table below is imported by `waffle` and nothing more.
 | `sql` | any query layer | use `pgx`, `sqlc`, `bun`, whatever | the repository generics and the `stored<X>` mapping |
 | `http`, `grpc`, `scribus`, `cron`, `migrate` | a server or consumer you start yourself | implement `Command` directly | the wiring, flags and graceful shutdown each tool brings |
 | `elastic`, `redis` | thin clients | use the official ones | nothing but the constructors |
-| `goverter` | conversions between DTO and domain | write them by hand (`mapper: dto`, the default) | nothing — this is already the default |
+| `goverter` | conversions between DTO and domain | write them by hand (`mapper: dto`) | the refusal to generate on an unmappable field — a hand-written mapper compiles happily while a new model field stops reaching the wire |
 
 ## diogen
 

@@ -45,6 +45,7 @@ And leaving is as cheap as arriving. Delete a `//go:generate` line and the file 
 ### Conventions
 - [Input Parsing](docs/conventions/input-parsing.md) — Binding and validation by codegen, custom tags, escape hatches
 - [DTO Conversion](docs/conventions/dto-conversion.md) — goverter pattern, project-wide whitelist of conversion helpers
+- [AI-native development](docs/conventions/ai-native.md) — Specification before code, the component-test cut, and what is not built yet
 
 ### Reference
 - [Interfaces](docs/reference/interfaces.md) — Full interface listing for all packages

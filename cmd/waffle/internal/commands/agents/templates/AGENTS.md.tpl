@@ -10,6 +10,10 @@ versions and a stale AGENTS.md will steer you toward deprecated patterns.
 For service-specific instructions (business rules, custom commands, known
 quirks), edit `CONTRIBUTING.md` instead — this file does not touch it.
 
+**Read `CONTRIBUTING.md` before starting, if it exists.** It overrides this file
+wherever the two disagree, because it was written for this service and this one
+was not.
+
 ## This service
 
 - Module: `{{ .ModulePath }}`
@@ -97,10 +101,10 @@ pkg/
   goverter/convert.go                Project-wide conversion whitelist (see Rule #6)
 ```
 
-The `mapper` key in `waffle.yaml` decides conversions. Default `dto`: no
-`convert/` package is scaffolded — write conversions by hand (inline in the
-handler, or a `dto.go` you add to its package). `goverter`: each transport
-gets a `convert/` package as shown above.
+The `mapper` key in `waffle.yaml` decides conversions. Default `goverter`: each
+transport gets a `convert/` package as shown above. `dto`: no `convert/` package
+is scaffolded — write conversions by hand (inline in the handler, or a `dto.go`
+you add to its package).
 
 ## Rule #3 — naming conventions (strict)
 
@@ -263,14 +267,13 @@ Both hooks are lowercase methods you write by hand; whisk finds them.
 
 ## Rule #6 — DTO conversion
 
-Default (`mapper: dto`): conversions are **hand-written** where needed —
-trivially inline in the handler, or in a `dto.go` you add to its package.
-Most methods need none (build the proto request inline, return the response
-as-is); add a converter only for non-trivial mappings.
+Default (`mapper: goverter`): each transport gets a generated `convert/`
+package. It is the default because goverter **refuses to generate** on a field
+it cannot map, so a field added to a model cannot silently stop reaching the
+wire — a hand-written mapper compiles happily and drops it.
 
-With `mapper: goverter` (or a one-off `waffle make:converter <path>`) a
-`convert/` package is generated instead. It uses a **single wildcard extend**
-pointing at the project-wide whitelist:
+The generated package uses a **single wildcard extend** pointing at the
+project-wide whitelist:
 
 ```go
 // domain/<x>/cmd/grpc/convert/convert.go
@@ -335,7 +338,7 @@ already exists as `_count` aggregate — don't add `db.client.operations` counte
 3. Add method to `domain/<x>/cmd/grpc/service.go` (flat `grpc` package)
 4. Add Management interface method (if needed) — to the **handler's** interface
 5. Implement on service in `domain/<x>/service/...`
-6. Add the proto ↔ domain conversion — by hand in the `grpc` package (default `mapper: dto`), or in `domain/<x>/cmd/grpc/convert/convert.go` (`mapper: goverter`)
+6. Add the proto ↔ domain conversion — in `domain/<x>/cmd/grpc/convert/convert.go` (default `mapper: goverter`), or by hand in the `grpc` package (`mapper: dto`)
 7. `make generate && make audit && make`
 
 ### Add a new database table
@@ -375,6 +378,101 @@ Then edit business logic in `domain/users/service/users.go`.
 - ❌ Wrap stdlib types in custom abstractions inside `domain/<x>/model/` — model stays pure Go types
 - ❌ Pass `context.Background()` deeper than the entrypoint — propagate ctx from caller
 - ❌ `panic(err)` outside `try.Catch`-wrapped blocks (and try is deprecated — prefer explicit error returns)
+
+## Rule #11 — specification before code
+
+### Which task this is
+
+| task | what to do |
+|---|---|
+| a feature, or a **design defect** — an internal contradiction in behaviour that was specified | the full cycle below |
+| a **code defect** at the level of a function — code that broke, not behaviour that was contradictory | a table test where the defect is, then the fix. None of the cycle below |
+| a **spike** — the requirements are a sketch and the point is to find out what is possible | exempt from the cycle, but its output is a specification, not merged code. The spike's code is thrown away and rewritten through the cycle |
+
+### 1. Requirements in, specification out
+
+From the written requirements produce two artifacts, and nothing else yet:
+
+- **an executable specification** — a component test today, a `.feature` file
+  once this service has a scenario harness (`CONTRIBUTING.md` says whether it
+  does). The **minimum** set of cases that pins down what the requirements left
+  open, not an exhaustive matrix: a set nobody can read carefully is worse than
+  no set at all, because approving it becomes a nod rather than a decision.
+- **a delta list** — every place the specification says something the source
+  document does not, each pointing at the place in the document it fills in.
+  Include what was deliberately left **out** of scope: a reviewer comparing two
+  documents will catch a wrong answer and miss a missing question.
+
+A delta list is not a list of decisions in general. It is the difference against
+the source, which is what makes reviewing it a bounded job rather than holding
+the whole document in your head.
+
+For a **design defect** the deliverable is the set of cases that cannot all pass
+at once. The contradiction has to be visible in the artifacts rather than argued
+in prose — if it cannot be written as two cases, it is not yet understood.
+
+### 2. Verification, then approval
+
+A human reads the source document and the delta list, and either corrects them or
+approves. Approval is the go-ahead: **no production code before it.**
+
+This is the load-bearing step. A specification written by an agent and skimmed by
+a human turns the agent's guess into the authoritative spec, which is worse than
+having no spec. If a case contains nothing that could have gone another way, it
+did not need to be a case.
+
+### 3. Steps and fixtures
+
+Bind the specification to the real container:
+
+```go
+app, err := diogen.InitAppWith(diogen.Replacements{ /* the cut */ })
+```
+
+Cut at the **leaves**. `waffle make:tests:mocks --suggest` marks them `# leaf`:
+their default constructor takes nothing else out of the container, so they are
+the boundary of the process. Replacing an interior seam instead deletes the
+subtree below it — the code the specification was meant to exercise.
+
+Two things the marker does not know, which is why the cut is chosen by a person:
+
+- `sql.Db` is a leaf, but a test hands it a real connection to a test database,
+  not a mock.
+- a factory that builds its clients from runtime data keeps the real boundary
+  below the leaf and outside the container. A mock of that boundary cannot reach
+  the app through `Replacements` at all; the component test cuts at the factory's
+  own port, and the boundary below it is mocked only for a unit test of the
+  factory.
+
+Still no production code at this stage.
+
+### 4. Red-green
+
+The specification and the steps are **frozen** at approval. The loop changes
+production code and nothing else.
+
+Never reach green by weakening an assertion, widening a matcher, deleting a case
+or relaxing a fixture. If the test cannot be made green without touching the
+specification or the steps, stop — that is the next section, not a licence.
+
+### Changing an approved specification
+
+Only through the human who approved it, whatever the reason. **Never on your own
+judgement.** Two things trigger it:
+
+- an **internal logical conflict**: two approved cases cannot both hold. State
+  the conflict and stop.
+- an **external constraint**: the case needs data this service does not own, or
+  an ordering the transport does not guarantee. Not a contradiction, but not
+  implementable either. State the constraint and stop.
+
+The human decides what changes — the specification, the scope, or the design.
+
+### The gate
+
+A merge request carries a link to the approved specification and its delta list.
+A rule that nothing checks is a rule new joiners learn to skip, because skipping
+is faster and nothing happens.
 
 ## Reference
 

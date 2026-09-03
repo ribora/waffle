@@ -80,7 +80,9 @@ func (s *userService) List(ctx context.Context, _ *proto.ListUsersRequest) (*pro
 
 ## dto.go — proto ↔ domain conversions
 
-With the default `mapper: dto` in `waffle.yaml` nothing extra is scaffolded — write conversions by hand where you need them: trivially inline in the handler, or in a `dto.go` file you add to the same package. Conversion functions are pure — no logic, no errors:
+With the default `mapper: goverter` conversions live in a generated `cmd/grpc/convert` package and there is no `dto.go` — see [dto-conversion.md](../conventions/dto-conversion.md).
+
+With `mapper: dto` in `waffle.yaml` nothing extra is scaffolded — write conversions by hand where you need them: trivially inline in the handler, or in a `dto.go` file you add to the same package. Conversion functions are pure — no logic, no errors:
 
 ```go
 // cmd/grpc/dto.go
@@ -107,7 +109,7 @@ func userToProtoList(u *model.User, _ int) *proto.User {
 
 The `lo.Map` helper requires a two-argument function `(T, int) R` — hence the `userToProtoList` variant.
 
-With `mapper: goverter` there is no `dto.go` — conversions live in a generated `cmd/grpc/convert` package instead. See [dto-conversion.md](../conventions/dto-conversion.md).
+Hand-written conversions are opt-in for a reason: they compile whatever they leave out, so a field added to `model.User` silently stops reaching the wire. goverter refuses to generate instead.
 
 ## Error mapping
 
@@ -142,8 +144,8 @@ di.Define(service.NewUserService,
 ```
 domain/user/cmd/grpc/
 ├── service.go        Handler struct, Start(), RPC methods
+├── convert/          Generated goverter converter (default, mapper: goverter)
 ├── dto.go            Proto ↔ domain conversions — hand-added when mapper: dto
-├── convert/          Generated goverter converter (mapper: goverter)
 └── errors.go         ErrorMapper (error → codes.Code map for this domain)
 ```
 

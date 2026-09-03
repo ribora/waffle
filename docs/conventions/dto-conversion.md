@@ -4,15 +4,19 @@ Each transport (gRPC, AMQP/scribus, HTTP) converts between external and
 domain types. Two strategies exist, selected by the `mapper` key in
 `waffle.yaml`:
 
-- **`dto` (default)** — hand-written conversion functions in a `dto.go` file
-  inside the handler package itself (`domain/<x>/cmd/grpc/dto.go`). No code
-  generation, no extra package; pure functions, no logic, no errors. See
+- **`goverter` (default)** — a `convert` package with a `Convert` interface that
+  [goverter](https://github.com/jmattheis/goverter) turns into compile-time
+  conversion functions. It is the default because it **refuses to generate** on
+  a field it cannot map: add a field to a model and generation fails until the
+  conversion accounts for it. Scaffold a one-off converter anywhere with
+  `waffle make:converter <path>`.
+- **`dto`** — hand-written conversion functions in a `dto.go` file inside the
+  handler package itself (`domain/<x>/cmd/grpc/dto.go`). No code generation, no
+  extra package; pure functions, no logic, no errors. The cost is the check
+  above: a hand-written mapper compiles whatever it leaves out, so a new model
+  field silently stops reaching the wire. See
   [tools/grpc-handler.md](../tools/grpc-handler.md#dtogo--proto--domain-conversions)
   for the shape.
-- **`goverter`** — a `convert` package with a `Convert` interface that
-  [goverter](https://github.com/jmattheis/goverter) turns into compile-time
-  conversion functions. Enable project-wide with `mapper: goverter` in
-  `waffle.yaml`, or scaffold one-off with `waffle make:converter <path>`.
 
 The rest of this page describes the goverter strategy:
 
@@ -161,15 +165,14 @@ The pattern is supported by waffle commands:
 
 | Command | What it scaffolds |
 |---|---|
-| `waffle make:domain:grpc <domain>` | with `mapper: goverter` — `domain/<x>/cmd/grpc/convert/convert.go` + ensures `pkg/goverter/convert.go`; with `mapper: dto` (default) — nothing extra |
-| `waffle make:domain:http <domain>` | with `mapper: goverter` — `domain/<x>/cmd/http/convert/convert.go` + ensures `pkg/goverter/convert.go`; with `mapper: dto` — nothing extra |
-| `waffle make:domain:scribus [--batch] <domain> <event>` | with `mapper: goverter` — `domain/<x>/cmd/scribus/convert/convert.go` + ensures `pkg/goverter/convert.go`; with `mapper: dto` — nothing extra |
+| `waffle make:domain:grpc <domain>` | with `mapper: goverter` (default) — `domain/<x>/cmd/grpc/convert/convert.go` + ensures `pkg/goverter/convert.go`; with `mapper: dto` — nothing extra |
+| `waffle make:domain:http <domain>` | with `mapper: goverter` (default) — `domain/<x>/cmd/http/convert/convert.go` + ensures `pkg/goverter/convert.go`; with `mapper: dto` — nothing extra |
+| `waffle make:domain:scribus [--batch] <domain> <event>` | with `mapper: goverter` (default) — `domain/<x>/cmd/scribus/convert/convert.go` + ensures `pkg/goverter/convert.go`; with `mapper: dto` — nothing extra |
 | `waffle make:converter <path>` | `<path>/convert.go` + ensures `pkg/goverter/convert.go` |
 
-`make:converter <path>` is the one-off opt-in: it adds a goverter converter
-at any directory without switching the whole project to `mapper: goverter`.
-Use it for a single transport handler in a `dto`-default service, or for
-outbound adapters and clients. Example:
+`make:converter <path>` covers the places no transport command reaches: it adds
+a goverter converter at any directory — an outbound adapter, a client, a single
+handler in a service that opted into `mapper: dto`. Example:
 
 ```
 waffle make:converter domain/users/cmd/grpc/convert

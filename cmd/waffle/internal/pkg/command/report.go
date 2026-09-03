@@ -40,3 +40,9 @@ func ReportKept(paths ...string) {
 func reportAction(text string) {
 	_, _ = fmt.Fprintf(output, "  %s %s\n", addMark, text)
 }
+
+// For a caller that writes its own files rather than going through Write — the
+// mock generator shells out, and mockgen creates the destination itself.
+func ReportCreated(paths ...string) {
+	reportCreated(paths)
+}
