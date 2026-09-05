@@ -171,6 +171,65 @@ Where to put it, by number of consumers — with no exception for gorib:
 | two or more | next to the client: client in `pkg/kafka` → `pkg/kafka/kafkatest` |
 | the client moved into gorib | the harness moves with it |
 
+## Choosing where to cut
+
+The decision is written down, in `waffle.yaml`, as a permission list:
+
+```yaml
+replacements:
+  allow:
+    gitlab.com/sherpa-erp/sherpa/api/contract: [ContractServiceClient]
+```
+
+What it does not name may not be replaced, in any form. `waffle
+check:tests:replacements` reads the `Replacements` literals in the tests and
+fails naming the field and the interface, so a cut nobody granted stops being a
+question of whether a reviewer noticed. Two things it deliberately does not
+decide: **which form** the replacement takes — mock, spy, fake or no-op — which
+follows from the assertion and belongs to whoever writes the test, and anything
+in `tests/internal/`, which is the same person's harness as the list itself.
+
+A grant is keyed by interface, not by field, so an interface serving two
+container fields is granted for both.
+
+`waffle check:tests:replacements --suggest` prints the menu; a person picks from
+it, and what they pick goes into `replacements.allow`. The `# leaf` marker means
+one thing only — *this constructor takes nothing else out of the container* — and
+that is a heuristic, not the answer.
+
+**Cut above anything that speaks a language the code itself generates.** A
+stand-in for such a level would have to speak it too, and then the test checks
+the language instead of the behaviour. `sql.Db` carries SQL the repository
+builds; `grpc.ClientConnInterface.Invoke(ctx, method string, args, reply any)`
+carries the wire — a method name as a string and an untyped payload; an
+elasticsearch client carries the query DSL.
+
+So for an outbound gRPC dependency the cut is the **typed client**, one level
+above the transport, even though `--suggest` does not mark it `# leaf` — its
+constructor does take the connection out of the container, which is exactly why
+it is not a leaf. Substitute both levels, for two different reasons: the typed
+client because that is the surface worth faking, and the connection with
+`grpcClient.Dead` so the boot stops reading the neighbour's host out of the
+environment. This shape recurs wherever a service adapts one transport to
+another — an http-to-grpc adapter looks the same.
+
+### What the marker cannot know
+
+- **`sql.Db` is a leaf and must not be replaced.** The component test hands it a
+  real database, so it stays out of `replacements.allow` and the harness supplies
+  it instead.
+- **An interior node can be the right cut**, as above. Not being a leaf is not a
+  reason to leave it alone.
+- **A boundary can sit below the leaf and outside the container.** A factory that
+  builds its client per call from runtime data keeps the real boundary out of
+  `Replacements` entirely: nothing supplied there can reach it, so the component
+  test cuts at the factory's own port and the boundary below is mocked only for a
+  unit test of the factory — which needs no grant, because `Replacements` plays
+  no part in it.
+- **An interface with no methods is not a seam.** Anything satisfies it, so
+  granting it grants nothing; if one exists in the code, somebody intended a seam
+  and left a stub.
+
 ## Replacing the leaves
 
 `Boot` fills the cut. Everything that is a condition of booting rather than a choice the test makes belongs here, not in the scenario:
@@ -203,6 +262,19 @@ That is the rule that decides which to use. A silent stand-in is fine where the 
 | `grpc.ClientConnInterface` | `grpcClient.Dead(name)` | — |
 
 **A log spy cannot be written outside `pry`.** `Option` is `func(Event)` and every option asserts to the package's unexported event type, so a foreign `Logger` is handed options it can never read. That is why `Recorder` lives there rather than in a test package.
+
+### A mock is a declaration, a spy is an observation
+
+Which one a seam gets follows from where the assertion sits, and that is decided by the notation rather than by taste.
+
+A generated mock declares its expectation **before** the call. A specification written in Gherkin puts its assertions **after** the action — `Then` follows `When`, by grammar. So in a scenario suite every conversion to a mock ends in one of three places: the declaration moves into the `When` step and the `Then` line stops asserting anything; a new `Given` states the expectation, and the specification describes a call sequence instead of behaviour; or `.AnyTimes()` with a `.DoAndReturn()` writes into the very slices a spy would keep, plus a controller on top.
+
+**So: in a godog suite a recorder is the default and a mock is the exception. In a unit test it is the other way round** — there the assertions are declarations already, the object under test is built by hand, and `.Times(0)` and `.Times(1)` are the clearest form there is.
+
+Two things this does not excuse:
+
+- A recorder must still assert the count. `.Times(1)` comes free with a mock; a spy that finds *a* matching call and stops will pass an implementation that calls twice.
+- The lifecycle is not the obstacle it looks like. godog runs each scenario as a subtest when `Options.TestingT` is set, and `godog.T(ctx)` satisfies gomock's reporter, so a per-scenario controller with correct attribution is available. The grammar is the reason, not the plumbing.
 
 ### Delivering an event
 

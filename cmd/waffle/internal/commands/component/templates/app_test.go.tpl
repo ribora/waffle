@@ -11,9 +11,10 @@ import (
 // up and serves the handlers. Keep both — this one fails faster and closer to
 // the wiring.
 //
-// To see what can go into Replacements:
+// What may go into Replacements is replacements.allow in waffle.yaml. To see
+// everything the container exposes, granted or not:
 //
-//	./waffle make:tests:mocks --suggest
+//	./waffle check:tests:replacements --suggest
 func TestApp(t *testing.T) {
 	t.Skip("remove once the environment below is filled in")
 

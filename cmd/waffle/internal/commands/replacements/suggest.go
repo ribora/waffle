@@ -1,7 +1,8 @@
-package mocks
+package replacements
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -28,8 +29,8 @@ var tierHeading = map[tier]string{
 	tierStdlib:   "standard library",
 }
 
-// Tiers order the report and nothing else. Whether a test uses a mock or the
-// real dependency is decided per test, so nothing here is demoted.
+// Tiers order the report and nothing else. Which of these a test may replace is
+// the allow list's answer, so nothing here is demoted.
 func tierOf(path, module string) tier {
 	rel, inside := strings.CutPrefix(path, module+"/")
 	first, _, _ := strings.Cut(path, "/")
@@ -49,33 +50,31 @@ func tierOf(path, module string) tier {
 	}
 }
 
-// candidate is one interface a container exposes, with the one structural fact
-// worth carrying: whether its default constructor takes anything else out of the
-// container.
+// candidate is one interface a container exposes, with the two facts that bear
+// on granting it: whether its default constructor takes anything else out of the
+// container, and whether the list already grants it.
 type candidate struct {
-	Path string
-	Name string
-	Leaf bool
+	Path    string
+	Name    string
+	Leaf    bool
+	Allowed bool
 }
 
-// unlisted are the interfaces a container exposes that waffle.yaml mentions in
-// neither mocks.generate nor mocks.ignore. Composite seams are left out of this
-// list because no single mock satisfies interface{A; B} — but they are not
-// noise: they are reported separately, since a composite names the contracts one
-// management object owes.
-func unlisted(seams []command.Seam, cfg command.Config) []candidate {
+func candidates(seams []command.Seam, cfg command.Config) []candidate {
 	var out []candidate
 	seen := map[string]bool{}
 	for _, seam := range seams {
-		if seam.Composite() {
-			continue
-		}
 		for _, ref := range seam.Types {
-			if seen[ref.String()] || cfg.Mocks.Listed(ref.Path, ref.Name) {
+			if seen[ref.String()] {
 				continue
 			}
 			seen[ref.String()] = true
-			out = append(out, candidate{Path: ref.Path, Name: ref.Name, Leaf: seam.Leaf})
+			out = append(out, candidate{
+				Path:    ref.Path,
+				Name:    ref.Name,
+				Leaf:    seam.Leaf,
+				Allowed: cfg.Replacements.Allowed(ref.Path, ref.Name),
+			})
 		}
 	}
 	return out
@@ -91,16 +90,8 @@ func composites(seams []command.Seam) []command.Seam {
 	return out
 }
 
-func packages(cands []candidate) int {
-	paths := map[string]bool{}
-	for _, c := range cands {
-		paths[c.Path] = true
-	}
-	return len(paths)
-}
-
-// entries renders the mapping lines only, at the given indent, so the same text
-// serves the printed report, the --check failure and the insert into waffle.yaml.
+// entries renders the mapping lines only, at the given indent, in the shape
+// replacements.allow takes — so granting one is a copied line.
 func entries(cands []candidate, module, indent string) []string {
 	byPath := map[string][]candidate{}
 	byTier := map[tier][]string{}
@@ -129,45 +120,50 @@ func entries(cands []candidate, module, indent string) []string {
 			// One interface stays inline — there is nothing to tell apart, and a
 			// block would double the height of a report that is mostly singles.
 			if len(group) == 1 {
-				out = append(out, indent+fmt.Sprintf("%s: [%s]%s", path, group[0].Name, leafNote(group[0].Leaf)))
+				out = append(out, indent+fmt.Sprintf("%s: [%s]%s", path, group[0].Name, note(group[0])))
 				continue
 			}
-			// Several go one per line, so the leaf marker sits on the interface it
+			// Several go one per line, so a marker sits on the interface it
 			// describes rather than naming it from the end of a shared line.
 			out = append(out, indent+path+":")
 			for _, c := range group {
-				out = append(out, indent+"  - "+c.Name+leafNote(c.Leaf))
+				out = append(out, indent+"  - "+c.Name+note(c))
 			}
 		}
 	}
 	return out
 }
 
-func leafNote(leaf bool) string {
-	if leaf {
-		return "  # leaf"
+func note(c candidate) string {
+	var marks []string
+	if c.Leaf {
+		marks = append(marks, "leaf")
 	}
-	return ""
+	if c.Allowed {
+		marks = append(marks, "allowed")
+	}
+	if len(marks) == 0 {
+		return ""
+	}
+	return "  # " + strings.Join(marks, ", ")
 }
 
-func suggestion(cands []candidate, merged []command.Seam, module string) string {
+func suggestion(seams []command.Seam, cfg command.Config, module string) string {
 	var b strings.Builder
-	b.WriteString("mocks:\n  generate:\n")
-	for _, line := range entries(cands, module, "    ") {
+	b.WriteString("# Everything the containers expose. This is a menu, not a proposal: what\n")
+	b.WriteString("# replacements.allow does not name, a test may not supply.\n\n")
+	for _, line := range entries(candidates(seams, cfg), module, "    ") {
 		b.WriteString(line + "\n")
 	}
 
 	b.WriteString("\n# leaf — the default constructor takes nothing else out of the container, so it\n")
-	b.WriteString("# is a boundary of the process. A component test replaces leaves and lets the\n")
-	b.WriteString("# rest run for real; the interior entries are for unit tests, where you build\n")
-	b.WriteString("# the object under test yourself and Replacements plays no part.\n")
+	b.WriteString("# is a boundary of the process. Granting a leaf leaves the whole service under\n")
+	b.WriteString("# test; granting an interior seam cuts out everything below it.\n")
 
-	if len(merged) > 0 {
-		b.WriteString("\n# Composite seams — one management object serving several declared\n")
-		b.WriteString("# contracts. This is the list of specifications the domain owes: each\n")
-		b.WriteString("# constituent is a caller, and a caller is a place a scenario binds.\n")
-		b.WriteString("# No single mock satisfies interface{A; B}, so mock a constituent for a\n")
-		b.WriteString("# handler unit test; the composite itself is read, not replaced.\n")
+	if merged := composites(seams); len(merged) > 0 {
+		b.WriteString("\n# Composite seams — one field diogen merged, serving several declared\n")
+		b.WriteString("# contracts. Granting one means granting every constituent, and whatever a\n")
+		b.WriteString("# test supplies has to implement all of them.\n")
 		for _, seam := range merged {
 			// Shortened for reading, but only as far as it stays unambiguous:
 			// two constituents can sit in packages that share a last segment.
@@ -185,4 +181,40 @@ func suggestion(cands []candidate, merged []command.Seam, module string) string 
 		}
 	}
 	return b.String()
+}
+
+// The last segment of each path, lengthened one segment at a time until no two
+// are the same. Repeats are collapsed first: one composite seam names the same
+// package several times, and no suffix can ever tell a path from itself.
+func distinctSuffixes(paths []string, sep string) map[string]string {
+	unique := make([]string, 0, len(paths))
+	for _, p := range paths {
+		if !slices.Contains(unique, p) {
+			unique = append(unique, p)
+		}
+	}
+
+	out := make(map[string]string, len(unique))
+	for k := 1; k <= 16; k++ {
+		clear(out)
+		seen := make(map[string]bool, len(unique))
+		clash := false
+		for _, p := range unique {
+			segments := strings.Split(p, "/")
+			if k < len(segments) {
+				segments = segments[len(segments)-k:]
+			}
+			joined := strings.Join(segments, sep)
+			if seen[joined] {
+				clash = true
+				break
+			}
+			seen[joined] = true
+			out[p] = joined
+		}
+		if !clash {
+			break
+		}
+	}
+	return out
 }

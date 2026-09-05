@@ -13,10 +13,9 @@ import (
 var output io.Writer = os.Stderr
 
 var (
-	addMark    = color.New(color.FgGreen).Sprint("+")
-	keepMark   = color.New(color.FgYellow).Sprint("=")
-	removeMark = color.New(color.FgRed).Sprint("-")
-	warnMark   = color.New(color.FgYellow).Sprint("!")
+	addMark  = color.New(color.FgGreen).Sprint("+")
+	keepMark = color.New(color.FgYellow).Sprint("=")
+	warnMark = color.New(color.FgYellow).Sprint("!")
 )
 
 // Not an error: the run succeeded, and this is about something it deliberately
@@ -45,18 +44,4 @@ func ReportKept(paths ...string) {
 
 func reportAction(text string) {
 	_, _ = fmt.Fprintf(output, "  %s %s\n", addMark, text)
-}
-
-// For a caller that writes its own files rather than going through Write — the
-// mock generator shells out, and mockgen creates the destination itself.
-func ReportCreated(paths ...string) {
-	reportCreated(paths)
-}
-
-// Loud on purpose: a run that silently shrinks the tree is worse than one that
-// grows it. The reason is the caller's — this package is shared.
-func ReportRemoved(reason string, paths ...string) {
-	for _, path := range paths {
-		_, _ = fmt.Fprintf(output, "  %s %s — %s\n", removeMark, path, reason)
-	}
 }

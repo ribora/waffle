@@ -14,20 +14,19 @@ import (
 
 // Config mirrors waffle.yaml.
 type Config struct {
-	ApiImport string      `yaml:"api_import"`
-	ProtoDir  string      `yaml:"proto_dir"`
-	Mapper    string      `yaml:"mapper"`
-	Mocks     MocksConfig `yaml:"mocks"`
+	ApiImport    string             `yaml:"api_import"`
+	ProtoDir     string             `yaml:"proto_dir"`
+	Mapper       string             `yaml:"mapper"`
+	Replacements ReplacementsConfig `yaml:"replacements"`
 }
 
-// MocksConfig is the mocks: group. Grouped rather than three top-level keys,
-// because the top level of waffle.yaml is what a reader skims.
-type MocksConfig struct {
-	Dir string `yaml:"dir"`
-	// Both are keyed by import path, so an entry maps onto one mockgen call.
-	// Ignore is what --check accepts as classified without generating anything.
-	Generate map[string][]string `yaml:"generate"`
-	Ignore   map[string][]string `yaml:"ignore"`
+// ReplacementsConfig is the replacements: group — a permission list, so that
+// what nobody granted stays unreplaceable instead of merely unmentioned.
+type ReplacementsConfig struct {
+	// Keyed by import path, so one entry covers one package: the interfaces a
+	// test may supply on the container's Replacements struct, in whatever form
+	// the test author picks.
+	Allow map[string][]string `yaml:"allow"`
 }
 
 // ProjectConfig loads waffle.yaml; a missing file is identical to all-defaults.
@@ -63,59 +62,36 @@ func (c *Command) ProjectConfig(projectName string) (Config, error) {
 	if cfg.Mapper == "" {
 		cfg.Mapper = "goverter"
 	}
-	// Under the test tree, because that is the only thing that imports mocks —
-	// but deliberately not under tests/internal/: Go's internal rule would then
-	// scope them to the tests/ subtree, and a table test living next to the
-	// defect it pins (domain/x/service/x_test.go) could not import them at all.
-	// That colocated test is exactly where a function-level defect belongs, so
-	// the visibility has to stay module-wide.
-	if cfg.Mocks.Dir == "" {
-		cfg.Mocks.Dir = filepath.Join("tests", "mocks")
-	}
 
 	if cfg.Mapper != "dto" && cfg.Mapper != "goverter" {
 		return Config{}, fmt.Errorf("waffle.yaml: mapper must be \"dto\" or \"goverter\", got %q", cfg.Mapper)
 	}
-	if err := cfg.Mocks.validate(); err != nil {
+	if err := cfg.Replacements.validate(); err != nil {
 		return Config{}, err
 	}
 
 	return cfg, nil
 }
 
-// Listed reports whether an interface appears under either key, which is what
-// --check goes by.
-func (m MocksConfig) Listed(path, name string) bool {
-	return slices.Contains(m.Generate[path], name) || slices.Contains(m.Ignore[path], name)
+// Allowed reports whether a test may supply this interface itself.
+func (r ReplacementsConfig) Allowed(path, name string) bool {
+	return slices.Contains(r.Allow[path], name)
 }
 
-// A typo here would otherwise surface as a mockgen run failing much later,
-// naming a package rather than the line that asked for it.
-func (m MocksConfig) validate() error {
-	for _, key := range []string{"generate", "ignore"} {
-		listed := m.Generate
-		if key == "ignore" {
-			listed = m.Ignore
+// A typo here would otherwise read as a denial: the check would name a seam the
+// list looks like it already grants.
+func (r ReplacementsConfig) validate() error {
+	for path, names := range r.Allow {
+		if strings.TrimSpace(path) == "" {
+			return errors.New("waffle.yaml: replacements.allow has an entry with an empty import path")
 		}
-		for path, names := range listed {
-			if strings.TrimSpace(path) == "" {
-				return fmt.Errorf("waffle.yaml: mocks.%s has an entry with an empty import path", key)
-			}
-			if len(names) == 0 {
-				return fmt.Errorf("waffle.yaml: mocks.%s lists %s with no interfaces", key, path)
-			}
-			for _, name := range names {
-				if !token.IsIdentifier(name) || !token.IsExported(name) {
-					return fmt.Errorf("waffle.yaml: mocks.%s lists %q under %s, which is not an exported Go identifier",
-						key, name, path)
-				}
-			}
+		if len(names) == 0 {
+			return fmt.Errorf("waffle.yaml: replacements.allow lists %s with no interfaces", path)
 		}
-	}
-	for path, names := range m.Generate {
 		for _, name := range names {
-			if slices.Contains(m.Ignore[path], name) {
-				return fmt.Errorf("waffle.yaml: %s.%s is in both mocks.generate and mocks.ignore", path, name)
+			if !token.IsIdentifier(name) || !token.IsExported(name) {
+				return fmt.Errorf("waffle.yaml: replacements.allow lists %q under %s, which is not an exported Go identifier",
+					name, path)
 			}
 		}
 	}

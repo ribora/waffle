@@ -23,7 +23,7 @@ go install gitlab.com/gorib/waffle/cmd/waffle@latest
 | `waffle make:domain:command <name> <command>` | Add a CLI subcommand scoped to a domain |
 | `waffle make:converter <path>` | Scaffold a goverter convert.go at the given path |
 | `waffle make:tests:component` | Scaffold a component test that boots the container through `InitAppWith` ([details](../di/overview.md#testing-with-the-container)) |
-| `waffle make:tests:mocks [--suggest \| --write \| --check] [--dir=<path>]` | Generate the mocks listed in `waffle.yaml` into `tests/mocks`; the flags list, record and enforce what the container exposes |
+| `waffle check:tests:replacements [--suggest] [--container=<path>]` | Fail if a test replaces a container field `replacements.allow` does not grant; `--suggest` lists everything the containers expose |
 | `waffle agents` | Regenerate `AGENTS.md` after a waffle upgrade ([details](agents.md)) |
 
 `--help` on any of them prints its description and operands. A failing command
@@ -103,9 +103,7 @@ Project-level conventions live in `waffle.yaml`, next to `go.mod`. `init:service
 | `api_import` | `<module>/api/pb` | Import path prefix for generated proto stubs |
 | `proto_dir` | `api/proto` | Where `.proto` sources are written |
 | `mapper` | `"goverter"` | `"goverter"` scaffolds a goverter `convert/convert.go`; `"dto"` scaffolds nothing extra (hand-written conversions) |
-| `mocks.generate` | empty | Interfaces to generate mocks for, keyed by import path: `gitlab.com/gorib/sql: [Db]` |
-| `mocks.ignore` | empty | Seams deliberately left without a mock, same shape; `--check` passes once every seam is in one of the two |
-| `mocks.dir` | `tests/mocks` | Where the generated mocks go, one flat package; `--dir` overrides it |
+| `replacements.allow` | empty | Interfaces a test may supply on the container's `Replacements`, keyed by import path: `gitlab.com/gorib/sql: [Db]`. A permission list — an empty one allows nothing |
 
 `<service>` is the last path segment of the module name. A missing `waffle.yaml`, or one missing some keys, behaves exactly like a file containing only the defaults above — the two are indistinguishable to every command. An unknown key (e.g. a typo) is a hard error, and an invalid `mapper` value (anything other than `dto` or `goverter`) is a hard error.
 
@@ -121,8 +119,8 @@ The whisk generator keeps its own `whisk.yaml` beside it, on the same missing-is
 
 The remaining commands — `make:domain:http`, `make:domain:scribus`,
 `make:domain:repository`, `make:domain:migration`, `make:domain:command`,
-`make:converter`, `make:tests:component` and `make:tests:mocks` — have no page of
-their own. They
+`make:converter`, `make:tests:component` and `check:tests:replacements` — have no
+page of their own. They
 follow the same rules as the ones above (project root detection, idempotent
 writes, `make generate` afterwards); what they produce is described where the
 produced thing is documented: [tools/http-handler](../tools/http-handler.md),
@@ -137,44 +135,53 @@ containers gets a test beside each. The scaffolded test starts with a `t.Skip`,
 because the container reads the environment while it wires and nothing can guess
 which variables this test needs.
 
-### make:tests:mocks
+### check:tests:replacements
 
-The seams a test can replace are the fields of the generated `Replacements`
-struct, so that struct is what this command reads — parsed, not type-checked,
-which is why it also works on a service whose dependencies do not currently
-compile. The unit of the report is the interface, not the seam: several fields of
-one type collapse to a single entry, and an instantiated generic collapses to the
-generic interface mockgen actually mocks.
+What a test can replace are the fields of the generated `Replacements` struct, so
+that struct is what this command reads — parsed, not type-checked, which is why
+it also works on a service whose dependencies do not currently compile. The unit
+is the interface, not the field: several fields of one type collapse to a single
+entry, and an instantiated generic collapses to the generic interface it
+instantiates.
 
 | | |
 |---|---|
-| no flags | run mockgen over `mocks.generate`, one invocation per import path |
-| `--suggest` | print, as a paste-ready block, every interface listed in neither `mocks.generate` nor `mocks.ignore` |
-| `--write` | add those to `mocks.generate`, leaving the rest of the file untouched |
-| `--check` | exit non-zero if there are any, so CI notices a new dependency nobody classified |
+| no flags | fail if a test fills in a field `replacements.allow` does not grant |
+| `--suggest` | print everything the containers expose, marking `# leaf` and `# allowed` |
 | `--container=<path>` | read this generated file instead of discovering it; repeatable |
-| `--dir=<path>` | write the mocks here instead of `mocks.dir`; only meaningful without the flags above, which write nothing |
 
-Mocks land in `mocks.dir`, which defaults to **`tests/mocks`** — under the test
-tree, because that is what imports them, and deliberately *not* under
-`tests/internal/`: Go's internal rule would then scope them to the `tests/`
-subtree, and a table test living next to the defect it pins
-(`domain/x/service/x_test.go`) could not import them at all. That colocated test
-is exactly where a function-level defect belongs, so the visibility stays
-module-wide. The package name follows the directory's last segment.
+`replacements.allow` is a **permission list**, not a list of exceptions: an empty
+one allows nothing, and what it does not name may not be replaced in any form —
+mock, spy, hand-written fake or no-op. Which form to use is the test author's
+choice, because it follows from the assertion; where the boundary lies is not.
 
-A run also **removes** mocks that `mocks.generate` no longer asks for —
-otherwise an interface moved to `mocks.ignore` leaves its mock behind,
-compiling and importable, with nothing to say it is stale. Only files carrying
-mockgen's generated header are candidates, so a hand-written helper sharing the
-directory survives.
+The check reads every `.go` file in the module and reports the position of each
+field it finds filled in, in either form:
 
-Composite seams — `interface{ A; B }`, produced when registrations share a
-container field — are reported separately, because no single mock satisfies
-them. They are the most informative lines in the report rather than noise: a
-composite names the contracts one management object owes, and each constituent
-is a caller, which is a place a scenario binds. Mock one constituent for a
-handler unit test; the composite itself is read, not replaced.
+```go
+diogen.Replacements{SecurityAdapter: spy}   // the literal handed to Boot
+cut.SecurityAdapter = spy                   // filled in field by field
+```
+
+Two things are excluded. The generated container file declares the struct and
+assigns every field — but only that file, not its directory, so a component test
+sitting beside `InitAppWith` is read like any other. And `tests/internal/` is the
+harness: it hands in the real database and the connections a boot demands, which
+is the platform owner's own decision, so measuring it against the platform
+owner's own list would deny the thing the list exists to allow.
+
+A grant is keyed by import path and interface, never by field name — the field
+name is diogen's, and it changes when registrations do. One consequence worth
+knowing: an interface serving two fields is granted for both. `google.golang.org/
+grpc: [ClientConnInterface]` grants every connection in the container at once,
+which is a reason not to grant it.
+
+A **composite** field — `interface{ A; B }`, produced when registrations share a
+container field — is granted only when every constituent is, because replacing
+the field replaces every contract it merges. Composites are the most informative
+lines in the report rather than noise: a composite names the contracts one
+management object owes, and each constituent is a caller, which is a place a
+scenario binds.
 
 An entry marked `# leaf` has a default constructor that takes nothing else out of
 the container, which makes it a boundary of the process rather than a node inside
@@ -185,7 +192,7 @@ not a recommendation — but it is the fact that separates the two kinds of test
   Replacing an interior seam instead deletes the subtree below it, which is the
   code the test was meant to exercise.
 - a **unit test** builds the object under test itself, so `Replacements` plays no
-  part; the interior entries are in the config for their mocks alone.
+  part, and this list has nothing to say about it.
 
 A package holding more than one interface is written one per line, so the marker
 sits on the interface it describes — which is the common case, because a domain
@@ -193,48 +200,49 @@ declares the port of an external adapter next to its own repositories. A single
 interface stays inline, where there is nothing to tell apart:
 
 ```yaml
-mocks:
-  generate:
+replacements:
+  allow:
     gitlab.com/gorib/sql: [Db]  # leaf
 
     gitlab.com/sherpa-erp/sherpa/warehouse/domain/warehouse/service:
       - FacilityRepository
-      - SecurityAdapter  # leaf
+      - SecurityAdapter  # leaf, allowed
       - UnitRepository
 ```
 
-The marker is structural, not advice, and the boundary of the container is not
-always the boundary of the process — it misses in both directions:
+The marker is structural, and the boundary of the container is not always the
+boundary of the process — it misses in both directions:
 
 - reaching another service over gRPC, the leaf is `grpc.ClientConnInterface`,
-  while the seam worth replacing is the generated `*ServiceClient` one hop above
-  it. Mocking the connection would mean answering with encoded protobuf.
+  while the seam worth granting is the generated `*ServiceClient` one hop above
+  it. Faking the connection would mean answering with encoded protobuf.
 - behind a factory that builds its clients from runtime data, the real boundary
-  is below the leaf and outside the container entirely. A mock of it cannot reach
-  the app through `Replacements` at all — it is for a unit test of the factory,
-  and the component test still cuts at the factory's own port.
+  is below the leaf and outside the container entirely. It cannot be reached
+  through `Replacements` at all — that one is for a unit test of the factory, and
+  the component test still cuts at the factory's own port.
 
-A leaf is also not always worth a mock. `sql.Db` is one, but a component test
-hands it a real connection to a test database, so it belongs in `mocks.ignore`
-while still being part of the cut. Same for a port whose production
-implementation already has a null variant selected by data: nothing needs
-replacing, so it is classified and left alone.
+A leaf is also not always worth granting. `sql.Db` is one, but a component test
+wants a real connection to a test database, and a stand-in for a dependency
+carrying a language the code itself generates makes the test check the language
+rather than the behaviour. Same for a leaf that only has to be non-nil for the
+boot — the logger, a consumer, the connection under a replaced client: the
+harness supplies it, so no grant is needed.
+[conventions/component-harness](../conventions/component-harness.md) has the
+reasoning and the stand-ins that ship with each interface.
 
-A leaf that only has to be non-nil for the boot — the logger, a consumer, the
-connection under a replaced client — belongs in `mocks.ignore` too: it takes the
-no-op or the recorder that ships with its interface, not a generated mock. Those
-live next to the interfaces, and
-[conventions/component-harness](../conventions/component-harness.md) lists them.
+None of this is derivable, which is why the list is written by hand.
 
-None of this is derivable, which is why both lists are curated by hand and
-`mocks.generate` accepts any interface — seam or not.
+**Mocks are not generated by waffle.** A test that needs one carries its own
+`//go:generate go tool mockgen` line, which keeps the mock beside its only user
+and inside `go generate ./...`:
 
-Mocks land in one flat package, so two interfaces of the same name from different
-packages would collide. Only those are renamed, by the shortest path suffix that
-tells them apart: `MockVendorsServiceImageClient` next to
-`MockProductServiceImageClient`, while everything unique keeps mockgen's own
-`MockPaymentServiceClient`.
+```go
+//go:generate go tool mockgen -typed -package security -self_package <this package> -destination client_mock_test.go <this package> Client
+```
 
-`make mocks` runs the generation. It is deliberately not part of `make generate`:
-mockgen loads the packages the container names, so it wants a tree that already
-compiles, and the mock set changes far less often than the container does.
+Generating into a `_test.go` destination in the package under test is what makes
+a private field reachable, and it keeps a single-use mock out of the production
+build and out of everyone else's import graph.
+
+`make replacements` runs the check. It is deliberately not part of `make
+generate`: it reads the container, so it wants a tree that already compiles.

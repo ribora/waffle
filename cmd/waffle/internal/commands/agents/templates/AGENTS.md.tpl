@@ -376,12 +376,26 @@ Then edit business logic in `domain/users/service/users.go`.
 - ❌ `protoc` directly — proto generation is driven by the project's proto step (in-module: `go generate ./api/...`; monorepo with `proto_dir` outside the module: a central step such as `make -C <api-dir>`)
 - ❌ Manual `go mod tidy` after every edit — `make .tidy` does it consistently
 - ❌ Add `replace` directives in `go.mod` — coordinate gorib version bumps instead
-- ❌ Touch `di_gen.go`, `*_goverter_gen.go`, `*_whisk_gen.go`, `*_store_gen.go`, `*_mock.go` — they're generated
+- ❌ Touch `di_gen.go`, `*_goverter_gen.go`, `*_whisk_gen.go`, `*_store_gen.go`, `*_mock*.go` — they're generated
 - ❌ Wrap stdlib types in custom abstractions inside `domain/<x>/model/` — model stays pure Go types
 - ❌ Pass `context.Background()` deeper than the entrypoint — propagate ctx from caller
 - ❌ `panic(err)` outside `try.Catch`-wrapped blocks (and try is deprecated — prefer explicit error returns)
 
 ## Rule #11 — specification before code
+
+### Who decides what
+
+Two roles, and this rule is written for the first one.
+
+| | owns | in this repository |
+|---|---|---|
+| the person writing the specification | the cases, the steps, the red-green loop | `tests/feature/` |
+| the person who owns the platform | what may be replaced, and the harness | `waffle.yaml`, `tests/internal/` |
+
+**You work for the first.** The platform is a given: read it, use it, and when it
+does not fit the case, say so and stop. Changing a seam to make a case pass
+substitutes your judgement for the platform owner's, in the one place where the
+whole suite's meaning is fixed.
 
 ### Which task this is
 
@@ -446,7 +460,7 @@ load with no payoff. Follow whatever is already in `tests/`; if nothing is, the
 choice is the human's, not yours.
 
 **One specification per declared contract, not per service.** The
-`interface{ A; B; C }` entry that `waffle make:tests:mocks --suggest` reports for
+`interface{ A; B; C }` entry that `waffle check:tests:replacements --suggest` reports for
 a shared container field *is* the list of contracts a domain owes — one
 constituent per caller, each a place a scenario binds. Measured on one service:
 a domain's management served four callers (gRPC, a consumer, two cron commands)
@@ -462,14 +476,53 @@ cases equals the number of known defects.** A mismatch means a defect got frozen
 or a case is wrong; it caught both mistakes on the two services this was built
 on.
 
+**Name what the case excludes.** For a case of the form "X comes from Y", answer
+which implementation would also pass it and should not. If one exists, the case
+does not discriminate, and it needs variation — two facilities configured
+differently rather than one. Put the answer in the delta list: a reviewer can
+judge a named alternative, but not imagine the whole space of them.
+
+Measured: three cases pinning "the adapter is asked with the facility's own
+config" used one facility with one provider, so an implementation holding a
+single configuration for the whole process passed all three. The second facility
+is what made them cases.
+
 **Fold duplicates along one axis only.** Same setup and same trigger, differing
 only in the expectation, is one case with a column added. Differing in the
 *setup* is not: merging leaves a column empty on most rows, and a sparse column
 means two questions were forced into one table.
 
-**Case titles describe behaviour, not identifiers.** `Create refuses an empty
-code`, not `F2 Create refuses an empty code`. Reference numbers go in the file's
-header comment.
+The same holds when both cases are real. Two cases that differ in one cell and
+carry different information are still one table — written as prose they read as
+the same case twice, and a reviewer spends the attention on telling them apart
+instead of on what they say. Every column of the table has to be substituted
+somewhere: a column nobody reads is a placeholder someone forgot to wire, and
+the rationale it wanted to carry belongs in the comment above, naming the rows
+in order.
+
+**A case must not quietly re-assert a rule that has its own case.** Leaving a
+field out of a request and then asserting the default it acquired tests the
+default rule for a second time, in a case about something else — so when the
+default changes, an unrelated case fails. Fill the cell.
+
+**State the contract facts your cases lean on.** A case whose outcome depends on
+something the contract does and no case says — that writing the same key again
+edits rather than refuses, that a version is identified by a date — smuggles
+that fact in. The reader cannot tell whether it is a rule or an accident, and
+the reviewer cannot approve it. Either give it a case of its own or, when
+another case already implies it, say it in the rule's comment.
+
+**Assert the meaning, not the representation.** "The contract holds version 1"
+pins how a link is stored; "the contract holds terms at 50 percent" pins what
+has to survive, and it fails for the right reason when a later version is used
+instead. Where both are available, the second is the case and the first is an
+implementation detail the specification should not fix.
+
+**Nothing here refers to the baseline.** It is a working artifact and is not
+committed, so a reference to it or to its numbering points at a file the reader
+does not have. Titles describe behaviour — `Create refuses an empty code`, not
+`F2 Create refuses an empty code` — and a comment carries the reason itself
+rather than a pointer to where the reason was argued.
 
 **Language.** Step text and case titles are English — a closed vocabulary, half
 of it wire identifiers. The **reasoning** — case comments and the delta list —
@@ -478,6 +531,13 @@ a translation inside that comparison is unaudited. Domain identifiers are never
 translated: they are the names on the wire.
 
 ### 2. Verification, then approval
+
+**Say that the arithmetic was read, not run.** Every number in the cases was
+computed by reading the code, because the steps do not exist yet, and at that
+volume one of them will be wrong. Saying so at the gate turns the correction
+that follows the first run into an expected event instead of a surprise, and it
+tells the reviewer which parts of the document carry the least confidence.
+Measured: one row of a hundred and four, and the code was right.
 
 A human reads the source document and the delta list, then corrects or approves.
 **No production code before approval.** If a case contains nothing that could
@@ -498,75 +558,83 @@ Then bind to the real container:
 app, err := diogen.InitAppWith(diogen.Replacements{ /* the cut */ })
 ```
 
+#### What may be replaced is given, not chosen
+
+`waffle.yaml` says what a test may supply itself, and it is **read-only for this
+task**:
+
+```yaml
+replacements:
+  allow:
+    <import path>: [<interface>]
+```
+
+A permission list, not a list of exceptions: what it does not name may not be
+replaced, in any form — mock, spy, fake or no-op. `waffle
+check:tests:replacements` reads the `Replacements` literals in the tests and
+fails naming any field the list does not cover, so this is not a convention you
+can drift past. Do not add an entry to it. `--suggest` prints everything the
+containers expose, granted or not; it is a menu for whoever owns the platform,
+not a licence.
+
+`tests/internal/harness/` is read-only too. `Boot` supplies what is a condition
+of loading rather than a choice — the database, the logger, a dead connection
+under a replaced client. Do not change it, and do not move a replacement in
+there because a scenario was inconvenient.
+
+**The form of the replacement is yours**, because it follows from the assertion:
+
+- a **spy** — `pry.Recorder()`, `scribus.Recorder()`,
+  `amqp.NewPublisherRecorder()`, or a hand-written fake that keeps what it was
+  given — is read in a `Then`. A Gherkin step asserts after the call, which is
+  the shape a spy answers.
+- a **mock** (`mockgen`, `.EXPECT()`) declares before the call, so it fits where
+  the expectation belongs to the `Given`. Declare a negative expectation
+  explicitly (`.Times(0)`): an assertion that exists only as a missing line
+  cannot be reviewed.
+- a **no-op** (`pry.Noop()`, `grpcClient.Dead(name)`) keeps nothing, so no `Then`
+  can read it.
+
+The reasoning behind a particular grant is in waffle's
+`docs/conventions/component-harness.md`. Read it to understand what you were
+given; it is not a licence to change it.
+
+#### When the cut does not work, stop
+
+Say what you hit and what the specification needs, and hand it back. Do not work
+around it. The recognisable cases:
+
+- **a case needs a seam `replacements.allow` does not grant.** Name the
+  interface and the assertion it would carry. Adding the grant is not yours.
+- **a `Then` cannot see what it must assert** — the seam is a no-op, or a mock
+  whose expectation would have to be declared before the scenario knows the
+  value.
+- **the boot reaches for the environment or the network.** `InitAppWith` is a
+  flat eager sequence: a node is skipped only if that node itself was supplied,
+  so a replaced typed client still has its connection built beneath it. If the
+  harness has not covered that, it is a gap in the harness.
+- **a case needs a seam that does not exist** — controlled time is the usual
+  one. Where the code compares a fixture's date against `time.Now()`, set the
+  fixture relative to now (`now.AddDate(-1, 0, 0)` for "already started") and no
+  seam is needed. A case that needs time to *move* does need one, and adding it
+  is production code, which this step does not permit.
+- **the cut removes what the case was meant to exercise** — a repository
+  replaced by a mock makes the test check the mock's SQL, not the schema's.
+
 **Do not build the infrastructure by hand.** The harness is a set of libraries:
 `waffle/resource` is the three-method seam (`Provision`/`Migrate`/`Reset`, plus
 an optional `Down`), `sql/sqltest` and `elastic/elastictest` are resources, and
 `waffle/tools/grpc.Serve` puts the container's own handlers on an in-process
-server chaining interceptors with the **same** `UnaryChain` the daemon uses.
-What stays in this service is `Boot`, `Env` and the literal listing its
-resources — `Boot` imports the generated container, so it cannot live elsewhere.
-A run needs no configuration: with no DSN set, `sqltest.Docker` starts a postgres
-container and the next run reuses it. See waffle's
-`docs/conventions/component-harness.md`.
+server chaining interceptors with the **same** `UnaryChain` the daemon uses. A
+run needs no configuration: with no DSN set, `sqltest.Docker` starts a postgres
+container and the next run reuses it.
 
 **Write a boot smoke test before any case**, in `tests/`, next to the scenarios:
-it brings the resources up, boots on the intended cut and asserts only that the
+it brings the resources up, boots on the given cut and asserts only that the
 callers are non-nil. One run then tells you what the cut is missing instead of an
-hour inside a half-written suite, and it catches every eagerly-built node that
-reaches for the environment or the network. (`waffle make:tests:component`
-scaffolds a different, smaller check beside `InitAppWith` with no infrastructure
-at all. Keep both.)
-
-**Replacing a seam does not prune what feeds it.** `InitAppWith` is a flat eager
-sequence: a node is skipped only if that node itself was supplied. Supplying a
-typed gRPC client still builds the `ClientConnInterface` beneath it, and the boot
-still demands that service's host and port. Replace **both** levels — the
-connection so the boot stops reaching for the environment, the typed client
-because that is the surface worth faking. Use `grpcClient.Dead(name)` for the
-connection: reaching it panics, which means the replacement above did not take.
-
-Cut at the **leaves**. `waffle make:tests:mocks --suggest` marks them `# leaf`:
-their default constructor takes nothing else out of the container. Replacing an
-interior seam deletes the subtree below it — the code the specification was
-meant to exercise.
-
-Three kinds of seam inside the cut, and the split is structural:
-
-- one the test **programs** — an outbound client, an adapter — gets a generated
-  mock from `mocks.generate`. Declare a negative expectation explicitly
-  (`.Times(0)`); an assertion that exists only as a missing line cannot be
-  reviewed.
-- one that merely has to be **non-nil for the boot** gets a no-op owned by the
-  harness, not the test. Use the one shipping with the interface — `pry.Noop()`,
-  `grpcClient.Dead(name)` — rather than writing another.
-- one whose calls a **`Then` step inspects** gets a **spy**: `pry.Recorder()`,
-  `scribus.Recorder()`, `amqp.NewPublisherRecorder()`. Hand-write one only for a
-  seam that is yours alone. A *stub* programs a return, a *mock* asserts
-  expectations declared up front, a *spy* records calls for later — and a `Then`
-  needs the third, because the expected value is often read from the database at
-  assertion time and is unknown when the scenario is set up.
-
-**A silent stand-in is only for a leaf the specification says nothing about.**
-`Noop()` is a recorder nobody queries. A no-op consumer absorbs `SetExchange`,
-`SetQueue` and `Bind`, so a typo in a handler's routing key stays green while
-production receives nothing. When a step asserts on what a leaf was told, take
-the recorder.
-
-Three things the `--suggest` marker does not know, which is why a person chooses
-the cut:
-
-- `sql.Db` is a leaf, but the test hands it a real connection to a test
-  database. It stays in `mocks.ignore`, and that entry is authoritative: a
-  stand-in for a dependency carrying a language the code itself generates makes
-  the test check the language rather than the behaviour.
-- a factory that builds its clients from runtime data keeps the real boundary
-  below the leaf and outside the container. A mock of that boundary cannot reach
-  the app through `Replacements` at all; cut at the factory's own port instead.
-- **controlled time is usually not needed.** Where the code compares a fixture's
-  date against `time.Now()`, set the fixture relative to now
-  (`now.AddDate(-1, 0, 0)` for "already started"). Reach for a clock seam only
-  when a case needs time to *move* — and adding one is production code, which
-  this step does not permit yet.
+hour inside a half-written suite. (`waffle make:tests:component` scaffolds a
+different, smaller check beside `InitAppWith` with no infrastructure at all.
+Keep both.)
 
 Still no production code at this stage.
 
@@ -578,6 +646,20 @@ production code and nothing else.
 Never reach green by weakening an assertion, widening a matcher, deleting a case
 or relaxing a fixture. If the test cannot go green without touching the
 specification or the steps, stop — that is the next section, not a licence.
+
+**A case that was never red has not been shown to fail.** It happens when the
+fix and the case land together — a value moved into configuration with the new
+number as its default, a condition widened — and the case is green from its
+first run. Prove it: put the old value back for one run, check that exactly that
+case fails and for its own reason, then restore. Say at the gate that you will,
+and say afterwards that you did. A case nobody has seen fail is a decoration,
+and the red count check above cannot notice it.
+
+**A step can be the thing that is wrong.** A failure that is not on the expected
+list is as likely to be a step that does not send what the case says as a defect
+in the service — a column added to a table and not read, a value formatted for
+the wire the wrong way. Read the failure before believing it: a step defect that
+survives makes the case green while it tests nothing. Measured: one of sixteen.
 
 ### Changing an approved specification
 

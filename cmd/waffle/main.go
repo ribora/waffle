@@ -19,7 +19,7 @@ import (
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/http"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/migrate"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/migration"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/mocks"
+	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/replacements"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/repository"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/scribus"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/service"
@@ -79,7 +79,7 @@ func newCommands() commands {
 	cmds.Add(cmdcommand.New())
 	cmds.Add(converter.New())
 	cmds.Add(component.New())
-	cmds.Add(mocks.New())
+	cmds.Add(replacements.New())
 	cmds.Add(agents.New())
 	return cmds
 }
