@@ -1,11 +1,12 @@
 package grpc
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"net"
 	"os"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -45,26 +46,39 @@ type Server interface {
 }
 
 func NewGrpcCommand(commands []ServiceHandler, interceptors []grpc.Interceptor, streamInterceptors []grpc.StreamInterceptor, command app.BaseCommand, addr net.Addr, logger pry.Logger) *grpcCommand {
-	sortedUnary := append([]grpc.Interceptor(nil), interceptors...)
-	sort.SliceStable(sortedUnary, func(i, j int) bool { return sortedUnary[i].Order() < sortedUnary[j].Order() })
-	mw := make([]baseGrpc.UnaryServerInterceptor, 0, len(sortedUnary))
-	for _, ic := range sortedUnary {
-		mw = append(mw, ic.Run())
-	}
-	sortedStream := append([]grpc.StreamInterceptor(nil), streamInterceptors...)
-	sort.SliceStable(sortedStream, func(i, j int) bool { return sortedStream[i].Order() < sortedStream[j].Order() })
-	streamMw := make([]baseGrpc.StreamServerInterceptor, 0, len(sortedStream))
-	for _, ic := range sortedStream {
-		streamMw = append(streamMw, ic.Run())
-	}
 	return &grpcCommand{
 		commands:    commands,
-		middlewares: mw,
-		streamMw:    streamMw,
+		middlewares: UnaryChain(interceptors),
+		streamMw:    StreamChain(streamInterceptors),
 		addr:        addr,
 		BaseCommand: command,
 		logger:      logger,
 	}
+}
+
+// Ascending Order(), smaller outermost. Exported so an in-process test server
+// chains them identically — getting this order wrong has already cost one bug.
+func UnaryChain(interceptors []grpc.Interceptor) []baseGrpc.UnaryServerInterceptor {
+	return chain[baseGrpc.UnaryServerInterceptor](interceptors)
+}
+
+func StreamChain(interceptors []grpc.StreamInterceptor) []baseGrpc.StreamServerInterceptor {
+	return chain[baseGrpc.StreamServerInterceptor](interceptors)
+}
+
+type ordered[T any] interface {
+	Order() int
+	Run() T
+}
+
+func chain[T any, I ordered[T]](interceptors []I) []T {
+	sorted := slices.Clone(interceptors)
+	slices.SortStableFunc(sorted, func(a, b I) int { return cmp.Compare(a.Order(), b.Order()) })
+	built := make([]T, 0, len(sorted))
+	for _, interceptor := range sorted {
+		built = append(built, interceptor.Run())
+	}
+	return built
 }
 
 type grpcCommand struct {

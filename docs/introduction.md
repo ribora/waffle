@@ -87,6 +87,7 @@ You pick which commands your service needs by adding the corresponding blank imp
 ```
 waffle/
 ├── app/          Core application lifecycle and command system
+├── resource/     The component-harness seam — external systems a test runs against
 ├── tools/
 │   ├── http/     HTTP server command and middleware registry
 │   ├── grpc/     gRPC server command, middleware and error mapping
@@ -94,3 +95,11 @@ waffle/
 │   └── scribus/  RabbitMQ consumer command
 └── cmd/waffle/   Scaffolding CLI (waffle init:service, make:domain, …)
 ```
+
+## Testing
+
+A component test boots the real container over real infrastructure and replaces
+only the leaves. The shared pieces live next to what they describe — `sql/sqltest`,
+`elastic/elastictest`, `pry.Recorder()`, `scribus.Recorder()`,
+`tools/grpc.Serve` — behind the three-method seam in `waffle/resource`. See
+[conventions/component-harness](conventions/component-harness.md).

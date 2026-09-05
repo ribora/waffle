@@ -59,8 +59,10 @@ type candidate struct {
 }
 
 // unlisted are the interfaces a container exposes that waffle.yaml mentions in
-// neither mocks.generate nor mocks.ignore. Composite seams are left out: no
-// single mock satisfies interface{A; B}, so suggesting one would be a lie.
+// neither mocks.generate nor mocks.ignore. Composite seams are left out of this
+// list because no single mock satisfies interface{A; B} — but they are not
+// noise: they are reported separately, since a composite names the contracts one
+// management object owes.
 func unlisted(seams []command.Seam, cfg command.Config) []candidate {
 	var out []candidate
 	seen := map[string]bool{}
@@ -161,8 +163,11 @@ func suggestion(cands []candidate, merged []command.Seam, module string) string 
 	b.WriteString("# the object under test yourself and Replacements plays no part.\n")
 
 	if len(merged) > 0 {
-		b.WriteString("\n# Composite seams — interface{A; B}, which no single mock satisfies.\n")
-		b.WriteString("# Mock a constituent for a handler unit test; it cannot go into Replacements.\n")
+		b.WriteString("\n# Composite seams — one management object serving several declared\n")
+		b.WriteString("# contracts. This is the list of specifications the domain owes: each\n")
+		b.WriteString("# constituent is a caller, and a caller is a place a scenario binds.\n")
+		b.WriteString("# No single mock satisfies interface{A; B}, so mock a constituent for a\n")
+		b.WriteString("# handler unit test; the composite itself is read, not replaced.\n")
 		for _, seam := range merged {
 			// Shortened for reading, but only as far as it stays unambiguous:
 			// two constituents can sit in packages that share a last segment.

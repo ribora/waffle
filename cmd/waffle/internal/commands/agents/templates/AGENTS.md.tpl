@@ -7,12 +7,10 @@ Instructions for AI coding agents working in this repository. This file is
 gitlab.com/gorib/waffle@latest`) — framework conventions change between
 versions and a stale AGENTS.md will steer you toward deprecated patterns.
 
-For service-specific instructions (business rules, custom commands, known
-quirks), edit `CONTRIBUTING.md` instead — this file does not touch it.
-
-**Read `CONTRIBUTING.md` before starting, if it exists.** It overrides this file
-wherever the two disagree, because it was written for this service and this one
-was not.
+**Read `CONTRIBUTING.md` first, if it exists.** It holds service-specific
+instructions — business rules, custom commands, known quirks — and it overrides
+this file wherever the two disagree. `waffle agents` never touches it, so
+service-specific notes go there and not here.
 
 ## This service
 
@@ -185,6 +183,10 @@ app, err := diogen.InitAppWith(diogen.Replacements{
 The field's type is the interface the value is wired as, so a fake that stops
 satisfying it fails to compile at the line that supplies it.
 
+**It does not prune what fed that constructor** — anything eagerly built that
+touches the environment or the network has to be in the cut too. See Rule #11,
+"Steps and fixtures".
+
 - ✅ Use `InitAppWith` for component tests that need the real graph and a few fakes
 - ❌ Do **not** add `if env.Value("APP_ENV") == "test"` branches to `InitDi()` —
   that puts test knowledge into production wiring
@@ -247,7 +249,7 @@ whisk warns when it does. The directory is `validate.storage` in `whisk.yaml`.
 
 ### Escape hatches
 
-Reaching for one is normal, not a failure of the generator:
+Sanctioned — reaching for one is not a failure of the generator:
 
 | When | Hatch |
 |---|---|
@@ -389,60 +391,182 @@ Then edit business logic in `domain/users/service/users.go`.
 | a **code defect** at the level of a function — code that broke, not behaviour that was contradictory | a table test where the defect is, then the fix. None of the cycle below |
 | a **spike** — the requirements are a sketch and the point is to find out what is possible | exempt from the cycle, but its output is a specification, not merged code. The spike's code is thrown away and rewritten through the cycle |
 
+### 0. When the code came first
+
+This service has behaviour nobody wrote down, so the first change to touch it
+has nothing to sit inside. Derive a **baseline** from the code first: what it
+does today, per declared contract, in the notation the cases will use.
+
+A baseline read out of code inherits the code's defects, so **every case carries
+a verdict**, and none is a boundary until it has one:
+
+- **✓** confirmed as intended — a regression boundary.
+- **✗** confirmed defect — the case that pins it asserts the *intended*
+  behaviour and is therefore red until the fix lands.
+- **?** no verdict, so not part of the boundary. Only the human who owns the
+  behaviour moves it. Do not guess, and do not mark ✓ because the code is old.
+
+**Adjudication is the human's.** Deriving cases is the cheap half. Expect to be
+wrong about which are defects: on the two services this was built on, several
+proposed defects were deliberate business rules and one could not be reproduced.
+
+**When a defect is fixed the case flips ✗ → ✓** and its prose is rewritten to
+describe the fixed behaviour, with one line saying what used to be wrong.
+
+**Do not state counts you will not maintain.** "22 cases, 6 defects" in a header
+is wrong within two edits, and a stale count reads as current.
+
 ### 1. Requirements in, specification out
 
-From the written requirements produce two artifacts, and nothing else yet:
+Produce two artifacts and nothing else yet:
 
 - **an executable specification** — a component test today, a `.feature` file
-  once this service has a scenario harness (`CONTRIBUTING.md` says whether it
-  does). The **minimum** set of cases that pins down what the requirements left
-  open, not an exhaustive matrix: a set nobody can read carefully is worse than
-  no set at all, because approving it becomes a nod rather than a decision.
+  once this service has a harness wired. Look in `tests/`; that is the fact,
+  whatever any document says. See "Steps and fixtures". The **minimum** set that pins
+  down what the requirements left open, not an exhaustive matrix.
 - **a delta list** — every place the specification says something the source
-  document does not, each pointing at the place in the document it fills in.
-  Include what was deliberately left **out** of scope: a reviewer comparing two
-  documents will catch a wrong answer and miss a missing question.
+  document does not, each pointing at the place it fills in. Include what was
+  deliberately left **out** of scope: comparing two documents catches a wrong
+  answer and misses a missing question.
 
-A delta list is not a list of decisions in general. It is the difference against
-the source, which is what makes reviewing it a bounded job rather than holding
-the whole document in your head.
+The two go to different places. The specification is committed; the delta list
+belongs with the ticket, because it is finished at approval. The reasoning for
+each case is written **into** the specification.
 
 For a **design defect** the deliverable is the set of cases that cannot all pass
-at once. The contradiction has to be visible in the artifacts rather than argued
-in prose — if it cannot be written as two cases, it is not yet understood.
+at once. If the contradiction cannot be written as two cases, it is not yet
+understood.
+
+**The specification is one artifact, not prose plus code.** Do not produce a
+Markdown description and an implementation beside it — that needs verifying
+twice, and the second comparison is the one nobody does.
+
+**One notation per service.** Two ways of writing cases in one repository is
+load with no payoff. Follow whatever is already in `tests/`; if nothing is, the
+choice is the human's, not yours.
+
+**One specification per declared contract, not per service.** The
+`interface{ A; B; C }` entry that `waffle make:tests:mocks --suggest` reports for
+a shared container field *is* the list of contracts a domain owes — one
+constituent per caller, each a place a scenario binds. Measured on one service:
+a domain's management served four callers (gRPC, a consumer, two cron commands)
+with no overlap at all, so a specification written against the gRPC operations
+alone would have covered one contract in four.
+
+### Writing the cases
+
+**A case for a known defect asserts the behaviour you want, so it is red.**
+Writing what the code currently does turns a defect into a green regression
+boundary. Mechanical check before handing anything over: **the number of red
+cases equals the number of known defects.** A mismatch means a defect got frozen
+or a case is wrong; it caught both mistakes on the two services this was built
+on.
+
+**Fold duplicates along one axis only.** Same setup and same trigger, differing
+only in the expectation, is one case with a column added. Differing in the
+*setup* is not: merging leaves a column empty on most rows, and a sparse column
+means two questions were forced into one table.
+
+**Case titles describe behaviour, not identifiers.** `Create refuses an empty
+code`, not `F2 Create refuses an empty code`. Reference numbers go in the file's
+header comment.
+
+**Language.** Step text and case titles are English — a closed vocabulary, half
+of it wire identifiers. The **reasoning** — case comments and the delta list —
+is written in the language of the requirements it is verified against, because
+a translation inside that comparison is unaudited. Domain identifiers are never
+translated: they are the names on the wire.
 
 ### 2. Verification, then approval
 
-A human reads the source document and the delta list, and either corrects them or
-approves. Approval is the go-ahead: **no production code before it.**
-
-This is the load-bearing step. A specification written by an agent and skimmed by
-a human turns the agent's guess into the authoritative spec, which is worse than
-having no spec. If a case contains nothing that could have gone another way, it
-did not need to be a case.
+A human reads the source document and the delta list, then corrects or approves.
+**No production code before approval.** If a case contains nothing that could
+have gone another way, it did not need to be a case.
 
 ### 3. Steps and fixtures
 
-Bind the specification to the real container:
+**Bind at the declared contract** — the operation: a handler in `cmd`, a
+consumer command, a cron command. Not the management interface below it: one
+layer short skips conversion and the error→code map, and makes stand-ins invent
+database behaviour (uniqueness, not-found) that belongs to the schema. Fixtures
+go in through the container's own repositories, never through the operation under
+test.
+
+Then bind to the real container:
 
 ```go
 app, err := diogen.InitAppWith(diogen.Replacements{ /* the cut */ })
 ```
 
+**Do not build the infrastructure by hand.** The harness is a set of libraries:
+`waffle/resource` is the three-method seam (`Provision`/`Migrate`/`Reset`, plus
+an optional `Down`), `sql/sqltest` and `elastic/elastictest` are resources, and
+`waffle/tools/grpc.Serve` puts the container's own handlers on an in-process
+server chaining interceptors with the **same** `UnaryChain` the daemon uses.
+What stays in this service is `Boot`, `Env` and the literal listing its
+resources — `Boot` imports the generated container, so it cannot live elsewhere.
+A run needs no configuration: with no DSN set, `sqltest.Docker` starts a postgres
+container and the next run reuses it. See waffle's
+`docs/conventions/component-harness.md`.
+
+**Write a boot smoke test before any case**, in `tests/`, next to the scenarios:
+it brings the resources up, boots on the intended cut and asserts only that the
+callers are non-nil. One run then tells you what the cut is missing instead of an
+hour inside a half-written suite, and it catches every eagerly-built node that
+reaches for the environment or the network. (`waffle make:tests:component`
+scaffolds a different, smaller check beside `InitAppWith` with no infrastructure
+at all. Keep both.)
+
+**Replacing a seam does not prune what feeds it.** `InitAppWith` is a flat eager
+sequence: a node is skipped only if that node itself was supplied. Supplying a
+typed gRPC client still builds the `ClientConnInterface` beneath it, and the boot
+still demands that service's host and port. Replace **both** levels — the
+connection so the boot stops reaching for the environment, the typed client
+because that is the surface worth faking. Use `grpcClient.Dead(name)` for the
+connection: reaching it panics, which means the replacement above did not take.
+
 Cut at the **leaves**. `waffle make:tests:mocks --suggest` marks them `# leaf`:
-their default constructor takes nothing else out of the container, so they are
-the boundary of the process. Replacing an interior seam instead deletes the
-subtree below it — the code the specification was meant to exercise.
+their default constructor takes nothing else out of the container. Replacing an
+interior seam deletes the subtree below it — the code the specification was
+meant to exercise.
 
-Two things the marker does not know, which is why the cut is chosen by a person:
+Three kinds of seam inside the cut, and the split is structural:
 
-- `sql.Db` is a leaf, but a test hands it a real connection to a test database,
-  not a mock.
+- one the test **programs** — an outbound client, an adapter — gets a generated
+  mock from `mocks.generate`. Declare a negative expectation explicitly
+  (`.Times(0)`); an assertion that exists only as a missing line cannot be
+  reviewed.
+- one that merely has to be **non-nil for the boot** gets a no-op owned by the
+  harness, not the test. Use the one shipping with the interface — `pry.Noop()`,
+  `grpcClient.Dead(name)` — rather than writing another.
+- one whose calls a **`Then` step inspects** gets a **spy**: `pry.Recorder()`,
+  `scribus.Recorder()`, `amqp.NewPublisherRecorder()`. Hand-write one only for a
+  seam that is yours alone. A *stub* programs a return, a *mock* asserts
+  expectations declared up front, a *spy* records calls for later — and a `Then`
+  needs the third, because the expected value is often read from the database at
+  assertion time and is unknown when the scenario is set up.
+
+**A silent stand-in is only for a leaf the specification says nothing about.**
+`Noop()` is a recorder nobody queries. A no-op consumer absorbs `SetExchange`,
+`SetQueue` and `Bind`, so a typo in a handler's routing key stays green while
+production receives nothing. When a step asserts on what a leaf was told, take
+the recorder.
+
+Three things the `--suggest` marker does not know, which is why a person chooses
+the cut:
+
+- `sql.Db` is a leaf, but the test hands it a real connection to a test
+  database. It stays in `mocks.ignore`, and that entry is authoritative: a
+  stand-in for a dependency carrying a language the code itself generates makes
+  the test check the language rather than the behaviour.
 - a factory that builds its clients from runtime data keeps the real boundary
   below the leaf and outside the container. A mock of that boundary cannot reach
-  the app through `Replacements` at all; the component test cuts at the factory's
-  own port, and the boundary below it is mocked only for a unit test of the
-  factory.
+  the app through `Replacements` at all; cut at the factory's own port instead.
+- **controlled time is usually not needed.** Where the code compares a fixture's
+  date against `time.Now()`, set the fixture relative to now
+  (`now.AddDate(-1, 0, 0)` for "already started"). Reach for a clock seam only
+  when a case needs time to *move* — and adding one is production code, which
+  this step does not permit yet.
 
 Still no production code at this stage.
 
@@ -452,27 +576,26 @@ The specification and the steps are **frozen** at approval. The loop changes
 production code and nothing else.
 
 Never reach green by weakening an assertion, widening a matcher, deleting a case
-or relaxing a fixture. If the test cannot be made green without touching the
+or relaxing a fixture. If the test cannot go green without touching the
 specification or the steps, stop — that is the next section, not a licence.
 
 ### Changing an approved specification
 
 Only through the human who approved it, whatever the reason. **Never on your own
-judgement.** Two things trigger it:
+judgement.** Two triggers:
 
 - an **internal logical conflict**: two approved cases cannot both hold. State
   the conflict and stop.
 - an **external constraint**: the case needs data this service does not own, or
-  an ordering the transport does not guarantee. Not a contradiction, but not
-  implementable either. State the constraint and stop.
+  an ordering the transport does not guarantee. State the constraint and stop.
 
 The human decides what changes — the specification, the scope, or the design.
 
-### The gate
+### What the merge request carries
 
-A merge request carries a link to the approved specification and its delta list.
-A rule that nothing checks is a rule new joiners learn to skip, because skipping
-is faster and nothing happens.
+The **specification**, as a diff, and a **link to the ticket** where the delta
+list was argued. Approval itself is not machine-checkable: a pipeline can verify
+that a link is present, not that anybody read anything.
 
 ## Reference
 
@@ -483,5 +606,11 @@ is faster and nothing happens.
 
 ## Service-specific notes
 
-For instructions specific to **this** service (business rules, custom commands,
-known quirks), edit `CONTRIBUTING.md`. `waffle agents` does not touch it.
+`CONTRIBUTING.md` holds instructions specific to **this** service — business
+rules, custom commands, known quirks. `waffle agents` does not touch it, and a
+service where this file is enough does not need one at all.
+
+**It belongs to the humans who own the service. Do not create or edit it unless
+you were asked to.** When you learn something that belongs there — a convention
+you had to infer, a quirk that cost you a wrong turn — say so and quote what you
+would write. Whether it gets written is theirs to decide.

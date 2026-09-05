@@ -319,6 +319,204 @@ func TestWrittenConfigLoadsBack(t *testing.T) {
 	}
 }
 
+// The default is part of the contract with every service: mocks live under the
+// test tree, and deliberately not under tests/internal/, where Go's internal
+// rule would stop a table test next to the defect from importing them.
+func TestDefaultDirIsUnderTests(t *testing.T) {
+	inModule(t)
+
+	cfg, err := command.New("x", "", templates, nil).ProjectConfig(module)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join("tests", "mocks"); cfg.Mocks.Dir != want {
+		t.Errorf("default mocks.dir = %q, want %q", cfg.Mocks.Dir, want)
+	}
+	if strings.Contains(cfg.Mocks.Dir, "internal") {
+		t.Errorf("default mocks.dir = %q, must not sit under internal/", cfg.Mocks.Dir)
+	}
+}
+
+func TestPruneRemovesOnlyStaleGeneratedMocks(t *testing.T) {
+	dir := t.TempDir()
+
+	wanted := filepath.Join(dir, "wanted.go")
+	stale := filepath.Join(dir, "stale.go")
+	handwritten := filepath.Join(dir, "helper.go")
+
+	write(t, wanted, generatedHeader+"\n\npackage mocks\n")
+	write(t, stale, generatedHeader+"\n\npackage mocks\n")
+	// Same directory, not generated: a command that deleted this would be
+	// deleting files it does not recognise.
+	write(t, handwritten, "package mocks\n\n// hand-written, stays\n")
+
+	removed, err := prune(dir, []invocation{{Destination: wanted}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if removed != 1 {
+		t.Errorf("removed = %d, want 1", removed)
+	}
+
+	if _, err := os.Stat(wanted); err != nil {
+		t.Errorf("the wanted mock was removed: %v", err)
+	}
+	if _, err := os.Stat(stale); !os.IsNotExist(err) {
+		t.Errorf("the stale mock survived: err = %v", err)
+	}
+	if _, err := os.Stat(handwritten); err != nil {
+		t.Errorf("a hand-written file in the same directory was removed: %v", err)
+	}
+}
+
+// A service can classify every seam as ignore. That is a decision, and the
+// mocks an earlier decision left behind still have to go.
+func TestPruneRemovesEverythingWhenNothingIsWanted(t *testing.T) {
+	dir := t.TempDir()
+	generated := filepath.Join(dir, "client.go")
+	write(t, generated, generatedHeader+"\n\npackage mocks\n")
+
+	removed, err := prune(dir, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if removed != 1 {
+		t.Errorf("removed = %d, want 1", removed)
+	}
+	if _, err := os.Stat(generated); !os.IsNotExist(err) {
+		t.Errorf("the mock survived: err = %v", err)
+	}
+}
+
+// The default moved, and prune only knows the directory it writes to. Without
+// this the old mocks stay behind, compiling and importable.
+func TestTheOldDefaultDirectoryIsReported(t *testing.T) {
+	t.Chdir(t.TempDir())
+	if err := os.MkdirAll(oldDefaultDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cfg := command.Config{}
+	cfg.Mocks.Dir = filepath.Join("tests", "mocks")
+
+	if !staleDefaultDir(cfg, "") {
+		t.Fatal("the leftover directory was not noticed")
+	}
+}
+
+func TestNothingIsReportedWithoutTheOldDirectory(t *testing.T) {
+	t.Chdir(t.TempDir())
+	cfg := command.Config{}
+	cfg.Mocks.Dir = filepath.Join("tests", "mocks")
+
+	if staleDefaultDir(cfg, "") {
+		t.Fatal("reported a directory that is not there")
+	}
+}
+
+// An explicit --dir or a configured mocks.dir is a decision already made.
+func TestNothingIsReportedWhenTheDirectoryWasChosen(t *testing.T) {
+	t.Chdir(t.TempDir())
+	if err := os.MkdirAll(oldDefaultDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cfg := command.Config{}
+	cfg.Mocks.Dir = filepath.Join("tests", "mocks")
+
+	if staleDefaultDir(cfg, "elsewhere") {
+		t.Error("--dir was given, so nothing is left over by accident")
+	}
+
+	cfg.Mocks.Dir = oldDefaultDir
+	if staleDefaultDir(cfg, "") {
+		t.Error("mocks.dir still points there, so nothing is stale")
+	}
+}
+
+func TestDirStaysInsideTheProject(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+
+	for _, dir := range []string{
+		"../other-service/tests/mocks",
+		"..",
+		filepath.Join(filepath.Dir(root), "elsewhere"),
+	} {
+		if _, err := insideProject(dir); err == nil {
+			t.Errorf("%s was accepted", dir)
+		}
+	}
+}
+
+// filepath.Base(".") is "." — mockgen would fail on it as a package name, with
+// nothing pointing back here.
+func TestDirRefusesTheProjectRoot(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	_, err := insideProject(".")
+
+	if err == nil {
+		t.Fatal("\".\" was accepted")
+	}
+}
+
+func TestDirAcceptsAPathInsideAndMakesItRelative(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+
+	for _, dir := range []string{"tests/mocks", "./tests/mocks", filepath.Join(root, "tests", "mocks")} {
+		got, err := insideProject(dir)
+		if err != nil {
+			t.Fatalf("%s: %v", dir, err)
+		}
+		if got != filepath.Join("tests", "mocks") {
+			t.Errorf("%s resolved to %s", dir, got)
+		}
+	}
+}
+
+func TestPruneIsQuietWhenTheDirectoryWasNeverCreated(t *testing.T) {
+	removed, err := prune(filepath.Join(t.TempDir(), "absent"), nil)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if removed != 0 {
+		t.Errorf("removed = %d, want 0", removed)
+	}
+}
+
+// A file shorter than the header must not be mistaken for one, and a file that
+// merely mentions the header line is not generated either.
+func TestIsGeneratedReadsOnlyThePrefix(t *testing.T) {
+	dir := t.TempDir()
+
+	cases := map[string]struct {
+		body string
+		want bool
+	}{
+		"generated":  {generatedHeader + "\n\npackage mocks\n", true},
+		"empty":      {"", false},
+		"tiny":       {"//\n", false},
+		"mentions":   {"package mocks\n\n// " + generatedHeader + "\n", false},
+		"no comment": {"package mocks\n", false},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			file := filepath.Join(dir, name+".go")
+			write(t, file, tc.body)
+			got, err := isGenerated(file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != tc.want {
+				t.Errorf("isGenerated(%q) = %v, want %v", tc.body, got, tc.want)
+			}
+		})
+	}
+}
+
 func inModule(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()

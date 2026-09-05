@@ -187,7 +187,7 @@ type Consumer interface {
     SetDsn(dsn string) error
     SetExchange(exchange string) error
     SetQueue(queue string) error
-    SetRoutingKey(routingKey string) error
+    Bind(routingKey string) error
     SetPageSize(pageSize uint16) error
     SetFlushInterval(flushInterval time.Duration) error
     SetReconnectInterval(interval time.Duration) error
@@ -195,4 +195,40 @@ type Consumer interface {
 }
 ```
 
-The AMQP consumer from `gitlab.com/gorib/amqp`. Configured and started by `scribusCommand.Run`. You do not implement this — it is provided by the registrations in `tools/scribus/init.go` (see [Scribus Tool](../tools/scribus.md) for setup).
+The AMQP consumer from `gitlab.com/gorib/amqp`. Configured and started by `scribusCommand.Run`, with `Bind` called once per routing key a handler declares. In production you do not implement this — it comes from the registrations in `tools/scribus/init.go` (see [Scribus Tool](../tools/scribus.md) for setup). A component test replaces it with `scribus.Recorder()`, which keeps that wiring and delivers through the handler the command installed (see [Component harness](../conventions/component-harness.md)).
+
+---
+
+## resource package
+
+### Resource
+
+```go
+type Resource interface {
+    Provision(ctx context.Context) error
+    Migrate(ctx context.Context) error
+    Reset(ctx context.Context) error
+}
+```
+
+An external system a component test runs against for real. The package names no system and imports no client, so an implementation can live anywhere — `sql/sqltest`, `elastic/elastictest`, or next to a client of your own. `Set` (from `resource.New`) runs `Up` once per run and `Reset` between scenarios. See [Component harness](../conventions/component-harness.md).
+
+### Named
+
+```go
+type Named interface {
+    Name() string
+}
+```
+
+Optional. A resource with a name gets it quoted in errors, which matters once a suite lists several.
+
+### Ephemeral
+
+```go
+type Ephemeral interface {
+    Down(ctx context.Context) error
+}
+```
+
+Optional. A resource with something to remove when the run ends — `sqltest.Ephemeral()` drops its database. Call `Set.Down` once per process, from `TestMain`.

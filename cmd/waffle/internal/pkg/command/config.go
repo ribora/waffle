@@ -63,8 +63,14 @@ func (c *Command) ProjectConfig(projectName string) (Config, error) {
 	if cfg.Mapper == "" {
 		cfg.Mapper = "goverter"
 	}
+	// Under the test tree, because that is the only thing that imports mocks —
+	// but deliberately not under tests/internal/: Go's internal rule would then
+	// scope them to the tests/ subtree, and a table test living next to the
+	// defect it pins (domain/x/service/x_test.go) could not import them at all.
+	// That colocated test is exactly where a function-level defect belongs, so
+	// the visibility has to stay module-wide.
 	if cfg.Mocks.Dir == "" {
-		cfg.Mocks.Dir = filepath.Join("internal", "dimock")
+		cfg.Mocks.Dir = filepath.Join("tests", "mocks")
 	}
 
 	if cfg.Mapper != "dto" && cfg.Mapper != "goverter" {

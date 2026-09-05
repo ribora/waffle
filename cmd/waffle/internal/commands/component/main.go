@@ -15,7 +15,7 @@ var templates embed.FS
 
 func New() *cmd {
 	return &cmd{command.New("make:tests:component",
-		"Scaffold a component test that boots the container through InitAppWith", templates, nil)}
+		"Scaffold a container smoke test next to InitAppWith — no infrastructure", templates, nil)}
 }
 
 type cmd struct {

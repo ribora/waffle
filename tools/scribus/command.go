@@ -223,13 +223,16 @@ func (c *scribusCommand) Usage(ctx context.Context) error {
 	if *page != 0 {
 		_ = c.consumer.SetPageSize(*page)
 	}
-	if len(opts.Args()) > 0 {
-		if len(opts.Args()) != 4 {
-			return errors.New("unexpected connection parameters count")
+	// Getopt has already taken the command name off the front, so the three
+	// parameters of SetParameters start at zero. Counting from one made the
+	// documented form — dsn, exchange, queue — fail as the wrong count.
+	if args := opts.Args(); len(args) > 0 {
+		if len(args) != 3 {
+			return fmt.Errorf("expected 3 connection parameters (dsn exchange queue), got %d", len(args))
 		}
-		_ = c.consumer.SetDsn(opts.Args()[1])
-		_ = c.consumer.SetExchange(opts.Args()[2])
-		_ = c.consumer.SetQueue(opts.Args()[3])
+		_ = c.consumer.SetDsn(args[0])
+		_ = c.consumer.SetExchange(args[1])
+		_ = c.consumer.SetQueue(args[2])
 	}
 	return nil
 }

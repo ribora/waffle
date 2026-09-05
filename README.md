@@ -46,6 +46,7 @@ And leaving is as cheap as arriving. Delete a `//go:generate` line and the file 
 - [Input Parsing](docs/conventions/input-parsing.md) — Binding and validation by codegen, custom tags, escape hatches
 - [DTO Conversion](docs/conventions/dto-conversion.md) — goverter pattern, project-wide whitelist of conversion helpers
 - [AI-native development](docs/conventions/ai-native.md) — Specification before code, the component-test cut, and what is not built yet
+- [Component harness](docs/conventions/component-harness.md) — The resource seam, real postgres and elasticsearch, recorders instead of silent stand-ins
 
 ### Reference
 - [Interfaces](docs/reference/interfaces.md) — Full interface listing for all packages

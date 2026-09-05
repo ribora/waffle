@@ -23,7 +23,7 @@ go install gitlab.com/gorib/waffle/cmd/waffle@latest
 | `waffle make:domain:command <name> <command>` | Add a CLI subcommand scoped to a domain |
 | `waffle make:converter <path>` | Scaffold a goverter convert.go at the given path |
 | `waffle make:tests:component` | Scaffold a component test that boots the container through `InitAppWith` ([details](../di/overview.md#testing-with-the-container)) |
-| `waffle make:tests:mocks [--suggest \| --write \| --check]` | Generate the mocks listed in `waffle.yaml`; the flags list, record and enforce what the container exposes |
+| `waffle make:tests:mocks [--suggest \| --write \| --check] [--dir=<path>]` | Generate the mocks listed in `waffle.yaml` into `tests/mocks`; the flags list, record and enforce what the container exposes |
 | `waffle agents` | Regenerate `AGENTS.md` after a waffle upgrade ([details](agents.md)) |
 
 `--help` on any of them prints its description and operands. A failing command
@@ -105,7 +105,7 @@ Project-level conventions live in `waffle.yaml`, next to `go.mod`. `init:service
 | `mapper` | `"goverter"` | `"goverter"` scaffolds a goverter `convert/convert.go`; `"dto"` scaffolds nothing extra (hand-written conversions) |
 | `mocks.generate` | empty | Interfaces to generate mocks for, keyed by import path: `gitlab.com/gorib/sql: [Db]` |
 | `mocks.ignore` | empty | Seams deliberately left without a mock, same shape; `--check` passes once every seam is in one of the two |
-| `mocks.dir` | `internal/dimock` | Where the generated mocks go, one flat package |
+| `mocks.dir` | `tests/mocks` | Where the generated mocks go, one flat package; `--dir` overrides it |
 
 `<service>` is the last path segment of the module name. A missing `waffle.yaml`, or one missing some keys, behaves exactly like a file containing only the defaults above — the two are indistinguishable to every command. An unknown key (e.g. a typo) is a hard error, and an invalid `mapper` value (anything other than `dto` or `goverter`) is a hard error.
 
@@ -153,10 +153,28 @@ generic interface mockgen actually mocks.
 | `--write` | add those to `mocks.generate`, leaving the rest of the file untouched |
 | `--check` | exit non-zero if there are any, so CI notices a new dependency nobody classified |
 | `--container=<path>` | read this generated file instead of discovering it; repeatable |
+| `--dir=<path>` | write the mocks here instead of `mocks.dir`; only meaningful without the flags above, which write nothing |
+
+Mocks land in `mocks.dir`, which defaults to **`tests/mocks`** — under the test
+tree, because that is what imports them, and deliberately *not* under
+`tests/internal/`: Go's internal rule would then scope them to the `tests/`
+subtree, and a table test living next to the defect it pins
+(`domain/x/service/x_test.go`) could not import them at all. That colocated test
+is exactly where a function-level defect belongs, so the visibility stays
+module-wide. The package name follows the directory's last segment.
+
+A run also **removes** mocks that `mocks.generate` no longer asks for —
+otherwise an interface moved to `mocks.ignore` leaves its mock behind,
+compiling and importable, with nothing to say it is stale. Only files carrying
+mockgen's generated header are candidates, so a hand-written helper sharing the
+directory survives.
 
 Composite seams — `interface{ A; B }`, produced when registrations share a
-container field — are reported separately and never suggested: no single mock
-satisfies them. Mock one constituent for a handler unit test instead.
+container field — are reported separately, because no single mock satisfies
+them. They are the most informative lines in the report rather than noise: a
+composite names the contracts one management object owes, and each constituent
+is a caller, which is a place a scenario binds. Mock one constituent for a
+handler unit test; the composite itself is read, not replaced.
 
 An entry marked `# leaf` has a default constructor that takes nothing else out of
 the container, which makes it a boundary of the process rather than a node inside
@@ -201,6 +219,12 @@ hands it a real connection to a test database, so it belongs in `mocks.ignore`
 while still being part of the cut. Same for a port whose production
 implementation already has a null variant selected by data: nothing needs
 replacing, so it is classified and left alone.
+
+A leaf that only has to be non-nil for the boot — the logger, a consumer, the
+connection under a replaced client — belongs in `mocks.ignore` too: it takes the
+no-op or the recorder that ships with its interface, not a generated mock. Those
+live next to the interfaces, and
+[conventions/component-harness](../conventions/component-harness.md) lists them.
 
 None of this is derivable, which is why both lists are curated by hand and
 `mocks.generate` accepts any interface — seam or not.

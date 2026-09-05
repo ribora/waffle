@@ -8,15 +8,22 @@ import (
 	"github.com/fatih/color"
 )
 
-// Scaffolding stays idempotent by never overwriting, which makes a second run look
-// exactly like a run that did nothing. So it says what it left alone: otherwise a
-// changed template silently leaves half a domain on the previous version.
+// Scaffolding never overwrites, so a second run looks like one that did nothing.
+// Saying what was left alone is how a changed template stops being invisible.
 var output io.Writer = os.Stderr
 
 var (
-	addMark  = color.New(color.FgGreen).Sprint("+")
-	keepMark = color.New(color.FgYellow).Sprint("=")
+	addMark    = color.New(color.FgGreen).Sprint("+")
+	keepMark   = color.New(color.FgYellow).Sprint("=")
+	removeMark = color.New(color.FgRed).Sprint("-")
+	warnMark   = color.New(color.FgYellow).Sprint("!")
 )
+
+// Not an error: the run succeeded, and this is about something it deliberately
+// did not touch.
+func ReportWarning(text string) {
+	_, _ = fmt.Fprintf(output, "  %s %s\n", warnMark, text)
+}
 
 func reportCreated(paths []string) {
 	for _, path := range paths {
@@ -30,9 +37,8 @@ func reportKept(paths []string) {
 	}
 }
 
-// For a caller that decides for itself that a target is already there: a migration
-// carries a timestamp in its name and cannot be recognised by the name it would get
-// on this run.
+// For a caller that decides for itself: a migration carries a timestamp, so the
+// name it would get on this run recognises nothing.
 func ReportKept(paths ...string) {
 	reportKept(paths)
 }
@@ -45,4 +51,12 @@ func reportAction(text string) {
 // mock generator shells out, and mockgen creates the destination itself.
 func ReportCreated(paths ...string) {
 	reportCreated(paths)
+}
+
+// Loud on purpose: a run that silently shrinks the tree is worse than one that
+// grows it. The reason is the caller's — this package is shared.
+func ReportRemoved(reason string, paths ...string) {
+	for _, path := range paths {
+		_, _ = fmt.Fprintf(output, "  %s %s — %s\n", removeMark, path, reason)
+	}
 }

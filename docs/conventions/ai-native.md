@@ -32,6 +32,14 @@ step 2 through the person who approved it. The agent never edits an approved
 test on its own judgement — an agent told to make a test pass will otherwise
 weaken the test, and that is the failure mode this whole shape exists to prevent.
 
+There is a subtler version of that failure, and it took catching in practice: a
+case written for a *known defect* must assert the behaviour you want, so it is
+red until the fix lands. Write what the code currently does and the defect
+becomes a green regression boundary — frozen, protected, and reading as
+passing. The check that catches it is arithmetic: the number of red cases has to
+equal the number of known defects, and a mismatch means either a defect got
+frozen or a case is wrong.
+
 ### Why a delta list rather than "read the scenarios"
 
 Requirements written by analysts always have gaps, and an agent transforming them
@@ -93,16 +101,43 @@ thing, and they miss in both directions:
 
 - reaching another service over gRPC, the leaf is `grpc.ClientConnInterface`,
   while the seam worth replacing is the generated `*ServiceClient` one hop above
-  it. Mocking a connection means answering with encoded protobuf.
+  it. Mocking a connection means answering with encoded protobuf. Replace
+  **both**: supplying the typed client does not stop the connection under it
+  from being built, because `InitAppWith` is a flat eager sequence and prunes
+  nothing — so the boot still reads that service's host and port. The
+  connection is then unreachable, which makes a panicking stub the honest
+  filling.
 - behind a factory that builds its clients from runtime data, the real boundary
   is *below* the leaf and outside the container entirely. A mock of it cannot
   reach the app through `Replacements` at all — it serves a unit test of the
   factory, while the component test still cuts at the factory's own port.
 
 A leaf is also not always worth a mock. `sql.Db` is one, but a component test
-hands it a real connection to a test database. Same for a port whose production
+hands it a real connection to a test database. The rule behind that: a
+dependency carrying a language the code itself generates cannot be stood in for,
+because a stand-in has to understand the language, and then the test checks the
+language instead of the behaviour. Same for a port whose production
 implementation already has a null variant selected by data: nothing needs
 replacing, so it is classified and left alone.
+
+Within the cut, what gets a generated mock and what gets a no-op is structural,
+not a matter of taste:
+
+- a seam the test **programs** — an outbound client, an adapter — gets a mock.
+- a seam that only has to be **non-nil for the boot** — a message consumer, an
+  unreachable connection, the logger — gets a no-op owned by the harness
+  (`pry.Noop()`, `grpcClient.Dead()`). Declaring expectations for the calls a
+  container makes while constructing itself turns "this does not matter" into
+  work in every case.
+- a seam a later assertion **reads back** gets a recorder — `pry.Recorder()`,
+  `scribus.Recorder()`. The line between the last two is the specification: a
+  no-op is a recorder nobody queries, so silence is right exactly where nothing
+  is asserted, and hides the subject everywhere else.
+
+And the negative assertion is written, never implied: `.Times(0)` rather than
+leaving the call undeclared and letting the controller fail. The suite is a
+document that someone approves, and an assertion that exists only as a missing
+line cannot be reviewed.
 
 None of this is derivable, which is why the marker is a fact about the graph and
 not a recommendation, and why both `mocks.generate` and `mocks.ignore` are
@@ -118,8 +153,16 @@ of writing it down.
 **Writing it down buys two things** that the in-your-head version cannot: an
 agent can work against it unsupervised, and a second person can do the
 verification later. It is also what onboarding cannot otherwise transfer — a new
-joiner reading code infers intent, while a specification plus a delta list shows
-which decisions were deliberate.
+joiner reading code infers intent, while a specification shows which decisions
+were deliberate.
+
+The two artifacts do not end up in the same place, and should not. The
+specification is about the code, is read as current, and belongs in the
+repository — with the reasoning for each case written into it, which is the part
+a new joiner needs. The delta list is about the *requirement*: a record of what
+the document left open and what was decided, addressed to whoever wrote it. It
+belongs with the ticket. Committing it would put a negotiation that was finished
+at approval into a place where everything is read as still true.
 
 **The ceiling moves to verification.** Team output becomes bounded by how many
 specifications one person can carefully approve, and that does not improve by
@@ -149,20 +192,43 @@ workflow that gets abandoned at the first step that does not work.
   and `--check`, keeps the classification of every seam honest.
 - Rule #11 in `AGENTS.md`, which is phrased over "executable specification"
   rather than any one format, so it is followable today with ordinary Go tests.
+- **the component harness**, as libraries — see
+  [conventions/component-harness](component-harness.md). The resource seam is
+  `waffle/resource`; postgres and elasticsearch are `sql/sqltest` and
+  `elastic/elastictest`; the in-process gRPC server is `waffle/tools/grpc.Serve`,
+  chaining interceptors with the same `UnaryChain` the daemon uses; the leaves
+  that used to be hand-written per service — a silent logger, a no-op consumer, a
+  dead connection — are `pry.Noop()`/`pry.Recorder()`, `scribus.Recorder()` and
+  `grpcClient.Dead()`. Two services run on them. A run needs no configuration at
+  all: without a DSN the harness starts a postgres container and the next run
+  reuses it.
 
 **Not available yet:**
 
-- **a scenario harness.** Gherkin needs a runner, a database lifecycle
-  (migrations onto a test database, data reset between scenarios), a home for
-  fixtures and controlled time. None of that ships with waffle, and building it
-  per service is the expensive part of step 3. The leverage is to extract it once
-  into a shared package rather than pay for it in every service — do that before
-  rolling the cycle out widely.
-- **a gate.** Rule #11 asks a merge request to carry a link to the approved
-  specification. Nothing checks it, and a rule nothing checks is one new joiners
-  learn to skip.
+- **a check that behaviour did not change without its specification.** Decidable
+  from a diff: domain service or model files changed, and no `.feature` or
+  baseline did. It fails on the case that actually happens — code edited in a
+  hurry, no specification touched — and asks for nothing when nothing is wrong.
+  Not written yet.
 
-Until the harness exists, "executable specification" means a component test in
-Go. That is enough for the protocol — approval before code, frozen after — which
-is the part that actually does the work. Gherkin is a format; the freeze is the
-mechanism.
+**Deliberately not a gate.** Rule #11 is satisfied by a person reading a
+specification and judging it, and no pipeline can check that a person did. A
+pipeline can check that a *string* is present, which is worse than checking
+nothing: it trains everyone to paste a link, and then the merge request carries a
+"specification approved" mark that nobody consciously gave. Approval is an act
+inside a session; what has to survive the session is the specification itself, in
+the repository, and a link to the ticket where the delta was argued. Only the
+first of those is worth a machine check, and the bullet above is its honest form.
+
+What the two services showed, worth knowing before the third: the expensive
+parts were not the runner but the decisions around it — binding at the declared
+contract rather than one layer below, discovering that replacing a seam does not
+prune what feeds it, and noticing that most cases need no clock at all if
+fixture dates are set relative to now. Those are written down in Rule #11 so the
+third service does not rediscover them.
+
+The extraction itself taught one thing worth repeating: **what deserved to be
+shared was not the silent stand-in but the recording one.** A silent leaf is
+three lines written on the spot; a spy is the part that gets rewritten badly, or
+cannot be written at all — a log spy is impossible outside `pry`, because the
+options only unpack inside that package. `Noop()` is a recorder nobody queries.

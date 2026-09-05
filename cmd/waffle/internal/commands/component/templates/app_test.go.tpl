@@ -6,9 +6,12 @@ import (
 	"{{.Import}}"
 )
 
-// A component test boots the real container and replaces only the boundaries it
-// cares about — everything else is the production wiring. To see what can go
-// into Replacements:
+// Does the container wire at all, with no infrastructure behind it. This is not
+// the scenario suite's smoke test: that one lives in tests/, brings a database
+// up and serves the handlers. Keep both — this one fails faster and closer to
+// the wiring.
+//
+// To see what can go into Replacements:
 //
 //	./waffle make:tests:mocks --suggest
 func TestApp(t *testing.T) {
