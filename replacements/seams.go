@@ -1,4 +1,4 @@
-package command
+package replacements
 
 import (
 	"errors"
@@ -11,8 +11,6 @@ import (
 	"strconv"
 )
 
-// TypeRef is an interface named by a seam, in the shape mockgen asks for it: the
-// import path it is declared in, and the name declared there.
 type TypeRef struct {
 	Path string
 	Name string
@@ -20,29 +18,20 @@ type TypeRef struct {
 
 func (t TypeRef) String() string { return t.Path + "." + t.Name }
 
-// Seam is one entry of the generated Replacements struct — a container field a
-// test can fill in instead of letting the container build it. More than one type
-// means diogen merged registrations that share the field, and the entry is a
-// composite interface that no single mock satisfies.
+// More than one type means diogen merged registrations sharing the field, and
+// the entry is a composite interface that no single mock satisfies.
 type Seam struct {
 	Field string
 	Types []TypeRef
-	// Leaf is set when the default constructor for this seam takes nothing else
-	// out of the container, which makes it a boundary of the process rather than
-	// a node inside it. Replacing a leaf leaves the whole service under test;
-	// replacing an interior seam cuts out everything below it.
+	// Replacing a leaf leaves the whole service under test; replacing an interior
+	// seam cuts out everything below it.
 	Leaf bool
 }
 
 func (s Seam) Composite() bool { return len(s.Types) > 1 }
 
-// ReadSeams takes the seams off the Replacements struct of a generated
-// container. It parses instead of type-checking, so it also works on a service
-// whose dependencies do not currently compile — and Replacements is the
-// authoritative list either way, being the thing InitAppWith accepts.
-//
-// importPath is the container's own package, for a seam whose interface is
-// declared there rather than imported.
+// Parses instead of type-checking, so it works on a service whose dependencies
+// do not currently compile.
 func ReadSeams(c Container, importPath string) ([]Seam, error) {
 	file, err := parser.ParseFile(token.NewFileSet(), c.File, nil, parser.SkipObjectResolution)
 	if err != nil {
@@ -70,16 +59,8 @@ func ReadSeams(c Container, importPath string) ([]Seam, error) {
 	return seams, nil
 }
 
-// Which seams sit at a boundary, read off the body of InitAppWith. Every seam
-// appears there as
-//
-//	container.x = replacements.X
-//	if container.x == nil { ... }
-//
-// so the prologue assignment names the container fields a seam feeds, and the
-// guarded block holds the constructor that runs when no replacement was given.
-// A block that reads no other container field is building something from the
-// environment alone — a leaf.
+// A guarded block that reads no other container field is building from the
+// environment alone — a leaf. Shape of the generated body: di/cmd/diogen/ARCHITECTURE.md.
 func leafSeams(file *ast.File) map[string]bool {
 	body := initAppWithBody(file)
 	if body == nil {
@@ -97,7 +78,6 @@ func leafSeams(file *ast.File) map[string]bool {
 		owner[field] = seam
 	}
 
-	// Container fields read by the block that guards each seam.
 	reads := map[string]map[string]bool{}
 	for _, stmt := range body.List {
 		block, ok := stmt.(*ast.IfStmt)
@@ -159,8 +139,7 @@ func prologueAssignment(stmt ast.Stmt) (field, seam string, ok bool) {
 	return field, seam, true
 }
 
-// The container fields an "== nil" guard tests, so a condition carrying a branch
-// condition alongside still resolves.
+// Recursive, so a guard carrying a branch condition alongside still resolves.
 func guardedFields(cond ast.Expr) []string {
 	binary, ok := cond.(*ast.BinaryExpr)
 	if !ok {
@@ -180,8 +159,8 @@ func guardedFields(cond ast.Expr) []string {
 	return nil
 }
 
-// Container fields the block reads. An assignment target is a write, and the
-// closers slice is bookkeeping the generator adds to every seam alike.
+// An assignment target is a write, and the closers slice is bookkeeping the
+// generator adds to every seam alike.
 func containerReads(block *ast.BlockStmt) map[string]bool {
 	written := map[ast.Expr]bool{}
 	ast.Inspect(block, func(n ast.Node) bool {

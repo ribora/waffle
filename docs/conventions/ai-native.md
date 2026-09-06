@@ -40,6 +40,46 @@ passing. The check that catches it is arithmetic: the number of red cases has to
 equal the number of known defects, and a mismatch means either a defect got
 frozen or a case is wrong.
 
+### What the two failures were, and what actually fixed them
+
+Rule #11 has been broken twice by agents that had it in front of them, and the
+two are worth reading together because the second one refutes the obvious fix.
+
+**First: crossing into the platform's zone.** A session told only "build the
+scenarios per Rule #11" wrote the cases, went straight on to the harness and the
+steps, and edited `waffle.yaml` to grant itself the nine seams its hand-written
+fakes needed. The prohibition was in the file, in three places.
+
+**Second: the right lane, the wrong order.** A later session stayed inside its
+own zone and wrote production code across two domains before any case existed.
+Its own diagnosis was exact: it had read the short mid-work imperatives that
+settle a design question — "add it", "forbid it", "do B" — as authorisation to
+implement. The rule said what a *task* is not; it never said what an *answer to
+your own question* is, and every such answer resets an agent's sense of having
+just been handed a job.
+
+The expensive part was not the order. The change pinned nothing: the
+specification said the same thing before and after, and the suite would have
+been exactly as green without it. Worse, it could not be pinned at that cut —
+telling the two designs apart needs a failure *inside* the transaction at the
+declared-contract level, and no seam offers one. So the correct move had been to
+stop and report a gap, which the rule does say.
+
+**What did not work: more prose.** After the first failure the fix was a
+paragraph of argument, and one line of it made things worse — "run the check
+before you hand anything over" turns a red check into a list of the exact lines
+that would make it green. What worked was a **review surface that does not
+depend on the author's compliance**: `waffle.yaml` must never appear in the diff
+of a specification task, which costs a reviewer one glance at the file list.
+After the second failure the same surface was extended to production files and to
+`CONTRIBUTING.md`, and the red-count check gained its mirror — every production
+file in the diff is named by a case that went red.
+
+The generalisation, now with two data points: **prose describing a state does not
+stop an agent with momentum. A prohibition needs either a mechanism or a surface
+a third party can check.** Both incidents were argued against, at length, in the
+file the agent had read.
+
 ### Why a delta list rather than "read the scenarios"
 
 Requirements written by analysts always have gaps, and an agent transforming them
@@ -56,6 +96,36 @@ made a guess authoritative.
 The out-of-scope half of the list matters for a specific reason: a reviewer
 comparing two documents reliably catches a wrong answer and reliably misses a
 missing question. Absence has to be stated to be reviewable.
+
+### Measurements the rule leans on
+
+The instructions in `AGENTS.md` are terse where these numbers are the reason for
+them.
+
+- **One specification per declared contract, not per service.** On dungeon, a
+  domain's management served four callers — gRPC, a consumer and two cron
+  commands — with no overlap at all, so a specification written against the gRPC
+  operations alone would have covered one contract in four. The
+  `interface{ A; B; C }` entry that `check:tests:replacements --suggest` prints
+  for a shared container field *is* that list of contracts.
+- **Adjudication of defects is the human's.** Deriving candidate defects from
+  code is the cheap half and it is wrong often: across the two services this was
+  built on, several proposed defects turned out to be deliberate business rules
+  and one could not be reproduced at all.
+- **The red-count check earns its place.** On both services, "the number of red
+  cases equals the number of known defects" caught a real mistake — once a
+  defect frozen as a green boundary, once a case that was simply wrong.
+- **A case can fail to discriminate and still look complete.** Three cases
+  pinning "the adapter is asked with the facility's own configuration" all used
+  one facility with one provider, so an implementation holding a single
+  configuration for the whole process passed all three. The second facility is
+  what turned them into cases.
+- **Hand-computed numbers fail at about one in a hundred.** On kostej, one row
+  of a hundred and four had the wrong date — month-end clamping done in the
+  head — and the code was right. Which is why the gate is told that the
+  arithmetic was read rather than run.
+- **An unexpected failure is as likely to be the step as the service.** One of
+  sixteen on kostej: a column added to a fixture table that the step never read.
 
 ## Why this needs the container cut
 
@@ -172,6 +242,60 @@ adding agents. It is a better ceiling than code review — a misunderstanding
 caught in a specification is cheaper than one caught in a merge request — but it
 is a ceiling, and it is lower than people expect.
 
+## Opting out
+
+Rule #11 is a convention, not a lock. A service can decline it, and that call
+belongs to whoever owns the repository. A rule its owner cannot switch off does
+not produce the work it describes — it produces cases written to satisfy a file.
+
+The mechanism already exists and needs nothing built: `CONTRIBUTING.md` overrides
+`AGENTS.md` wherever the two disagree, as the generated file's own preamble says,
+and `waffle agents` never touches it. So declining is a paragraph there, and it
+survives every upgrade.
+
+**The wording is yours.** How you instruct an agent in your own project is not
+the framework's business, and nothing here prescribes a form of words. Two
+properties of it are worth knowing, because they are what the agent side is told
+to look for:
+
+- **An opt-out has to be about this rule.** An agent is instructed not to infer
+  one from general remarks about pace — "we move fast here", "tests come after" —
+  so a paragraph meant to switch the workflow off has to say that it does. This
+  constrains how strictly an agent reads, not how you write.
+- **Nothing else falls with it.** The platform boundary is not part of Rule #11:
+  `replacements.allow` is enforced by a test in the ordinary suite, and an agent
+  may no more grant itself a seam in traditional mode than in this one. Turning
+  the workflow off does not hand over the cut.
+
+**Say what replaces it.** "Traditional mode" is not one protocol. If an approved
+specification stops being the artifact that says what *correct* means, something
+else has to — at a minimum, a test for the behaviour that changed. Leaving that
+open reproduces the failure this cycle exists to prevent, by policy instead of by
+accident: a production change nothing pins, which the next reader takes for a
+decision because the code is the only thing left to read.
+
+**It is not binary.** The rule already exempts two categories on its own — a
+code defect at the level of a function takes a table test where the defect is,
+and a spike is exempt entirely. Keeping the cycle for features and design
+defects while dropping it elsewhere is a smaller step than switching it off, and
+it is the shape most teams actually want.
+
+**A repository file and a task are different scopes.** `CONTRIBUTING.md` says how
+this service lives, always, and a session cannot choose otherwise. "Quickly, just
+this once" is a property of one task and belongs in the task. Putting it in the
+repository turns a standing decision into a switch for whatever mood the day is
+in.
+
+**What declining gives up.** On kostej — the first service taken through the
+cycle end to end, 233 scenarios over 18 operations — writing the cases surfaced
+defects in code that was already in production: a grid keeping the wrong version,
+freeze boundaries off by a day at both ends, a missing facility requirement, a
+currency anchored to the wrong moment, a promo window short by its last day, and
+a product kind that could be changed after the fact. None of them needed a test
+run to find. They came out of having
+to state, per case, what the answer should be — which is the part traditional
+mode removes, and it is not the same as the part that runs in CI.
+
 ## What this does not cover
 
 A component test with the edges cut verifies one service against its *assumed*
@@ -190,9 +314,10 @@ workflow that gets abandoned at the first step that does not work.
 
 - `waffle make:tests:component` scaffolds the component test that boots the
   container.
-- `waffle check:tests:replacements` enforces `replacements.allow` — what a test
-  may replace is a decision someone made, not a habit — and `--suggest` prints
-  everything the containers expose.
+- `replacements.Check()`, scaffolded as a test beside the container, enforces
+  `replacements.allow` — what a test may replace is a decision someone made, not
+  a habit — and `waffle check:tests:replacements` runs the same comparison with
+  `--suggest` to print everything the containers expose.
 - Rule #11 in `AGENTS.md`, which is phrased over "executable specification"
   rather than any one format, so it is followable today with ordinary Go tests.
 - **the component harness**, as libraries — see

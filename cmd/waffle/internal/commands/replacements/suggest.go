@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
+	check "gitlab.com/gorib/waffle/replacements"
 )
 
 type tier int
@@ -50,9 +51,6 @@ func tierOf(path, module string) tier {
 	}
 }
 
-// candidate is one interface a container exposes, with the two facts that bear
-// on granting it: whether its default constructor takes anything else out of the
-// container, and whether the list already grants it.
 type candidate struct {
 	Path    string
 	Name    string
@@ -60,7 +58,7 @@ type candidate struct {
 	Allowed bool
 }
 
-func candidates(seams []command.Seam, cfg command.Config) []candidate {
+func candidates(seams []check.Seam, cfg command.Config) []candidate {
 	var out []candidate
 	seen := map[string]bool{}
 	for _, seam := range seams {
@@ -80,8 +78,8 @@ func candidates(seams []command.Seam, cfg command.Config) []candidate {
 	return out
 }
 
-func composites(seams []command.Seam) []command.Seam {
-	var out []command.Seam
+func composites(seams []check.Seam) []check.Seam {
+	var out []check.Seam
 	for _, seam := range seams {
 		if seam.Composite() {
 			out = append(out, seam)
@@ -90,8 +88,8 @@ func composites(seams []command.Seam) []command.Seam {
 	return out
 }
 
-// entries renders the mapping lines only, at the given indent, in the shape
-// replacements.allow takes — so granting one is a copied line.
+// Mapping lines only, in the shape replacements.allow takes, so granting one is
+// a copied line.
 func entries(cands []candidate, module, indent string) []string {
 	byPath := map[string][]candidate{}
 	byTier := map[tier][]string{}
@@ -148,7 +146,7 @@ func note(c candidate) string {
 	return "  # " + strings.Join(marks, ", ")
 }
 
-func suggestion(seams []command.Seam, cfg command.Config, module string) string {
+func suggestion(seams []check.Seam, cfg command.Config, module string) string {
 	var b strings.Builder
 	b.WriteString("# Everything the containers expose. This is a menu, not a proposal: what\n")
 	b.WriteString("# replacements.allow does not name, a test may not supply.\n\n")

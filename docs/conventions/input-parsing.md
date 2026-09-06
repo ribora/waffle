@@ -13,15 +13,17 @@ type Source interface {
 }
 ```
 
-A **scope** is an opaque string. whisk never hardcodes one — it emits `src.Lookup("query", "status")` verbatim and the adapter decides what that means. An unknown scope returns an empty string; that is the contract, not a failure.
+A **scope** is an opaque string. whisk never hardcodes one — it emits `src.Lookup("query", "status")` verbatim and the adapter decides what that means. An unknown scope returns an empty string; that is the contract, not a failure. Binding reads what the transport carries and says nothing about whether it should have been there — checking that is `validate`'s job, and it is the only place that does it.
 
-| Adapter | Scopes |
-|---|---|
-| `gorib/http/server` | `path`, `query`, `header`, `cookie`, `form` |
-| `gorib/amqp` | `header`, `routing-key`, `exchange` |
-| `scan.FromBytes` | none — body only, for files, fixtures, anything already in memory |
+| Adapter | Scopes | of those, `,repeated` |
+|---|---|---|
+| `gorib/http/server` | `path`, `query`, `header`, `cookie`, `form`, `request=method` | `query`, `header`, `form` |
+| `gorib/amqp` | `header`, `routing-key`, `exchange` | all three, but each holds one value, so a slice gets at most one element |
+| `scan.FromBytes` | none — body only, for files, fixtures, anything already in memory | — |
 
 The same DTO therefore works behind any of them: a struct whose fields all come from the body needs no scope at all, and one that reads `header` reads it from an HTTP request and an AMQP delivery alike.
+
+Which means a misspelled scope, or one belonging to another transport, is not caught anywhere: the field is simply never filled. What reports it is `validate:"required"` on that field — as a missing input, so read the tag before the caller. The `,repeated` column has the same shape: on a scope that holds one value the slice stays empty and nothing objects.
 
 ## Generating
 

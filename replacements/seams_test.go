@@ -1,4 +1,4 @@
-package command
+package replacements
 
 import (
 	"path/filepath"

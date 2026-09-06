@@ -4,12 +4,13 @@ import (
 	"context"
 	"embed"
 	"fmt"
-	"path"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
+	check "gitlab.com/gorib/waffle/replacements"
 )
 
 // No templates: this command reads and reports, it writes nothing.
@@ -55,16 +56,24 @@ func (c *cmd) Run(_ context.Context, args ...string) error {
 	if err != nil {
 		return err
 	}
-	seams, generated, err := readSeams(containers, project)
+	root, err := command.ModuleRoot()
+	if err != nil {
+		return err
+	}
+	read, err := targets(root, containers)
+	if err != nil {
+		return err
+	}
+	found, err := check.Inspect(root, read)
 	if err != nil {
 		return err
 	}
 
 	if suggest {
-		fmt.Print(suggestion(seams, cfg, project))
+		fmt.Print(suggestion(found.Seams, cfg, project))
 		return nil
 	}
-	return check(seams, generated, cfg)
+	return report(check.Verify(root, found, cfg.Replacements))
 }
 
 func takeFlag(args *[]string, name string) bool {
@@ -75,46 +84,24 @@ func takeFlag(args *[]string, name string) bool {
 	return false
 }
 
-// generated is what the check needs beyond the seams: the import paths that
-// name the struct, and the files that declare it.
-type generated struct {
-	Paths []string
-	Files []string
-}
-
-func readSeams(overrides []string, project string) ([]command.Seam, generated, error) {
-	var containers []command.Container
-	switch {
-	case len(overrides) > 0:
-		for _, file := range overrides {
-			dir := filepath.Dir(file)
-			containers = append(containers, command.Container{
-				File: file, Dir: dir, Package: filepath.Base(dir),
-			})
-		}
-	default:
-		found, err := command.DiscoverContainers()
-		if err != nil {
-			return nil, generated{}, err
-		}
-		containers = found
+// A named container is taken at its word — that is what the flag is for.
+func targets(root string, overrides []string) ([]check.Container, error) {
+	if len(overrides) == 0 {
+		return check.DiscoverContainers(root)
 	}
-
-	var all []command.Seam
-	var found generated
-	for _, container := range containers {
-		importPath := path.Join(project, filepath.ToSlash(container.Dir))
-		seams, err := command.ReadSeams(container, importPath)
-		if err != nil {
-			return nil, generated{}, err
+	out := make([]check.Container, 0, len(overrides))
+	for _, file := range overrides {
+		// A path a person typed is relative to where they typed it; the check
+		// works from the module root, which is not always the same place.
+		if !filepath.IsAbs(file) {
+			cwd, err := os.Getwd()
+			if err != nil {
+				return nil, fmt.Errorf("failed to get current working directory: %w", err)
+			}
+			file = filepath.Join(cwd, file)
 		}
-		file, err := filepath.Abs(container.File)
-		if err != nil {
-			return nil, generated{}, err
-		}
-		all = append(all, seams...)
-		found.Paths = append(found.Paths, importPath)
-		found.Files = append(found.Files, file)
+		dir := filepath.Dir(file)
+		out = append(out, check.Container{File: file, Dir: dir, Package: filepath.Base(dir)})
 	}
-	return all, found, nil
+	return out, nil
 }

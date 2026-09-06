@@ -13,6 +13,7 @@ import (
 	"text/template"
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/plural"
+	"gitlab.com/gorib/waffle/replacements"
 )
 
 func New(name, description string, templates embed.FS, funcs template.FuncMap) *Command {
@@ -239,21 +240,7 @@ func (c *Command) EnsureTool(module string) error {
 }
 
 func findModuleRoot() (string, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", fmt.Errorf("failed to get current working directory: %w", err)
-	}
-	for {
-		if _, err := os.Stat(filepath.Join(cwd, "go.mod")); err == nil {
-			return cwd, nil
-		} else if !errors.Is(err, os.ErrNotExist) {
-			return "", fmt.Errorf("failed to stat go.mod: %w", err)
-		}
-		if cwd == "/" {
-			return "", fmt.Errorf("failed to find go.mod")
-		}
-		cwd = filepath.Dir(cwd)
-	}
+	return replacements.ModuleRoot()
 }
 
 func (c *Command) FindProjectName() (string, error) {

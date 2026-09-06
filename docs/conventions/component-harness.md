@@ -181,10 +181,13 @@ replacements:
     gitlab.com/sherpa-erp/sherpa/api/contract: [ContractServiceClient]
 ```
 
-What it does not name may not be replaced, in any form. `waffle
-check:tests:replacements` reads the `Replacements` literals in the tests and
-fails naming the field and the interface, so a cut nobody granted stops being a
-question of whether a reviewer noticed. Two things it deliberately does not
+What it does not name may not be replaced, in any form.
+`TestReplacementsStayInsideTheList`, scaffolded beside the container by `waffle
+make:tests:component`, reads the `Replacements` literals in the tests and fails
+naming the field and the interface — so a cut nobody granted stops being a
+question of whether a reviewer noticed, and shows up in `go test ./...` rather
+than only when someone runs a command. `waffle check:tests:replacements` is the
+same comparison with a report attached. Two things it deliberately does not
 decide: **which form** the replacement takes — mock, spy, fake or no-op — which
 follows from the assertion and belongs to whoever writes the test, and anything
 in `tests/internal/`, which is the same person's harness as the list itself.

@@ -133,7 +133,10 @@ produced thing is documented: [tools/http-handler](../tools/http-handler.md),
 `-output` off the `//go:generate` line that invokes diogen, so a service with two
 containers gets a test beside each. The scaffolded test starts with a `t.Skip`,
 because the container reads the environment while it wires and nothing can guess
-which variables this test needs.
+which variables this test needs. Beside the first container it also writes
+`replacements_test.go`, which calls `replacements.Check()` — the same comparison
+`check:tests:replacements` runs, as an ordinary test. That one reads the whole
+module, so one copy answers for every container, and it is not skipped.
 
 ### check:tests:replacements
 
@@ -143,6 +146,11 @@ it also works on a service whose dependencies do not currently compile. The unit
 is the interface, not the field: several fields of one type collapse to a single
 entry, and an instantiated generic collapses to the generic interface it
 instantiates.
+
+The comparison itself lives in `gitlab.com/gorib/waffle/replacements`, so a
+service runs it from its own suite through the scaffolded
+`TestReplacementsStayInsideTheList`. This command is that same call with a report
+attached, plus the two flags below.
 
 | | |
 |---|---|

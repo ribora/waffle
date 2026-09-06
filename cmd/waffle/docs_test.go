@@ -102,9 +102,20 @@ func TestAgentsTemplateRuleNumbering(t *testing.T) {
 	if len(rules) == 0 {
 		t.Fatal("no rules found — the template lost its structure")
 	}
-	for i, n := range rules {
-		if n != i+1 {
-			t.Errorf("rule #%d appears in position %d — numbering is not sequential", n, i+1)
+	// The numbers are identifiers, not a reading order — Rule #11 is deliberately
+	// first, because it decides whether the rest apply. What still has to hold is
+	// that every number from 1 to N appears exactly once, so an edit cannot lose
+	// a rule or leave two with the same name.
+	seen := make(map[int]bool, len(rules))
+	for _, n := range rules {
+		if seen[n] {
+			t.Errorf("Rule #%d appears twice", n)
+		}
+		seen[n] = true
+	}
+	for n := 1; n <= len(rules); n++ {
+		if !seen[n] {
+			t.Errorf("Rule #%d is missing, but the template carries %d rules", n, len(rules))
 		}
 	}
 
@@ -135,6 +146,26 @@ func TestDocsCiteRealCommands(t *testing.T) {
 			rel, _ := filepath.Rel(root, file)
 			t.Errorf("%s documents `waffle %s`, which is not a registered command (have: %s)",
 				rel, code, strings.Join(registered(cmds), ", "))
+		}
+	}
+}
+
+// The other direction, which is how the table drifted: three commands existed
+// and were listed nowhere an agent reads first. Rule #1 is presented as the
+// whole toolchain, so a command missing from it reads as a command that does not
+// exist — and the work gets done by hand instead.
+func TestAgentsTemplateListsEveryCommand(t *testing.T) {
+	body := read(t, filepath.Join(repoRoot(t), "cmd/waffle", agentsTemplate))
+
+	cited := map[string]bool{}
+	for _, m := range citedCommand.FindAllStringSubmatch(body, -1) {
+		cited[m[1]] = true
+	}
+	cmds := newCommands()
+	for code := range cmds.All() {
+		if !cited[code] {
+			t.Errorf("`waffle %s` is registered but AGENTS.md never mentions it — "+
+				"add it to Rule #1's table", code)
 		}
 	}
 }

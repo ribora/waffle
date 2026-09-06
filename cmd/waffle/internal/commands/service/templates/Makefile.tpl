@@ -10,8 +10,8 @@ audit:
 generate:
 	@go generate ./...
 
-# Fails when a test replaces something waffle.yaml does not allow. Separate
-# from build: it reads the container, so it wants a tree that already compiles.
+# Fails when a test replaces something waffle.yaml does not allow, and says what
+# it found. The same comparison runs inside go test; this target is the report.
 replacements:
 	@./waffle check:tests:replacements
 

@@ -1,4 +1,4 @@
-package command
+package replacements
 
 import (
 	"os"
@@ -96,7 +96,7 @@ func TestDiscoverContainers(t *testing.T) {
 				writeGo(t, path, body)
 			}
 
-			got, err := DiscoverContainers()
+			got, err := DiscoverContainers(".")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -116,7 +116,7 @@ func TestDiscoverContainersWithoutDirective(t *testing.T) {
 	inTempDir(t)
 	writeGo(t, filepath.Join("config", "di", "di.go"), "package di\n")
 
-	_, err := DiscoverContainers()
+	_, err := DiscoverContainers(".")
 	if err == nil {
 		t.Fatal("a tree with no diogen directive discovered a container")
 	}

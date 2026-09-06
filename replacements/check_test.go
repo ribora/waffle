@@ -5,26 +5,35 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
 )
+
+// Seams are handed in rather than read off a container: what is under test here
+// is the comparison, not the parsing.
+func check(seams []Seam, found Inspection, cfg Config) error {
+	root, err := ModuleRoot()
+	if err != nil {
+		return err
+	}
+	found.Seams = seams
+	_, err = Verify(root, found, cfg)
+	return err
+}
 
 const module = "example.test"
 
-var seams = []command.Seam{
-	{Field: "SqlDb", Types: []command.TypeRef{{Path: "gitlab.com/gorib/sql", Name: "Db"}}},
-	{Field: "SecurityAdapter", Types: []command.TypeRef{{Path: module + "/domain/service", Name: "SecurityAdapter"}}},
-	{Field: "Merged", Types: []command.TypeRef{
+var seams = []Seam{
+	{Field: "SqlDb", Types: []TypeRef{{Path: "gitlab.com/gorib/sql", Name: "Db"}}},
+	{Field: "SecurityAdapter", Types: []TypeRef{{Path: module + "/domain/service", Name: "SecurityAdapter"}}},
+	{Field: "Merged", Types: []TypeRef{
 		{Path: module + "/domain/a", Name: "Management"},
 		{Path: module + "/domain/b", Name: "Management"},
 	}},
 }
 
-func allow(entries map[string][]string) command.Config {
-	return command.Config{Replacements: command.ReplacementsConfig{Allow: entries}}
+func allow(entries map[string][]string) Config {
+	return Config{Allow: entries}
 }
 
-// The literal a test hands to Boot, which is the form the scenario suites use.
 const literal = `package feature
 
 import "example.test/config/diogen"
@@ -85,8 +94,6 @@ func boot() {
 	}
 }
 
-// The harness hands in the real database, and it is the platform engineer's own
-// code — the list is theirs, so applying it there would deny nothing.
 func TestIgnoresTheHarness(t *testing.T) {
 	write(t, map[string]string{"tests/internal/harness/harness.go": `package harness
 
@@ -102,8 +109,6 @@ func Boot(cut diogen.Replacements) {
 	}
 }
 
-// The generated file assigns every field; a test beside it is read like any
-// other, which is why the file is skipped and the directory is not.
 func TestIgnoresTheGeneratedContainerOnly(t *testing.T) {
 	root := write(t, map[string]string{
 		"config/diogen/di_gen.go": `package diogen
@@ -117,7 +122,7 @@ func InitAppWith(r Replacements) {
 		"config/diogen/app_test.go": literal,
 	})
 
-	found, err := scan(root, generated{
+	found, _, err := scan(root, Inspection{
 		Paths: []string{module + "/config/diogen"},
 		Files: []string{filepath.Join(root, "config", "diogen", "di_gen.go")},
 	})
@@ -129,8 +134,6 @@ func InitAppWith(r Replacements) {
 	}
 }
 
-// A composite field replaces every contract it merges, so a grant that covers
-// only one constituent is not a grant.
 func TestRefusesAPartlyGrantedComposite(t *testing.T) {
 	write(t, map[string]string{"tests/feature/steps_test.go": `package feature
 
@@ -154,8 +157,8 @@ func boot() {
 	}
 }
 
-// A field the container does not have means the container is older than the
-// test, and every other answer this command gives is then guesswork.
+// Fatal, not a warning: the container is older than the test, so every other
+// answer the check gives is guesswork.
 func TestFailsOnAFieldNoContainerExposes(t *testing.T) {
 	write(t, map[string]string{"tests/feature/steps_test.go": `package feature
 
@@ -172,8 +175,6 @@ func boot() {
 	}
 }
 
-// Reading it would mean trusting the field order of a generated struct, so it
-// is refused rather than passed.
 func TestRefusesALiteralWithoutFieldNames(t *testing.T) {
 	write(t, map[string]string{"tests/feature/steps_test.go": `package feature
 
@@ -190,7 +191,6 @@ func boot() {
 	}
 }
 
-// Another package's Replacements is another struct.
 func TestIgnoresAnUnrelatedReplacementsStruct(t *testing.T) {
 	write(t, map[string]string{"tests/feature/steps_test.go": `package feature
 
@@ -206,20 +206,27 @@ func boot() {
 	}
 }
 
+// It has to survive the passing check, or nobody would ever see it.
 func TestWarnsAboutAGrantNoContainerExposes(t *testing.T) {
-	cfg := allow(map[string][]string{module + "/domain/service": {"Renamed"}})
-	got := unknownGrants(cfg, seams)
-	if len(got) != 1 || got[0] != module+"/domain/service.Renamed" {
-		t.Fatalf("unknownGrants = %v, want the one entry nothing exposes", got)
+	root := write(t, map[string]string{"tests/feature/steps_test.go": literal})
+
+	cfg := allow(map[string][]string{module + "/domain/service": {"SecurityAdapter", "Renamed"}})
+	found := containers()
+	found.Seams = seams
+	rep, err := Verify(root, found, cfg)
+	if err != nil {
+		t.Fatalf("check refused a granted field: %v", err)
+	}
+	if len(rep.Warnings) != 1 || !strings.Contains(rep.Warnings[0], module+"/domain/service.Renamed") {
+		t.Fatalf("warnings = %v, want the one entry nothing exposes", rep.Warnings)
 	}
 }
 
-func containers() generated {
-	return generated{Paths: []string{module + "/config/diogen"}}
+func containers() Inspection {
+	return Inspection{Paths: []string{module + "/config/diogen"}}
 }
 
-// One module per test, entered with Chdir: the check finds its root the way the
-// command does, by walking up to go.mod.
+// Chdir, because the check walks up to go.mod from the working directory.
 func write(t *testing.T, files map[string]string) string {
 	t.Helper()
 	root := t.TempDir()

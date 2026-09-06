@@ -1,4 +1,4 @@
-package command
+package replacements
 
 import (
 	"bufio"
@@ -11,29 +11,25 @@ import (
 	"strings"
 )
 
-// Container is one generated di container, located by the //go:generate
-// directive that builds it. The path is already written there, and a copy of it
-// in waffle.yaml would be a second thing to keep in sync.
+// Located by the //go:generate directive: the path is written there already, and
+// a copy in waffle.yaml would be a second thing to keep in sync.
 type Container struct {
-	File    string // the generated file, relative to the working directory
-	Dir     string // the directory holding it
-	Package string // its package clause
+	File    string
+	Dir     string
+	Package string
 }
 
-// DiscoverContainers reads -output off every //go:generate line below the
-// working directory that invokes diogen. A service with two containers gets two
-// entries, which is why this returns a slice rather than the one path everyone
-// happens to have.
-func DiscoverContainers() ([]Container, error) {
+// A slice, because a service may have two containers.
+func DiscoverContainers(root string) ([]Container, error) {
 	var found []Container
 	seen := map[string]bool{}
 
-	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		switch {
 		case err != nil:
 			return err
 		case d.IsDir():
-			if path != "." && skipDir(d.Name()) {
+			if path != root && skipDir(d.Name()) {
 				return fs.SkipDir
 			}
 			return nil
@@ -50,7 +46,9 @@ func DiscoverContainers() ([]Container, error) {
 			if !ok {
 				continue
 			}
-			output = filepath.Clean(output)
+			// The directive's -output is written relative to the module root, which
+			// is where `go generate ./...` is run from.
+			output = filepath.Join(root, output)
 			if seen[output] {
 				continue
 			}
