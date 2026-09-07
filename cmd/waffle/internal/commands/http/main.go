@@ -3,7 +3,6 @@ package http
 import (
 	"context"
 	"embed"
-	"errors"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -26,11 +25,8 @@ type cmd struct {
 }
 
 func (c *cmd) Run(ctx context.Context, args ...string) error {
-	if err := command.RejectFlags(args); err != nil {
-		return fmt.Errorf("%w\n%s", err, c.Usage())
-	}
-	if len(args) == 0 {
-		return errors.New(c.Usage())
+	if err := c.Operands(args, 1, 1); err != nil {
+		return err
 	}
 	if err := command.ValidateName("domain", args[0]); err != nil {
 		return err

@@ -22,8 +22,8 @@ go install gitlab.com/gorib/waffle/cmd/waffle@latest
 | `waffle make:domain:migration <name> <description>` | Add a new SQL migration |
 | `waffle make:domain:command <name> <command>` | Add a CLI subcommand scoped to a domain |
 | `waffle make:converter <path>` | Scaffold a goverter convert.go at the given path |
-| `waffle make:tests:component` | Scaffold a component test that boots the container through `InitAppWith` ([details](../di/overview.md#testing-with-the-container)) |
-| `waffle check:tests:replacements [--suggest] [--container=<path>]` | Fail if a test replaces a container field `replacements.allow` does not grant; `--suggest` lists everything the containers expose |
+| `waffle tests:container [init]` | Report the container's own tests — a wiring check and the allow-list test — and write the missing ones with `init` ([details](../di/overview.md#testing-with-the-container)) |
+| `waffle tests:replacements [check] [--container=<path>]` | List everything the containers expose and what `replacements.allow` grants; `check` fails if a test replaces a field the list does not name |
 | `waffle agents` | Regenerate `AGENTS.md` after a waffle upgrade ([details](agents.md)) |
 
 `--help` on any of them prints its description and operands. A failing command
@@ -119,7 +119,7 @@ The whisk generator keeps its own `whisk.yaml` beside it, on the same missing-is
 
 The remaining commands — `make:domain:http`, `make:domain:scribus`,
 `make:domain:repository`, `make:domain:migration`, `make:domain:command`,
-`make:converter`, `make:tests:component` and `check:tests:replacements` — have no
+`make:converter`, `tests:container` and `tests:replacements` — have no
 page of their own. They
 follow the same rules as the ones above (project root detection, idempotent
 writes, `make generate` afterwards); what they produce is described where the
@@ -129,16 +129,18 @@ produced thing is documented: [tools/http-handler](../tools/http-handler.md),
 [conventions/dto-conversion](../conventions/dto-conversion.md) and
 [di/overview](../di/overview.md#testing-with-the-container).
 
-`make:tests:component` takes no operands: it finds the container by reading
-`-output` off the `//go:generate` line that invokes diogen, so a service with two
-containers gets a test beside each. The scaffolded test starts with a `t.Skip`,
-because the container reads the environment while it wires and nothing can guess
-which variables this test needs. Beside the first container it also writes
-`replacements_test.go`, which calls `replacements.Check()` — the same comparison
-`check:tests:replacements` runs, as an ordinary test. That one reads the whole
-module, so one copy answers for every container, and it is not skipped.
+`tests:container` names no container: it finds them by reading `-output` off the
+`//go:generate` lines that invoke diogen, so a service with two containers gets a
+test beside each. A bare run reports which of those tests are already there;
+`init` writes the ones that are not and leaves the rest alone. The scaffolded
+test starts with a `t.Skip`, because the container reads the environment while it
+wires and nothing can guess which variables this test needs. Beside the first
+container `init` also writes `replacements_test.go`, which calls
+`replacements.Check()` — the same comparison `tests:replacements check` runs, as
+an ordinary test. That one reads the whole module, so one copy answers for every
+container, and it is not skipped.
 
-### check:tests:replacements
+### tests:replacements
 
 What a test can replace are the fields of the generated `Replacements` struct, so
 that struct is what this command reads — parsed, not type-checked, which is why
@@ -149,13 +151,14 @@ instantiates.
 
 The comparison itself lives in `gitlab.com/gorib/waffle/replacements`, so a
 service runs it from its own suite through the scaffolded
-`TestReplacementsStayInsideTheList`. This command is that same call with a report
-attached, plus the two flags below.
+`TestReplacementsStayInsideTheList`. That is where the enforcement belongs — `go
+test ./...` is what people and pipelines already run — so this command is the
+report layer, and the comparison is what you ask for by name.
 
 | | |
 |---|---|
-| no flags | fail if a test fills in a field `replacements.allow` does not grant |
-| `--suggest` | print everything the containers expose, marking `# leaf` and `# allowed` |
+| no operand | print everything the containers expose, marking `# leaf` and `# allowed` |
+| `check` | fail if a test fills in a field `replacements.allow` does not grant |
 | `--container=<path>` | read this generated file instead of discovering it; repeatable |
 
 `replacements.allow` is a **permission list**, not a list of exceptions: an empty

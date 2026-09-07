@@ -3,7 +3,6 @@ package scribus
 import (
 	"context"
 	"embed"
-	"errors"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -34,11 +33,8 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 		args = append(args[:i], args[i+1:]...)
 	}
 
-	if err := command.RejectFlags(args); err != nil {
-		return fmt.Errorf("%w\n%s", err, c.Usage())
-	}
-	if len(args) < 2 {
-		return errors.New(c.Usage())
+	if err := c.Operands(args, 2, 3); err != nil {
+		return err
 	}
 	if err := command.ValidateName("domain", args[0]); err != nil {
 		return err

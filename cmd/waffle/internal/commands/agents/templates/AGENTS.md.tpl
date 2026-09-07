@@ -156,7 +156,7 @@ load with no payoff. Follow whatever is already in `tests/`; if nothing is, the
 choice is the human's, not yours.
 
 **One specification per declared contract, not per service.** The
-`interface{ A; B; C }` entry that `waffle check:tests:replacements --suggest`
+`interface{ A; B; C }` entry that `waffle tests:replacements`
 reports for a shared container field *is* the list of contracts a domain owes —
 one constituent per caller, each a place a scenario binds. Measured: four
 callers with no overlap at all, so cases written against the gRPC operations
@@ -277,8 +277,8 @@ replacements:
 
 A permission list, not a list of exceptions: what it does not name may not be
 replaced, in any form — mock, spy, fake or no-op. Do not add an entry to it.
-`--suggest` prints everything the containers expose, granted or not; it is a
-menu for whoever owns the platform, not a licence.
+`waffle tests:replacements` prints everything the containers expose, granted or
+not; it is a menu for whoever owns the platform, not a licence.
 
 **A missing `replacements:` key, or an empty one, grants nothing.** It does not
 mean "unrestricted" and it is not an oversight you may repair: on a service
@@ -293,7 +293,7 @@ the list catch up is the one move that destroys the point of having a list.
 sits beside the container and reads the `Replacements` literals out of every test
 in the module, failing with the name of each field the list does not cover — so
 an ungranted replacement is a red test in the ordinary suite, not something that
-depends on anyone remembering a command. `waffle check:tests:replacements` runs
+depends on anyone remembering a command. `waffle tests:replacements check` runs
 the same comparison and prints it; run it before you hand anything over and paste
 what it said.
 
@@ -361,9 +361,9 @@ do not ask for one.
 **Write a boot smoke test before any case**, in `tests/`, next to the scenarios:
 it brings the resources up, boots on the given cut and asserts only that the
 callers are non-nil. One run then tells you what the cut is missing instead of an
-hour inside a half-written suite. (`waffle make:tests:component` scaffolds a
-different, smaller check beside `InitAppWith` with no infrastructure at all.
-Keep both.)
+hour inside a half-written suite. (`waffle tests:container init` writes the
+container's own wiring check beside `InitAppWith`, with no infrastructure. Keep
+both.)
 
 Still no production code at this stage.
 
@@ -457,8 +457,9 @@ something to fill in by hand without saying so:
 | Add one migration to a domain that already has them | `waffle make:domain:migration <domain> <name>` |
 | Add CLI subcommand | `waffle make:domain:command <domain> <name>` |
 | Add DTO converter (any path) | `waffle make:converter <path>` — also creates `pkg/goverter/convert.go` if it is missing |
-| Scaffold the container's own tests | `waffle make:tests:component` — no operands, finds the container itself (Rule #11 step 3) |
-| Check what the tests replace | `waffle check:tests:replacements [--suggest]` (Rule #11 step 3) |
+| See the container's own tests, and write the missing ones | `waffle tests:container` reports, `waffle tests:container init` writes — finds the container itself (Rule #11 step 3) |
+| See what a test may replace | `waffle tests:replacements` — every seam, marked `# leaf` and `# allowed` |
+| Check what the tests replace | `waffle tests:replacements check` (Rule #11 step 3) |
 | Refresh AGENTS.md | `waffle agents` |
 
 Outbound adapters are the hole: there is **no** command for a client of another

@@ -106,7 +106,7 @@ them.
   domain's management served four callers — gRPC, a consumer and two cron
   commands — with no overlap at all, so a specification written against the gRPC
   operations alone would have covered one contract in four. The
-  `interface{ A; B; C }` entry that `check:tests:replacements --suggest` prints
+  `interface{ A; B; C }` entry that `waffle tests:replacements` prints
   for a shared container field *is* that list of contracts.
 - **Adjudication of defects is the human's.** Deriving candidate defects from
   code is the cheap half and it is wrong often: across the two services this was
@@ -146,12 +146,12 @@ Every field of `Replacements` is a seam — a place a test *may* fill in instead
 letting the container build it, if `replacements.allow` in `waffle.yaml` grants
 it. See [DI overview](../di/overview.md#testing-with-the-container) for the
 mechanics and
-[check:tests:replacements](../cli/overview.md#checktestsreplacements) for the
+[tests:replacements](../cli/overview.md#testsreplacements) for the
 tooling.
 
 ### Cut at the leaves
 
-`waffle check:tests:replacements --suggest` marks a seam `# leaf` when its default
+`waffle tests:replacements` marks a seam `# leaf` when its default
 constructor takes nothing else out of the container. Those are the boundaries of
 the process; everything else is a node inside it.
 
@@ -312,12 +312,13 @@ workflow that gets abandoned at the first step that does not work.
 
 **Available:**
 
-- `waffle make:tests:component` scaffolds the component test that boots the
-  container.
+- `waffle tests:container init` scaffolds the container's own wiring check — no
+  infrastructure, and deliberately not the component test this page means by the
+  word.
 - `replacements.Check()`, scaffolded as a test beside the container, enforces
   `replacements.allow` — what a test may replace is a decision someone made, not
-  a habit — and `waffle check:tests:replacements` runs the same comparison with
-  `--suggest` to print everything the containers expose.
+  a habit — and `waffle tests:replacements` prints everything the containers
+  expose, with `check` for the same comparison on demand.
 - Rule #11 in `AGENTS.md`, which is phrased over "executable specification"
   rather than any one format, so it is followable today with ordinary Go tests.
 - **the component harness**, as libraries — see

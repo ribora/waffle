@@ -17,11 +17,11 @@ import (
 var templates embed.FS
 
 func New() *cmd {
-	return &cmd{command.New("check:tests:replacements",
-		"Check that the tests replace only what waffle.yaml allows",
+	return &cmd{command.New("tests:replacements",
+		"Report every seam the containers expose and what waffle.yaml allows; check refuses the rest",
 		templates, nil).
-		WithUsage("[--suggest] [--container=<path>]\n" +
-			"  --suggest    print every seam the containers expose, marking what is already allowed\n" +
+		WithUsage("[check] [--container=<path>]\n" +
+			"  check        fail if a test replaces a seam replacements.allow does not grant\n" +
 			"  --container  read this generated container instead of the ones //go:generate names")}
 }
 
@@ -39,13 +39,14 @@ func (c *cmd) Run(_ context.Context, args ...string) error {
 		return ok
 	})
 
-	suggest := takeFlag(&args, "--suggest")
-
-	if err := command.RejectFlags(args); err != nil {
-		return fmt.Errorf("%w\n%s", err, c.Usage())
+	if err := c.Operands(args, 0, 1); err != nil {
+		return err
 	}
-	if len(args) > 0 {
-		return fmt.Errorf("unexpected operand %q\n%s", args[0], c.Usage())
+	// The comparison also runs inside `go test`, so the CLI's own default is the
+	// report a person came for, not a second copy of the pass/fail.
+	verify := len(args) == 1
+	if verify && args[0] != "check" {
+		return fmt.Errorf("unknown subcommand %q\n%s", args[0], c.Usage())
 	}
 
 	project, err := c.FindProjectName()
@@ -69,19 +70,11 @@ func (c *cmd) Run(_ context.Context, args ...string) error {
 		return err
 	}
 
-	if suggest {
+	if !verify {
 		fmt.Print(suggestion(found.Seams, cfg, project))
 		return nil
 	}
 	return report(check.Verify(root, found, cfg.Replacements))
-}
-
-func takeFlag(args *[]string, name string) bool {
-	if i := slices.Index(*args, name); i >= 0 {
-		*args = slices.Delete(*args, i, i+1)
-		return true
-	}
-	return false
 }
 
 // A named container is taken at its word — that is what the flag is for.

@@ -23,7 +23,10 @@ type cmd struct {
 	*command.Command
 }
 
-func (c *cmd) Run(ctx context.Context, _ ...string) error {
+func (c *cmd) Run(ctx context.Context, args ...string) error {
+	if err := c.Operands(args, 0, 0); err != nil {
+		return err
+	}
 	projectName, err := c.FindProjectName()
 	if err != nil {
 		return err

@@ -27,6 +27,9 @@ func (c *cmd) Description() string { return c.base.Description() }
 func (c *cmd) Usage() string       { return c.base.Usage() }
 
 func (c *cmd) Run(ctx context.Context, args ...string) error {
+	if err := c.base.Operands(args, 0, 0); err != nil {
+		return err
+	}
 	projectName, err := c.base.FindProjectName()
 	if err != nil {
 		return err

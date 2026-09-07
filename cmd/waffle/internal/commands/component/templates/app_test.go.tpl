@@ -14,7 +14,7 @@ import (
 // What may go into Replacements is replacements.allow in waffle.yaml. To see
 // everything the container exposes, granted or not:
 //
-//	./waffle check:tests:replacements --suggest
+//	./waffle tests:replacements
 func TestApp(t *testing.T) {
 	t.Skip("remove once the environment below is filled in")
 

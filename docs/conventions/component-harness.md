@@ -183,11 +183,11 @@ replacements:
 
 What it does not name may not be replaced, in any form.
 `TestReplacementsStayInsideTheList`, scaffolded beside the container by `waffle
-make:tests:component`, reads the `Replacements` literals in the tests and fails
+tests:container init`, reads the `Replacements` literals in the tests and fails
 naming the field and the interface — so a cut nobody granted stops being a
 question of whether a reviewer noticed, and shows up in `go test ./...` rather
-than only when someone runs a command. `waffle check:tests:replacements` is the
-same comparison with a report attached. Two things it deliberately does not
+than only when someone runs a command. `waffle tests:replacements check` is the
+same comparison on demand. Two things it deliberately does not
 decide: **which form** the replacement takes — mock, spy, fake or no-op — which
 follows from the assertion and belongs to whoever writes the test, and anything
 in `tests/internal/`, which is the same person's harness as the list itself.
@@ -195,7 +195,7 @@ in `tests/internal/`, which is the same person's harness as the list itself.
 A grant is keyed by interface, not by field, so an interface serving two
 container fields is granted for both.
 
-`waffle check:tests:replacements --suggest` prints the menu; a person picks from
+`waffle tests:replacements` prints the menu; a person picks from
 it, and what they pick goes into `replacements.allow`. The `# leaf` marker means
 one thing only — *this constructor takes nothing else out of the container* — and
 that is a heuristic, not the answer.
@@ -208,7 +208,7 @@ carries the wire — a method name as a string and an untyped payload; an
 elasticsearch client carries the query DSL.
 
 So for an outbound gRPC dependency the cut is the **typed client**, one level
-above the transport, even though `--suggest` does not mark it `# leaf` — its
+above the transport, even though `tests:replacements` does not mark it `# leaf` — its
 constructor does take the connection out of the container, which is exactly why
 it is not a leaf. Substitute both levels, for two different reasons: the typed
 client because that is the surface worth faking, and the connection with

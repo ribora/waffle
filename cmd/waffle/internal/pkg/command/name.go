@@ -1,6 +1,7 @@
 package command
 
 import (
+	"errors"
 	"fmt"
 	"go/token"
 	"path/filepath"
@@ -33,6 +34,22 @@ func RejectFlags(args []string) error {
 		if strings.HasPrefix(a, "-") {
 			return fmt.Errorf("unknown flag %q", a)
 		}
+	}
+	return nil
+}
+
+// An extra operand used to be dropped in silence: `make:domain:migration orders
+// add index` wrote a migration named "add". Takes RejectFlags with it, so a
+// command cannot close one gap and leave the other.
+func (c *Command) Operands(args []string, min, max int) error {
+	if err := RejectFlags(args); err != nil {
+		return fmt.Errorf("%w\n%s", err, c.Usage())
+	}
+	if len(args) < min {
+		return errors.New(c.Usage())
+	}
+	if len(args) > max {
+		return fmt.Errorf("unexpected operand %q\n%s", args[max], c.Usage())
 	}
 	return nil
 }
