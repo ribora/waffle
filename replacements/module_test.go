@@ -10,9 +10,8 @@ import (
 func TestCheckReadsTheModuleAndTheList(t *testing.T) {
 	tree := func(allow string) map[string]string {
 		return map[string]string{
-			"config/di/di.go":         "//go:generate diogen -output config/diogen/di_gen.go -pkg diogen $GOFILE\n\npackage di\n",
-			"config/diogen/di_gen.go": generatedContainer,
-			"waffle.yaml":             "replacements:\n  allow:\n    gitlab.com/gorib/sql: [" + allow + "]\n",
+			"config/di/di.go": "//go:generate diogen -output config/diogen/di_gen.go -pkg diogen $GOFILE\n\npackage di\n",
+			"waffle.yaml":     "replacements:\n  allow:\n    example.test/pkg/sql: [" + allow + "]\n",
 			"tests/feature/steps_test.go": `package feature
 
 import "example.test/config/diogen"
@@ -39,7 +38,7 @@ func boot() {
 		if err == nil {
 			t.Fatal("check passed a field that replacements.allow does not name")
 		}
-		for _, want := range []string{"SqlDb", "gitlab.com/gorib/sql.Db", "tests/feature/steps_test.go:6"} {
+		for _, want := range []string{"SqlDb", "example.test/pkg/sql.Db", "tests/feature/steps_test.go:6"} {
 			if !strings.Contains(err.Error(), want) {
 				t.Errorf("the refusal does not name %q:\n%s", want, err)
 			}
@@ -57,7 +56,7 @@ func boot() {
 		if err == nil {
 			t.Fatal("a module with no waffle.yaml replaced a seam nobody granted")
 		}
-		if !strings.Contains(err.Error(), "gitlab.com/gorib/sql.Db") {
+		if !strings.Contains(err.Error(), "example.test/pkg/sql.Db") {
 			t.Errorf("the module failed for some other reason than the missing grant: %v", err)
 		}
 	})

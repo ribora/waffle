@@ -143,11 +143,21 @@ container, and it is not skipped.
 ### tests:replacements
 
 What a test can replace are the fields of the generated `Replacements` struct, so
-that struct is what this command reads — parsed, not type-checked, which is why
-it also works on a service whose dependencies do not currently compile. The unit
-is the interface, not the field: several fields of one type collapse to a single
-entry, and an instantiated generic collapses to the generic interface it
-instantiates.
+that struct is what this command reads. The unit is the interface, not the field:
+several fields of one type collapse to a single entry, and an instantiated
+generic collapses to the generic interface it instantiates.
+
+The two halves read the module differently, and on purpose:
+
+| | how | why |
+|---|---|---|
+| the menu — what the containers expose | `go/parser` on the generated file alone | it is what you ask for when nothing builds yet, and it is the only way to learn what there is to request |
+| `check` — what the tests replace | `go/types` over the whole module | a `Replacements` value arrives through a helper's return, a field of the scenario struct, an element of a slice; none of those resolves by name, and all of them are how a suite is really written |
+
+`check` therefore refuses to answer on a module that does not type-check, rather
+than reporting that nothing is replaced — and a service in that state fails
+`go test` anyway. Loading the module costs about 0.4s, once per run, against a
+build cache `go test` has already warmed.
 
 The comparison itself lives in `gitlab.com/gorib/waffle/replacements`, so a
 service runs it from its own suite through the scaffolded

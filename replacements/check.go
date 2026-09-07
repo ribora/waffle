@@ -3,15 +3,15 @@ package replacements
 import (
 	"fmt"
 	"go/ast"
-	"go/parser"
 	"go/token"
-	"io/fs"
+	"go/types"
 	"path"
 	"path/filepath"
 	"slices"
 	"sort"
-	"strconv"
 	"strings"
+
+	"golang.org/x/tools/go/packages"
 )
 
 func Check() error {
@@ -82,11 +82,10 @@ type Report struct {
 func Verify(root string, found Inspection, cfg Config) (Report, error) {
 	report := Report{Warnings: unknownGrants(cfg, found.Seams)}
 
-	filledIn, warnings, err := scan(root, found)
+	filledIn, err := scan(root, found)
 	if err != nil {
 		return Report{}, err
 	}
-	report.Warnings = append(report.Warnings, warnings...)
 
 	byField := fields(found.Seams)
 	var refused []violation
@@ -239,44 +238,58 @@ func group(found []filled) []occurrences {
 	return out
 }
 
-// scan reads the module rather than one directory: a replacement is the same
-// decision wherever it is made, and a unit test next to the code it pins is as
-// good a place to make it as the feature package.
-func scan(root string, containers Inspection) ([]filled, []string, error) {
-	var out []filled
-	var warnings []string
-	err := filepath.WalkDir(root, func(p string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		rel, relErr := filepath.Rel(root, p)
-		if relErr != nil {
-			return relErr
-		}
-		if entry.IsDir() {
-			if skipScan(rel) {
-				return fs.SkipDir
-			}
-			return nil
-		}
-		// The generated container declares the struct and assigns its fields; a
-		// test in the same package is read like any other.
-		if !strings.HasSuffix(p, ".go") || slices.Contains(containers.Files, p) {
-			return nil
-		}
+// Types, not syntax: a helper's return, a field of the scenario struct and an
+// element of a slice all hold Replacements and none of them resolves by name.
+// The whole module, because a replacement is the same decision wherever it is made.
+func scan(root string, containers Inspection) ([]filled, error) {
+	fset := token.NewFileSet()
+	pkgs, err := packages.Load(&packages.Config{
+		Mode: packages.NeedName | packages.NeedSyntax | packages.NeedTypes |
+			packages.NeedTypesInfo | packages.NeedCompiledGoFiles,
+		Tests: true,
+		Dir:   root,
+		Fset:  fset,
+	}, "./...")
+	if err != nil {
+		return nil, fmt.Errorf("cannot read the module: %w", err)
+	}
+	// Refusing to answer beats saying "nothing is replaced" about sources nobody
+	// read.
+	if broken := loadErrors(pkgs); len(broken) > 0 {
+		return nil, fmt.Errorf("the module does not type-check, so its tests cannot be read:\n\t%s",
+			strings.Join(broken, "\n\t"))
+	}
 
-		fset := token.NewFileSet()
-		file, err := parser.ParseFile(fset, p, nil, parser.SkipObjectResolution)
-		if err != nil {
-			// Not fatal here: a file in this state fails the build too, and the
-			// compiler names the syntax better than this check can.
-			warnings = append(warnings, fmt.Sprintf("%s does not parse and was not read", filepath.ToSlash(rel)))
-			return nil
+	var out []filled
+	read := map[string]bool{}
+	for _, pkg := range pkgs {
+		for _, file := range pkg.Syntax {
+			name := fset.Position(file.Pos()).Filename
+			// Tests: true hands the same file back once per test variant.
+			if read[name] || excluded(root, name, containers.Files) {
+				continue
+			}
+			read[name] = true
+			out = append(out, replaced(file, pkg.TypesInfo, fset, root, containers.Paths)...)
 		}
-		out = append(out, replaced(file, fset, root, imports(file), containers.Paths)...)
-		return nil
-	})
-	return out, warnings, err
+	}
+	return out, nil
+}
+
+func loadErrors(pkgs []*packages.Package) []string {
+	var out []string
+	for _, pkg := range pkgs {
+		for _, e := range pkg.Errors {
+			out = append(out, e.Error())
+		}
+	}
+	slices.Sort(out)
+	out = slices.Compact(out)
+	// Enough to name the cause; the compiler will list the rest.
+	if len(out) > 3 {
+		out = out[:3]
+	}
+	return out
 }
 
 // The harness is the platform engineer's own code, and it is where the real
@@ -284,19 +297,20 @@ func scan(root string, containers Inspection) ([]filled, []string, error) {
 // deny the very thing the list exists to allow.
 var harnessDir = filepath.Join("tests", "internal")
 
-func skipScan(rel string) bool {
-	name := filepath.Base(rel)
-	switch {
-	case rel == ".":
-		return false
-	case name == "vendor" || name == "node_modules" || strings.HasPrefix(name, "."):
+func excluded(root, file string, containers []string) bool {
+	// The file, not its directory: the generated container assigns every field,
+	// but a test beside it is read like any other.
+	if slices.Contains(containers, file) {
 		return true
-	default:
-		return rel == harnessDir
 	}
+	rel, err := filepath.Rel(root, file)
+	if err != nil {
+		return true
+	}
+	return rel == harnessDir || strings.HasPrefix(rel, harnessDir+string(filepath.Separator))
 }
 
-func replaced(file *ast.File, fset *token.FileSet, root string, aliases map[string]string, containers []string) []filled {
+func replaced(file *ast.File, info *types.Info, fset *token.FileSet, root string, containers []string) []filled {
 	var out []filled
 	at := func(pos token.Pos) string {
 		p := fset.Position(pos)
@@ -307,11 +321,10 @@ func replaced(file *ast.File, fset *token.FileSet, root string, aliases map[stri
 		return fmt.Sprintf("%s:%d", filepath.ToSlash(rel), p.Line)
 	}
 
-	held := holders(file, aliases, containers)
 	ast.Inspect(file, func(n ast.Node) bool {
 		switch node := n.(type) {
 		case *ast.CompositeLit:
-			if !isReplacements(node.Type, aliases, containers) {
+			if !isReplacements(info.TypeOf(node), containers) {
 				return true
 			}
 			for _, elt := range node.Elts {
@@ -327,92 +340,33 @@ func replaced(file *ast.File, fset *token.FileSet, root string, aliases map[stri
 		case *ast.AssignStmt:
 			for _, lhs := range node.Lhs {
 				sel, ok := lhs.(*ast.SelectorExpr)
-				if !ok {
+				if !ok || !isReplacements(info.TypeOf(sel.X), containers) {
 					continue
 				}
-				if ident, ok := sel.X.(*ast.Ident); ok && held[ident.Name] {
-					out = append(out, filled{Field: sel.Sel.Name, Pos: at(sel.Pos())})
-				}
+				out = append(out, filled{Field: sel.Sel.Name, Pos: at(sel.Pos())})
 			}
 		}
 		return true
 	})
 	return out
-}
-
-func holders(file *ast.File, aliases map[string]string, containers []string) map[string]bool {
-	out := map[string]bool{}
-	ast.Inspect(file, func(n ast.Node) bool {
-		switch node := n.(type) {
-		case *ast.ValueSpec:
-			if isReplacements(node.Type, aliases, containers) {
-				for _, name := range node.Names {
-					out[name.Name] = true
-				}
-			}
-		case *ast.Field:
-			if isReplacements(node.Type, aliases, containers) {
-				for _, name := range node.Names {
-					out[name.Name] = true
-				}
-			}
-		case *ast.AssignStmt:
-			for i, lhs := range node.Lhs {
-				if i >= len(node.Rhs) {
-					break
-				}
-				if !isReplacements(literalType(node.Rhs[i]), aliases, containers) {
-					continue
-				}
-				if ident, ok := lhs.(*ast.Ident); ok {
-					out[ident.Name] = true
-				}
-			}
-		}
-		return true
-	})
-	return out
-}
-
-func literalType(expr ast.Expr) ast.Expr {
-	if unary, ok := expr.(*ast.UnaryExpr); ok {
-		expr = unary.X
-	}
-	if lit, ok := expr.(*ast.CompositeLit); ok {
-		return lit.Type
-	}
-	return nil
 }
 
 const structName = "Replacements"
 
-func isReplacements(expr ast.Expr, aliases map[string]string, containers []string) bool {
-	if star, ok := expr.(*ast.StarExpr); ok {
-		expr = star.X
-	}
-	sel, ok := expr.(*ast.SelectorExpr)
-	if !ok || sel.Sel.Name != structName {
+func isReplacements(t types.Type, containers []string) bool {
+	if t == nil {
 		return false
 	}
-	pkg, ok := sel.X.(*ast.Ident)
+	if ptr, ok := types.Unalias(t).(*types.Pointer); ok {
+		t = ptr.Elem()
+	}
+	named, ok := types.Unalias(t).(*types.Named)
 	if !ok {
 		return false
 	}
-	return slices.Contains(containers, aliases[pkg.Name])
-}
-
-func imports(file *ast.File) map[string]string {
-	out := make(map[string]string, len(file.Imports))
-	for _, spec := range file.Imports {
-		p, err := strconv.Unquote(spec.Path.Value)
-		if err != nil {
-			continue
-		}
-		name := path.Base(p)
-		if spec.Name != nil {
-			name = spec.Name.Name
-		}
-		out[name] = p
+	obj := named.Obj()
+	if obj.Name() != structName || obj.Pkg() == nil {
+		return false
 	}
-	return out
+	return slices.Contains(containers, obj.Pkg().Path())
 }
