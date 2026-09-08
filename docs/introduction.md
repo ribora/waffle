@@ -101,5 +101,6 @@ waffle/
 A component test boots the real container over real infrastructure and replaces
 only the leaves. The shared pieces live next to what they describe — `sql/sqltest`,
 `elastic/elastictest`, `pry.Recorder()`, `scribus.Recorder()`,
-`tools/grpc.Serve` — behind the three-method seam in `waffle/resource`. See
+`tools/grpc.Serve`, `tools/http.Serve` — behind the three-method seam in
+`waffle/resource`. See
 [conventions/component-harness](conventions/component-harness.md).

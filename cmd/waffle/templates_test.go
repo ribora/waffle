@@ -26,6 +26,10 @@ var (
 	// {{ .X }}, {{ title .X }}, {{- if .X }}
 	tplField  = regexp.MustCompile(`\{\{-?\s*(?:\w+\s+)?\.(\w+)`)
 	tplToggle = regexp.MustCompile(`\{\{-?\s*if\s+\.(\w+)`)
+	// The block, because what a list holds is decided by how the body reads it:
+	// a bare {{.}} wants strings, {{.Field}} wants records.
+	tplRange = regexp.MustCompile(`(?s)\{\{-?\s*range\s+\.(\w+)\s*-?\}\}(.*?)\{\{-?\s*end\s*-?\}\}`)
+	tplDot   = regexp.MustCompile(`\{\{-?\s*\.\s*-?\}\}`)
 )
 
 func commandDirs(t *testing.T) []string {
@@ -142,7 +146,28 @@ func values(fields []string, body string, toggles bool) map[string]any {
 	for _, m := range tplToggle.FindAllStringSubmatch(body, -1) {
 		out[m[1]] = toggles
 	}
+	// After the toggles, because a list is both: an empty one renders the off
+	// path of an `if` the way false does, and a full one the on path.
+	for _, m := range tplRange.FindAllStringSubmatch(body, -1) {
+		out[m[1]] = list(fields, m[2], toggles)
+	}
 	return out
+}
+
+func list(fields []string, block string, filled bool) any {
+	if !filled {
+		return []any{}
+	}
+	if tplDot.MatchString(block) {
+		return []string{"thing"}
+	}
+	// One record carrying every field the template names, so whichever of them
+	// the body reads resolves.
+	item := map[string]any{}
+	for _, f := range fields {
+		item[f] = "thing"
+	}
+	return []map[string]any{item}
 }
 
 func funcs() template.FuncMap {

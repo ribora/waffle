@@ -12,10 +12,10 @@ import (
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/agents"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/cmdcommand"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/component"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/converter"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/domain"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/grpc"
+	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/harness"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/http"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/migrate"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/migration"
@@ -78,7 +78,7 @@ func newCommands() commands {
 	cmds.Add(repository.New())
 	cmds.Add(cmdcommand.New())
 	cmds.Add(converter.New())
-	cmds.Add(component.New())
+	cmds.Add(harness.New())
 	cmds.Add(replacements.New())
 	cmds.Add(agents.New())
 	return cmds

@@ -319,7 +319,7 @@ func TestUserFlow(t *testing.T) {
 
 The field's type is the interface the value is wired as, so a fake that stops satisfying it fails to compile at the line that supplies it. Nothing is asserted at run time.
 
-Which fields a test may supply is a separate question, and the answer is `replacements.allow` in `waffle.yaml` — enforced by `TestReplacementsStayInsideTheList`, which `waffle tests:container init` scaffolds beside the container. See [tests:replacements](../cli/overview.md#testsreplacements).
+Which fields a test may supply is a separate question, and the answer is `replacements.allow` in `waffle.yaml` — enforced by `TestReplacementsStayInsideTheList`, which `waffle tests:harness init` scaffolds beside the container. See [tests:replacements](../cli/overview.md#testsreplacements).
 
 Note that `InitDi()` in `config/diogen/di.go` calls `InitApp()`, which passes no replacements — production behaviour is unchanged. Tests call `InitAppWith` directly.
 

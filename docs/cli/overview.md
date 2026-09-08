@@ -22,7 +22,7 @@ go install gitlab.com/gorib/waffle/cmd/waffle@latest
 | `waffle make:domain:migration <name> <description>` | Add a new SQL migration |
 | `waffle make:domain:command <name> <command>` | Add a CLI subcommand scoped to a domain |
 | `waffle make:converter <path>` | Scaffold a goverter convert.go at the given path |
-| `waffle tests:container [init]` | Report the container's own tests — a wiring check and the allow-list test — and write the missing ones with `init` ([details](../di/overview.md#testing-with-the-container)) |
+| `waffle tests:harness [init]` | Report the component harness, and write what is missing with `init` ([details](../conventions/component-harness.md)) |
 | `waffle tests:replacements [check] [--container=<path>]` | List everything the containers expose and what `replacements.allow` grants; `check` fails if a test replaces a field the list does not name |
 | `waffle agents` | Regenerate `AGENTS.md` after a waffle upgrade ([details](agents.md)) |
 
@@ -119,7 +119,7 @@ The whisk generator keeps its own `whisk.yaml` beside it, on the same missing-is
 
 The remaining commands — `make:domain:http`, `make:domain:scribus`,
 `make:domain:repository`, `make:domain:migration`, `make:domain:command`,
-`make:converter`, `tests:container` and `tests:replacements` — have no
+`make:converter`, `tests:harness` and `tests:replacements` — have no
 page of their own. They
 follow the same rules as the ones above (project root detection, idempotent
 writes, `make generate` afterwards); what they produce is described where the
@@ -129,16 +129,31 @@ produced thing is documented: [tools/http-handler](../tools/http-handler.md),
 [conventions/dto-conversion](../conventions/dto-conversion.md) and
 [di/overview](../di/overview.md#testing-with-the-container).
 
-`tests:container` names no container: it finds them by reading `-output` off the
-`//go:generate` lines that invoke diogen, so a service with two containers gets a
-test beside each. A bare run reports which of those tests are already there;
-`init` writes the ones that are not and leaves the rest alone. The scaffolded
-test starts with a `t.Skip`, because the container reads the environment while it
-wires and nothing can guess which variables this test needs. Beside the first
-container `init` also writes `replacements_test.go`, which calls
-`replacements.Check()` — the same comparison `tests:replacements check` runs, as
-an ordinary test. That one reads the whole module, so one copy answers for every
-container, and it is not skipped.
+`tests:harness` takes one optional operand: a bare run reports which of the
+harness files are there, and `init` writes the rest, leaving an existing file
+alone. Which files those are, and why they sit where they do, is
+[conventions/component-harness](../conventions/component-harness.md#scaffolding-it).
+
+Four things come from the container rather than from a flag, because a flag would
+close a set the container already knows:
+
+- **the database.** A seam of type `gitlab.com/gorib/sql.Db` means postgres, and
+  the harness gets `sqltest` plus every `domain/*/cmd/migrate` it finds. Without
+  one — an API gateway, a proxy — the set is `resource.New()`, whose `Up`, `Reset`
+  and `Down` do nothing. Adding a resource later is editing that literal.
+- **the transports.** `NewGrpcCommand` in the container gives an in-process gRPC
+  server, `NewHttpCommand` gives `waffleHttp.Serve` over the container's own mux
+  and router, and a service that has both gets both behind one `Clients` — two
+  of the nine in sherpa do.
+- **the handlers and the interceptor order**, copied out of the daemon's own
+  construction call, so the server a scenario talks to is chained like the
+  daemon's.
+- **the dead connections.** Every `grpc.ClientConnInterface` seam becomes
+  `grpcClient.Dead(...)`, because replacing a typed client does not stop the
+  connection under it from being built.
+
+What it cannot know — a second resource, extra environment, which typed client
+belongs to which handler — it leaves as a named gap rather than a guess.
 
 ### tests:replacements
 

@@ -77,7 +77,7 @@ Two roles, and this rule is written for the first one.
 
 | | owns | in this repository |
 |---|---|---|
-| the person writing the specification | the cases, the steps, the red-green loop | `tests/feature/` |
+| the person writing the specification | the cases, the steps, the red-green loop | `tests/`, except `tests/internal/` |
 | the person who owns the platform | what may be replaced, and the harness | `waffle.yaml`, `tests/internal/` |
 
 **You work for the first.** The platform is a given: read it, use it, and when it
@@ -258,11 +258,18 @@ database behaviour (uniqueness, not-found) that belongs to the schema. Fixtures
 go in through the container's own repositories, never through the operation under
 test.
 
-Then bind to the real container:
+Then bind to the real container through the harness, which fills in what is a
+condition of booting rather than a choice the case makes:
 
 ```go
-app, err := diogen.InitAppWith(diogen.Replacements{ /* the cut */ })
+app, err := harness.Boot(ctx, diogen.Replacements{ /* the cut */ })
+clients, err := app.Serve()
 ```
+
+`Boot` wraps `diogen.InitAppWith`; call that directly only on a service with no
+harness. The `.feature` files go in `tests/feature/` and the Go beside Go in
+`tests/` — only one of the two is a specification, and it is read by someone who
+does not read the other.
 
 #### What may be replaced is given, not chosen
 
@@ -351,19 +358,20 @@ around it. The recognisable cases:
 - **the cut removes what the case was meant to exercise** — a repository
   replaced by a mock makes the test check the mock's SQL, not the schema's.
 
-**Do not build the infrastructure by hand.** The harness is a set of libraries —
-the resource seam, postgres and elasticsearch resources, an in-process gRPC
-server chaining the **same** interceptors the daemon uses — listed in
-`docs/conventions/component-harness.md`. A run needs no configuration either:
-with no DSN set, a postgres container is started and the next run reuses it, so
-do not ask for one.
+**Do not build the infrastructure by hand.** `waffle tests:harness init` writes
+it, reading the container for what this service needs: the database and its
+migrations, the transport, the interceptor order, and a dead connection for every
+`ClientConnInterface` seam. A run needs no configuration either — with no DSN
+set, a postgres container is started and the next run reuses it, so do not ask
+for one. `docs/conventions/component-harness.md` in waffle is the reference.
 
-**Write a boot smoke test before any case**, in `tests/`, next to the scenarios:
-it brings the resources up, boots on the given cut and asserts only that the
-callers are non-nil. One run then tells you what the cut is missing instead of an
-hour inside a half-written suite. (`waffle tests:container init` writes the
-container's own wiring check beside `InitAppWith`, with no infrastructure. Keep
-both.)
+**The boot smoke test comes before any case**, and `init` writes it: it brings
+the resources up, boots on the given cut and asserts only that the callers are
+non-nil. One run then tells you what the cut is missing instead of an hour inside
+a half-written suite.
+
+What the command leaves for you is what the container cannot say: a second
+resource, extra environment, and which typed client belongs to which handler.
 
 Still no production code at this stage.
 
@@ -457,7 +465,7 @@ something to fill in by hand without saying so:
 | Add one migration to a domain that already has them | `waffle make:domain:migration <domain> <name>` |
 | Add CLI subcommand | `waffle make:domain:command <domain> <name>` |
 | Add DTO converter (any path) | `waffle make:converter <path>` — also creates `pkg/goverter/convert.go` if it is missing |
-| See the container's own tests, and write the missing ones | `waffle tests:container` reports, `waffle tests:container init` writes — finds the container itself (Rule #11 step 3) |
+| Put the component harness in place | `waffle tests:harness` reports what is there, `waffle tests:harness init` writes the rest (Rule #11 step 3) |
 | See what a test may replace | `waffle tests:replacements` — every seam, marked `# leaf` and `# allowed` |
 | Check what the tests replace | `waffle tests:replacements check` (Rule #11 step 3) |
 | Refresh AGENTS.md | `waffle agents` |

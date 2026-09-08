@@ -198,10 +198,10 @@ not a matter of taste:
 
 - a seam the test **programs** — an outbound client, an adapter — gets a mock.
 - a seam that only has to be **non-nil for the boot** — a message consumer, an
-  unreachable connection, the logger — gets a no-op owned by the harness
-  (`pry.Noop()`, `grpcClient.Dead()`). Declaring expectations for the calls a
-  container makes while constructing itself turns "this does not matter" into
-  work in every case.
+  unreachable connection, the logger — gets a stand-in owned by the harness, not
+  a mock (`grpcClient.Dead()` for a connection, a recorder for the rest).
+  Declaring expectations for the calls a container makes while constructing
+  itself turns "this does not matter" into work in every case.
 - a seam a later assertion **reads back** gets a recorder — `pry.Recorder()`,
   `scribus.Recorder()`. The line between the last two is the specification: a
   no-op is a recorder nobody queries, so silence is right exactly where nothing
@@ -312,9 +312,9 @@ workflow that gets abandoned at the first step that does not work.
 
 **Available:**
 
-- `waffle tests:container init` scaffolds the container's own wiring check — no
-  infrastructure, and deliberately not the component test this page means by the
-  word.
+- `waffle tests:harness init` scaffolds the harness, the suite's `TestMain`, the
+  boot smoke test and `TestReplacementsStayInsideTheList`, reading the container
+  for the database, the transport and the connections that must be dead.
 - `replacements.Check()`, scaffolded as a test beside the container, enforces
   `replacements.allow` — what a test may replace is a decision someone made, not
   a habit — and `waffle tests:replacements` prints everything the containers
@@ -324,13 +324,13 @@ workflow that gets abandoned at the first step that does not work.
 - **the component harness**, as libraries — see
   [conventions/component-harness](component-harness.md). The resource seam is
   `waffle/resource`; postgres and elasticsearch are `sql/sqltest` and
-  `elastic/elastictest`; the in-process gRPC server is `waffle/tools/grpc.Serve`,
-  chaining interceptors with the same `UnaryChain` the daemon uses; the leaves
-  that used to be hand-written per service — a silent logger, a no-op consumer, a
-  dead connection — are `pry.Noop()`/`pry.Recorder()`, `scribus.Recorder()` and
-  `grpcClient.Dead()`. Two services run on them. A run needs no configuration at
-  all: without a DSN the harness starts a postgres container and the next run
-  reuses it.
+  `elastic/elastictest`; the in-process servers are `waffle/tools/grpc.Serve`,
+  chaining interceptors with the same `UnaryChain` the daemon uses, and
+  `waffle/tools/http.Serve` over the container's own mux and router; the leaves
+  that used to be hand-written per service — a logger, a consumer, a dead
+  connection — are `pry.Recorder()`, `scribus.Recorder()` and `grpcClient.Dead()`.
+  Four services run on them. A run needs no configuration at all: without a DSN
+  the harness starts a postgres container and the next run reuses it.
 
 **Not available yet:**
 
