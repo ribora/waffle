@@ -323,8 +323,9 @@ workflow that gets abandoned at the first step that does not work.
   rather than any one format, so it is followable today with ordinary Go tests.
 - **the component harness**, as libraries — see
   [conventions/component-harness](component-harness.md). The resource seam is
-  `waffle/resource`; postgres and elasticsearch are `sql/sqltest` and
-  `elastic/elastictest`; the in-process servers are `waffle/tools/grpc.Serve`,
+  `waffle/resource`; postgres, redis and elasticsearch are `sql/sqltest`,
+  `redis/redistest` and `elastic/elastictest`; the in-process servers are
+  `waffle/tools/grpc.Serve`,
   chaining interceptors with the same `UnaryChain` the daemon uses, and
   `waffle/tools/http.Serve` over the container's own mux and router; the leaves
   that used to be hand-written per service — a logger, a consumer, a dead

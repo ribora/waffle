@@ -4,6 +4,7 @@ import (
 "context"
 
 {{if .Dead}}grpcClient "gitlab.com/gorib/grpc/client"
+{{end}}{{if .Hilton}}"gitlab.com/gorib/hilton"
 {{end}}{{if .Logger}}"gitlab.com/gorib/pry"
 {{end}}{{if .Consumer}}"gitlab.com/gorib/waffle/tools/scribus"
 {{end}}
@@ -18,7 +19,8 @@ type App struct {
 *{{.Package}}.Application
 {{if .Consumer}}
 Consumer *scribus.ConsumerRecorder{{end}}{{if .Logger}}
-Logger *pry.LogRecorder{{end}}
+Logger *pry.LogRecorder{{end}}{{if .Hilton}}
+Telemetry *hilton.Recording{{end}}
 }
 
 // Fills in what is a condition of booting rather than a choice the test makes.
@@ -31,11 +33,19 @@ return nil, err
 }
 
 {{if .Consumer}}consumer := scribus.Recorder()
+{{end}}{{if .Hilton}}// A recorder rather than hilton.Noop(), which is what the container would build
+// on its own: the interceptor order that decides which status a span carries is
+// only assertable if something kept the span.
+telemetry := hilton.Recorder()
 {{end}}{{if .Logger}}// A recorder rather than pry.Noop(): silence is right only where nothing is
 // asserted, and swapping it later means editing this line.
 logger := pry.Recorder()
 {{end}}{{if .Postgres}}cut.SqlDb = postgres.Db()
+{{end}}{{if .Redis}}// A real redis rather than a stand-in: the repository builds redis commands,
+// and a fake would be checking its own map.
+cut.RedisDb = cache.Db()
 {{end}}{{if .Logger}}cut.PryLogger = logger
+{{end}}{{if .Hilton}}cut.HiltonProvider = telemetry
 {{end}}{{if .Consumer}}cut.ScribusConsumer = consumer
 {{end}}{{if .Dead}}
 // Replacing a seam does not prune what feeds it, so the connection under a
@@ -49,5 +59,5 @@ application, err := {{.Package}}.InitAppWith(cut)
 if err != nil {
 return nil, err
 }
-return &App{Application: application{{if .Consumer}}, Consumer: consumer{{end}}{{if .Logger}}, Logger: logger{{end}}}, nil
+return &App{Application: application{{if .Consumer}}, Consumer: consumer{{end}}{{if .Logger}}, Logger: logger{{end}}{{if .Hilton}}, Telemetry: telemetry{{end}}}, nil
 }

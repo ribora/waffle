@@ -137,10 +137,11 @@ alone. Which files those are, and why they sit where they do, is
 Four things come from the container rather than from a flag, because a flag would
 close a set the container already knows:
 
-- **the database.** A seam of type `gitlab.com/gorib/sql.Db` means postgres, and
-  the harness gets `sqltest` plus every `domain/*/cmd/migrate` it finds. Without
-  one — an API gateway, a proxy — the set is `resource.New()`, whose `Up`, `Reset`
-  and `Down` do nothing. Adding a resource later is editing that literal.
+- **the systems.** A seam of type `gitlab.com/gorib/sql.Db` means postgres, and
+  the harness gets `sqltest` plus every `domain/*/cmd/migrate` it finds; a
+  `gitlab.com/gorib/redis.Db` seam means `redistest`. Without either — an API
+  gateway, a proxy — the set is `resource.New()`, whose `Up`, `Reset` and `Down`
+  do nothing. Adding a resource later is editing that literal.
 - **the transports.** `NewGrpcCommand` in the container gives an in-process gRPC
   server, `NewHttpCommand` gives `waffleHttp.Serve` over the container's own mux
   and router, and a service that has both gets both behind one `Clients` — two

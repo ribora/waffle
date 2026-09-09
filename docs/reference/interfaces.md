@@ -211,7 +211,7 @@ type Resource interface {
 }
 ```
 
-An external system a component test runs against for real. The package names no system and imports no client, so an implementation can live anywhere — `sql/sqltest`, `elastic/elastictest`, or next to a client of your own. `Set` (from `resource.New`) runs `Up` once per run and `Reset` between scenarios. See [Component harness](../conventions/component-harness.md).
+An external system a component test runs against for real. The package names no system and imports no client, so an implementation can live anywhere — `sql/sqltest`, `redis/redistest`, `elastic/elastictest`, or next to a client of your own. `Set` (from `resource.New`) runs `Up` once per run and `Reset` between scenarios. See [Component harness](../conventions/component-harness.md).
 
 ### Named
 

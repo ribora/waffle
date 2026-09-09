@@ -26,7 +26,7 @@ app, err := harness.Boot(ctx, diogen.Replacements{ /* the cut */ })
 clients, err := app.Serve()
 ```
 
-What goes into the files is read off the generated container: a `gitlab.com/gorib/sql.Db` seam means postgres and every `domain/*/cmd/migrate` it finds; `NewGrpcCommand` and `NewHttpCommand` decide the transports and hand over the handler and interceptor lists the daemon itself uses; every `grpc.ClientConnInterface` seam becomes a `grpcClient.Dead(...)` line.
+What goes into the files is read off the generated container: a `gitlab.com/gorib/sql.Db` seam means postgres and every `domain/*/cmd/migrate` it finds, a `gitlab.com/gorib/redis.Db` seam means redis; `NewGrpcCommand` and `NewHttpCommand` decide the transports and hand over the handler and interceptor lists the daemon itself uses; every `grpc.ClientConnInterface` seam becomes a `grpcClient.Dead(...)` line.
 
 No `--with=postgres,elastic`, and there never will be: a flag closes the set, and elastic 7 against elastic 8 is not even a different system, just a different class for the same one. What the container cannot say — a second resource, extra environment, which typed client belongs to which handler — is left as a named gap.
 
@@ -35,7 +35,7 @@ No `--with=postgres,elastic`, and there never will be: a flag closes the set, an
 | Layer | Where | Why there |
 |---|---|---|
 | the seam — `Resource`, `Set` | `gitlab.com/gorib/waffle/resource` | form, not a list: it imports no client, so it is tied to no version of anything |
-| the implementations | `<pkg>/<pkg>test` — [`sql/sqltest`](#postgres), [`elastic/elastictest`](#elasticsearch) | they move with what they describe, in the same commit and the same version |
+| the implementations | `<pkg>/<pkg>test` — [`sql/sqltest`](#postgres), [`redis/redistest`](#redis), [`elastic/elastictest`](#elasticsearch) | they move with what they describe, in the same commit and the same version |
 | `Boot`, `Env`, the resource list | the service, in `tests/internal/harness/` | `Boot` imports the service's generated `config/diogen`, and a library cannot depend on a service |
 
 The third row is the reason there is no catalogue of systems in `waffle.yaml`. `init` writes the third row's files, but it never holds the list. **The registry is a literal in the service's own code:**
@@ -119,6 +119,23 @@ The drop uses `with (force)` — **postgres 13 or later**: our own pool is close
 
 Truncation, not a database per scenario, and not a pinned transaction: the scenario talks to the service over a real connection, and context values do not cross that boundary.
 
+## Redis
+
+`gitlab.com/gorib/redis/redistest` works from a `host:port`, and the address chain is the postgres one: explicit `Addr`, then `Env` in order, then `Docker`, with the container last so that CI never starts one. `Reset` is `FLUSHDB`; `Migrate` does nothing, because keys carry their own shape.
+
+**The container is this run's own, and `Down` removes it** — the opposite of postgres, from the same reasoning. Measured on a laptop:
+
+| | postgres | redis |
+|---|---|---|
+| starting the container, to accepting connections | ~2.6 s | ~0.18 s |
+| emptying it | ~0.2 s (create + migrate) | <1 ms (`FLUSHDB`) |
+
+Postgres is a container that costs thirteen times what its contents cost, so you keep the container and throw the database away. Redis has no expensive contents to throw away, and the container itself is inside the noise — so you throw the container away instead. **Reuse what is expensive to build; discard what is cheap.** Copying the shape of `sqltest` here would have been copying its conclusion instead of its reasoning.
+
+Two things follow. The runtime picks the port (`-p 127.0.0.1::6379`, read back with `docker port`) and there is no container name, because a fixed name and a fixed port are exactly how two runs would land in one instance — so `redistest` is parallel-safe by construction, and `Index` matters only for a server that was given rather than started. And `Down` runs `context.WithoutCancel`: a cancelled run is precisely when the container has to go, so teardown must not inherit the cancellation that triggered it.
+
+**The sweep is what keeps a killed run from piling up.** `Down` does not run on Ctrl+C, a test timeout or a cancelled CI job. So `Provision` removes containers carrying the `gorib-harness=redis` label that are over an hour old and report no connections but its own probe. Unlike a postgres database, this needs no mark of its own: docker records the creation time.
+
 ## Elasticsearch
 
 `gitlab.com/gorib/elastic/elastictest` goes over HTTP instead of through `elastic.Client`, for one concrete reason: emptying an index and making a seed visible both need `?refresh`, and no client here exposes it.
@@ -165,6 +182,8 @@ Where to put it, by number of consumers — with no exception for gorib:
 | one service | `tests/internal/harness/kafkatest` |
 | two or more | next to the client: client in `pkg/kafka` → `pkg/kafka/kafkatest` |
 | the client moved into gorib | the harness moves with it |
+
+**Measure before choosing what to keep between runs.** Both existing resources start a container, and they dispose of it oppositely — see [Redis](#redis) for the two numbers that decide it. Take the reasoning from whichever one your system resembles, not the shape.
 
 ## Choosing where to cut
 
@@ -294,5 +313,5 @@ err = w.app.Consumer.Deliver(ctx, delivery)   // nil settled, error requeued
 
 ## Not there yet
 
-- **Only postgres is parallel-safe.** `sqltest.Ephemeral()` gives each process its own database; `elastictest` has no equivalent, so two processes sharing an elasticsearch would share its indices. A prefix per process is the same idea and the same few lines, once a service needs it.
-- **Redis has no resource yet**, and neither does rabbit. Both are a `flushdb`-shaped afternoon when a service needs one.
+- **Elasticsearch is not parallel-safe.** `sqltest.Ephemeral()` gives each process its own database and `redistest` its own container; `elastictest` has neither, so two processes sharing an elasticsearch would share its indices. A prefix per process is the same idea and the same few lines, once a service needs it.
+- **Rabbit has no resource yet.** A `flushdb`-shaped afternoon when a service needs one.

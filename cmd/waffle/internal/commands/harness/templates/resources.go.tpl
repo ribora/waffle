@@ -9,6 +9,7 @@ import (
 {{end}}"os"
 
 {{if .Migrations}}"github.com/pressly/goose/v3"
+{{end}}{{if .Redis}}"gitlab.com/gorib/redis/redistest"
 {{end}}{{if .Postgres}}"gitlab.com/gorib/sql/sqltest"
 {{end}}"gitlab.com/gorib/waffle/resource"
 {{range .Migrations}}{{.Alias}} "{{.Path}}"
@@ -23,9 +24,17 @@ sqltest.Database("{{.Service}}_test"),
 sqltest.Ephemeral(),
 {{if .Migrations}}sqltest.Migrations(migrations),
 {{end}})
+{{end}}{{if .Redis}}
+// Without {{.Env}}_TEST_REDIS a container of this run's own is started, and
+// Down removes it: starting one costs less than keeping two suites out of each
+// other's keyspace.
+var cache = redistest.New(
+redistest.Env("{{.Env}}_TEST_REDIS"),
+redistest.Docker("redis:8-alpine"),
+)
 {{end}}
 // The registry. Adding a system is adding it here, and nothing else changes.
-var resources = resource.New({{if .Postgres}}postgres{{end}})
+var resources = resource.New({{range .Resources}}{{.}}, {{end}})
 {{if .Migrations}}
 func migrations(ctx context.Context, handle *dbSql.DB) error {
 for _, source := range []embed.FS{

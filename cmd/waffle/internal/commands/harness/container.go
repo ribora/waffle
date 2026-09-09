@@ -14,17 +14,23 @@ import (
 const (
 	sqlDbPath    = "gitlab.com/gorib/sql"
 	sqlDbName    = "Db"
+	redisDbPath  = "gitlab.com/gorib/redis"
+	redisDbName  = "Db"
 	connPath     = "google.golang.org/grpc"
 	connName     = "ClientConnInterface"
 	loggerPath   = "gitlab.com/gorib/pry"
 	loggerName   = "Logger"
+	hiltonPath   = "gitlab.com/gorib/hilton"
+	hiltonName   = "Provider"
 	consumerPath = "gitlab.com/gorib/waffle/tools/scribus"
 	consumerName = "Consumer"
 )
 
 type shape struct {
 	Postgres bool
+	Redis    bool
 	Logger   bool
+	Hilton   bool
 	Consumer bool
 	Dead     []conn
 	Grpc     wiring
@@ -53,8 +59,12 @@ func read(container replacements.Container, seams []replacements.Seam) (shape, e
 			switch {
 			case ref.Path == sqlDbPath && ref.Name == sqlDbName:
 				out.Postgres = true
+			case ref.Path == redisDbPath && ref.Name == redisDbName:
+				out.Redis = true
 			case ref.Path == loggerPath && ref.Name == loggerName:
 				out.Logger = true
+			case ref.Path == hiltonPath && ref.Name == hiltonName:
+				out.Hilton = true
 			case ref.Path == consumerPath && ref.Name == consumerName:
 				out.Consumer = true
 			case ref.Path == connPath && ref.Name == connName:

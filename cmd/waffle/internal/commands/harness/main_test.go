@@ -129,6 +129,38 @@ func InitAppWith(replacements Replacements) (*Application, error) {
 }
 `
 
+const cacheContainer = `package diogen
+
+import (
+	sql "gitlab.com/gorib/sql"
+	redis "gitlab.com/gorib/redis"
+	hilton "gitlab.com/gorib/hilton"
+	pry "gitlab.com/gorib/pry"
+	grpcCommand "gitlab.com/gorib/waffle/tools/grpc"
+	server "gitlab.com/gorib/grpc/server"
+)
+
+type Replacements struct {
+	SqlDb          sql.Db
+	RedisDb        redis.Db
+	HiltonProvider hilton.Provider
+	PryLogger      pry.Logger
+}
+
+func InitAppWith(replacements Replacements) (*Application, error) {
+	{
+		s := grpcCommand.NewGrpcCommand(
+			[]grpcCommand.ServiceHandler{container.shopGrpcOrderServiceAsGrpcCommandServiceHandler},
+			[]server.Interceptor{container.interceptorLogMWAsServerInterceptor},
+			nil,
+			container.appBaseCommandForGrpcCommandGrpcCommand,
+		)
+		container.grpcGrpcCommand = s
+	}
+	return container, nil
+}
+`
+
 func module(t *testing.T, container string, extra map[string]string) {
 	t.Helper()
 	t.Chdir(t.TempDir())
@@ -314,6 +346,74 @@ func TestInitWritesAnHttpServerAndAnEmptyResourceSet(t *testing.T) {
 	}
 	if strings.Contains(server, "waffleGrpc") {
 		t.Errorf("a service that serves no gRPC got a gRPC server:\n%s", server)
+	}
+}
+
+// A second system is a second entry in the one registry, and the order of the
+// entries is the order they are declared above it.
+func TestInitWritesRedisBesideTheDatabase(t *testing.T) {
+	module(t, cacheContainer, nil)
+
+	if err := New().Run(t.Context(), "init"); err != nil {
+		t.Fatalf("init: %v", err)
+	}
+
+	resources := written(t, "tests/internal/harness/resources.go")
+	for _, want := range []string{
+		`redistest.Env("SHOP_TEST_REDIS")`,
+		`redistest.Docker("redis:8-alpine")`,
+		"resource.New(postgres, cache)",
+	} {
+		if !strings.Contains(resources, want) {
+			t.Errorf("resources.go is missing %q:\n%s", want, resources)
+		}
+	}
+
+	// The seam the container builds eagerly out of REDIS_HOST when nobody fills it.
+	if boot := written(t, "tests/internal/harness/boot.go"); !strings.Contains(boot, "cut.RedisDb = cache.Db()") {
+		t.Errorf("boot.go leaves redis to the environment:\n%s", boot)
+	}
+}
+
+// The container's own default is hilton.Noop(), so nothing breaks without this
+// — the span a scenario wants to read back merely does not exist.
+func TestInitRecordsTelemetryRatherThanSilencingIt(t *testing.T) {
+	module(t, cacheContainer, nil)
+
+	if err := New().Run(t.Context(), "init"); err != nil {
+		t.Fatalf("init: %v", err)
+	}
+
+	boot := written(t, "tests/internal/harness/boot.go")
+	for _, want := range []string{
+		"Telemetry *hilton.Recording",
+		"telemetry := hilton.Recorder()",
+		"cut.HiltonProvider = telemetry",
+		"Telemetry: telemetry",
+	} {
+		if !strings.Contains(boot, want) {
+			t.Errorf("boot.go is missing %q:\n%s", want, boot)
+		}
+	}
+	// The assignment, not the word: the comment above it names Noop as the thing
+	// being rejected.
+	if strings.Contains(boot, "= hilton.Noop()") {
+		t.Errorf("the harness silenced telemetry instead of recording it:\n%s", boot)
+	}
+}
+
+func TestInitLeavesRedisOutWhenTheContainerHasNone(t *testing.T) {
+	module(t, grpcContainer, nil)
+
+	if err := New().Run(t.Context(), "init"); err != nil {
+		t.Fatalf("init: %v", err)
+	}
+
+	resources := written(t, "tests/internal/harness/resources.go")
+	for _, unwanted := range []string{"redistest", "cache"} {
+		if strings.Contains(resources, unwanted) {
+			t.Errorf("a service with no redis got %q:\n%s", unwanted, resources)
+		}
 	}
 }
 

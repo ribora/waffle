@@ -146,7 +146,10 @@ func (c *cmd) plan() (map[string]string, map[string]any, error) {
 		"Container":        importPath,
 		"Package":          container.Package,
 		"Postgres":         found.Postgres,
+		"Redis":            found.Redis,
+		"Resources":        registry(found),
 		"Logger":           found.Logger,
+		"Hilton":           found.Hilton,
 		"Consumer":         found.Consumer,
 		"Migrations":       migrations(module),
 		"Dead":             dead(found.Dead),
@@ -177,6 +180,20 @@ func (c *cmd) plan() (map[string]string, map[string]any, error) {
 }
 
 func tpl(name string) string { return filepath.Join("templates", name) }
+
+// The literal resource.New is given, in the order the systems are declared
+// above it. Empty for a service that reaches no infrastructure at all, and Up,
+// Reset and Down then do nothing.
+func registry(found shape) []string {
+	var out []string
+	if found.Postgres {
+		out = append(out, "postgres")
+	}
+	if found.Redis {
+		out = append(out, "cache")
+	}
+	return out
+}
 
 func dead(conns []conn) []map[string]string {
 	out := make([]map[string]string, 0, len(conns))
