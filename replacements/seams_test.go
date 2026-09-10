@@ -96,6 +96,34 @@ func TestReadSeams(t *testing.T) {
 	}
 }
 
+// A di.Tags[T](tag) collection: []T, not an interface
+func TestReadSeamsForTagCollection(t *testing.T) {
+	c := writeContainer(t, `package diogen
+
+import fw "gitlab.com/gorib/di/testdata/cases/include_tags/framework"
+
+type Replacements struct {
+	FwHandlerAsHandlerTag []fw.Handler
+}
+`)
+
+	seams, err := ReadSeams(c, "example.com/svc/config/diogen")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(seams) != 1 {
+		t.Fatalf("read %d seams, want 1: %+v", len(seams), seams)
+	}
+	got := seams[0]
+	wantType := TypeRef{"gitlab.com/gorib/di/testdata/cases/include_tags/framework", "Handler"}
+	if got.Field != "FwHandlerAsHandlerTag" || len(got.Types) != 1 || got.Types[0] != wantType {
+		t.Errorf("= %+v, want Field=FwHandlerAsHandlerTag Types=[%v]", got, wantType)
+	}
+	if got.Composite() {
+		t.Error("a single-element []T collection reports itself as composite")
+	}
+}
+
 func TestReadSeamsEmptyStruct(t *testing.T) {
 	c := writeContainer(t, "package diogen\n\ntype Replacements struct{}\n")
 
@@ -206,6 +234,117 @@ func TestReadSeamsMarksLeaves(t *testing.T) {
 		if seam.Leaf != want[seam.Field] {
 			t.Errorf("%s: Leaf = %v, want %v", seam.Field, seam.Leaf, want[seam.Field])
 		}
+	}
+}
+
+// One constructor feeds two tag collections (di.Wire(NewBoth, di.Tag("h"),
+// di.Tag("n"))). Every tagged member builds unconditionally — diogen does not
+// skip it even when both collections are replaced, the same "a seam does not
+// prune what feeds it" rule ordinary fields already follow — so there is no
+// container.X = replacements.Y prologue line for leafSeams to key on at all;
+// the assignment lives inside an if/else instead.
+const tagCollectionContainer = `package diogen
+
+type Handler interface{ Path() string }
+type Named interface{ Name() string }
+
+type Replacements struct {
+	Multi_tagHandlerAsH []Handler
+	Multi_tagNamedAsN   []Named
+}
+
+func InitAppWith(replacements Replacements) (_ *Application, err error) {
+	s := NewBoth()
+	container.multi_tagBothAsMulti_tagHandler = s
+	container.multi_tagBothAsMulti_tagNamed = s
+
+	if replacements.Multi_tagHandlerAsH != nil {
+		container.multi_tagHandlerAsH = replacements.Multi_tagHandlerAsH
+	} else {
+		container.multi_tagHandlerAsH = []Handler{container.multi_tagBothAsMulti_tagHandler}
+	}
+
+	if replacements.Multi_tagNamedAsN != nil {
+		container.multi_tagNamedAsN = replacements.Multi_tagNamedAsN
+	} else {
+		container.multi_tagNamedAsN = []Named{container.multi_tagBothAsMulti_tagNamed}
+	}
+
+	return container, nil
+}
+`
+
+// A tag collection is never a leaf: leafSeams only recognizes the ordinary
+// container.X = replacements.Y prologue shape, which a tag collection's
+// if/else assignment does not match — so it is absent from leafSeams'
+// bookkeeping entirely, and Leaf defaults to false. That default happens to be
+// the right answer regardless: replacing the collection never prunes the real
+// tagged constructors feeding it.
+func TestReadSeamsTagCollectionsAreNotLeaves(t *testing.T) {
+	c := writeContainer(t, tagCollectionContainer)
+
+	seams, err := ReadSeams(c, "example.com/svc/config/diogen")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(seams) != 2 {
+		t.Fatalf("read %d seams, want 2: %+v", len(seams), seams)
+	}
+	for _, seam := range seams {
+		if seam.Leaf {
+			t.Errorf("%s: Leaf = true, want false", seam.Field)
+		}
+	}
+}
+
+// A tag collected into exactly one collection (the common case) is skippable:
+// diogen guards each tagged constructor with the same container.X == nil
+// prologue shape ordinary fields use, so leafSeams recognizes it directly —
+// unlike the non-skippable, absent-from-bookkeeping case above.
+const skippableTagCollectionContainer = `package diogen
+
+type Handler interface{ Path() string }
+
+type Replacements struct {
+	TagsHandlerAsHandlerTag []Handler
+}
+
+func InitAppWith(replacements Replacements) (_ *Application, err error) {
+	container.tagsHandlerAsHandlerTag = replacements.TagsHandlerAsHandlerTag
+
+	if container.tagsHandlerAsHandlerTag == nil {
+		s := NewA()
+		container.tagsHandlerFromNewA = s
+	}
+
+	if container.tagsHandlerAsHandlerTag == nil {
+		s := NewB()
+		container.tagsHandlerFromNewB = s
+	}
+
+	if container.tagsHandlerAsHandlerTag == nil {
+		container.tagsHandlerAsHandlerTag = []Handler{container.tagsHandlerFromNewA, container.tagsHandlerFromNewB}
+	}
+
+	return container, nil
+}
+`
+
+func TestReadSeamsSkippableTagCollectionIsNotALeaf(t *testing.T) {
+	c := writeContainer(t, skippableTagCollectionContainer)
+
+	seams, err := ReadSeams(c, "example.com/svc/config/diogen")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(seams) != 1 {
+		t.Fatalf("read %d seams, want 1: %+v", len(seams), seams)
+	}
+	// Assembling the real value reads tagsHandlerFromNewA/B, which belong to no
+	// seam of their own — same reason as the non-skippable case, just reached
+	// through actual bookkeeping instead of by absence this time.
+	if seams[0].Leaf {
+		t.Errorf("%s: Leaf = true, want false", seams[0].Field)
 	}
 }
 

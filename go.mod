@@ -8,7 +8,7 @@ require (
 	github.com/pborman/getopt/v2 v2.2.0
 	github.com/pressly/goose/v3 v3.27.3
 	gitlab.com/gorib/amqp v1.8.4
-	gitlab.com/gorib/di v1.6.2
+	gitlab.com/gorib/di v1.7.0
 	gitlab.com/gorib/elastic v1.3.2
 	gitlab.com/gorib/env v1.0.1
 	gitlab.com/gorib/failure v1.2.2

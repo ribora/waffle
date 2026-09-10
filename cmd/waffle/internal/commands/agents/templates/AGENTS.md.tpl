@@ -604,8 +604,10 @@ here is why a registration has no entry, and how *not* to substitute one:
 
 **A seam exists only when every type the registration is exposed as is an
 interface.** `di.Define(NewServer)` exposes the concrete `*Server` and gets no
-field; `di.Tag` members get none either, because the membership of a collection
-is fixed at generation time — replace the consumer that collects them instead.
+field. A `di.Tag` member gets no seam of its own either — membership is fixed at
+generation time, so replacing one member cannot change the set — but the
+collection its `di.Tags[T]` consumer gathers does: a `Replacements` field of type
+`[]T` replaces the whole collection at once.
 
 - ❌ `if env.Value("APP_ENV") == "test"` in `InitDi()` — that puts test knowledge
   into production wiring
@@ -615,7 +617,12 @@ is fixed at generation time — replace the consumer that collects them instead.
 And the surprise worth knowing before you design a cut: **supplying a field does
 not prune what fed that constructor.** Anything eagerly built below it still gets
 built, so whatever touches the environment or the network has to be in the cut
-too.
+too. The one exception is a tagged member that feeds nothing but that one
+collection: replacing the collection skips its constructor entirely. A member
+feeding more than one collection always builds for real regardless of what you
+supply — `di_gen.go` says which case a given constructor is in, right above the
+call: `// skipped once <Field> is supplied` or `// always builds regardless of
+replacements: ...`.
 
 ### Adding a waffle module
 

@@ -326,7 +326,7 @@ Note that `InitDi()` in `config/diogen/di.go` calls `InitApp()`, which passes no
 **Not every registration has an entry.** A `Replacements` field exists only where every type the registration is exposed as is an interface:
 
 - `di.Define(NewServer)` exposes the concrete `*Server` — declare an interface and wire it as that if you want the slot replaceable.
-- `di.Tag` members have no entry: the membership of a collection is fixed at generation time, so replacing one member cannot change the set. Replace the consumer that collects them with `di.Tags[T]` instead — it is an ordinary registration with an ordinary entry. In practice that means you replace the whole `[]server.Interceptor` chain by replacing the server, not by swapping one interceptor.
+- `di.Tag` members have no entry of their own: the membership of a collection is fixed at generation time, so replacing one member cannot change the set. But the collection its `di.Tags[T]` consumer gathers has its own entry — a `Replacements` field of type `[]T` — so you replace the whole `[]server.Interceptor` chain directly, without touching the server. A member's own constructor is skipped only if it feeds nothing but that one collection; a member feeding more than one collection always builds for real regardless of what you supply.
 
 Registrations that write the same container field — the two branches of an `if`/`else` over an env var, for instance — share a single entry, because which of them wins is decided at run time. Supplying it skips both branches.
 

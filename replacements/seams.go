@@ -59,8 +59,7 @@ func ReadSeams(c Container, importPath string) ([]Seam, error) {
 	return seams, nil
 }
 
-// A guarded block that reads no other container field is building from the
-// environment alone — a leaf. Shape of the generated body: di/cmd/diogen/ARCHITECTURE.md.
+// A guarded block that reads no other container field is building from the environment alone — a leaf.
 func leafSeams(file *ast.File) map[string]bool {
 	body := initAppWithBody(file)
 	if body == nil {
@@ -239,6 +238,12 @@ func importAliases(file *ast.File) map[string]string {
 
 func typeRefs(expr ast.Expr, aliases map[string]string, self string) ([]TypeRef, error) {
 	switch t := expr.(type) {
+	// A di.Tags[T](tag)
+	case *ast.ArrayType:
+		if t.Len != nil {
+			return nil, fmt.Errorf("unexpected fixed-size array — every seam is an interface or a []T tag collection")
+		}
+		return typeRefs(t.Elt, aliases, self)
 	case *ast.InterfaceType:
 		var out []TypeRef
 		for _, embedded := range t.Methods.List {
@@ -271,6 +276,6 @@ func typeRefs(expr ast.Expr, aliases map[string]string, self string) ([]TypeRef,
 	case *ast.Ident:
 		return []TypeRef{{Path: self, Name: t.Name}}, nil
 	default:
-		return nil, fmt.Errorf("unexpected type %T — every seam is an interface", expr)
+		return nil, fmt.Errorf("unexpected type %T — every seam is an interface or a []T tag collection", expr)
 	}
 }

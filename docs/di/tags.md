@@ -12,7 +12,7 @@ collection member — collect them with di.Tags, or drop the tag to wire it dire
 
 If you need the same implementation both in a collection and as a direct dependency, take `[]I` and pick from it. Registering the same constructor twice does not work: both registrations would be built and would claim the same container field, and Diogen refuses to generate (`is registered twice and both registrations are built`).
 
-Tagged registrations also have no `Replacements` entry, since replacing one member cannot change the membership of the collection. See [Testing with the container](overview.md#testing-with-the-container).
+A tagged registration has no `Replacements` entry of its own, since replacing one member cannot change the membership of the collection — but the collection itself does: `di.Tags[Interface](tag)`'s consumer gets a `Replacements` field of type `[]Interface` that replaces the whole collection at once. A member's own constructor is skipped only if it feeds nothing but that one collection; one feeding more than one collection (two tags on one registration, or one tag gathered under two different interfaces) always builds for real regardless of what you supply. See [Testing with the container](overview.md#testing-with-the-container).
 
 ## Quick reference
 
