@@ -185,15 +185,6 @@ func (w *wiring) assign(name, kind string) {
 	}
 }
 
-// container.x reaches a test as the getter Application.X.
-func field(expr ast.Expr) string {
-	name, ok := qualifiedBy(expr, "container")
-	if !ok {
-		return ""
-	}
-	return exported(name)
-}
-
 func exported(name string) string {
 	if name == "" {
 		return ""
