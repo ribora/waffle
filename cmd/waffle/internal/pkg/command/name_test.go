@@ -109,7 +109,7 @@ func TestIsHelp(t *testing.T) {
 			t.Errorf("%v was not read as a help request", args)
 		}
 	}
-	for _, args := range [][]string{{}, {"user"}, {"--no-storage", "user"}} {
+	for _, args := range [][]string{{}, {"user"}, {"--no-repository", "user"}} {
 		if IsHelp(args) {
 			t.Errorf("%v was read as a help request", args)
 		}
@@ -121,8 +121,8 @@ func TestUsage(t *testing.T) {
 	if got := bare.Usage(); got != "usage: waffle make:agents" {
 		t.Errorf("usage = %q", got)
 	}
-	withOperands := New("make:domain", "", testTemplates, nil).WithUsage("[--no-storage] <domain>")
-	if got := withOperands.Usage(); got != "usage: waffle make:domain [--no-storage] <domain>" {
+	withOperands := New("make:domain", "", testTemplates, nil).WithUsage("[--no-repository] <domain>")
+	if got := withOperands.Usage(); got != "usage: waffle make:domain [--no-repository] <domain>" {
 		t.Errorf("usage = %q", got)
 	}
 }

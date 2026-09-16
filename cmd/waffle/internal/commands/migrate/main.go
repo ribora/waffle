@@ -31,5 +31,7 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 	if err != nil {
 		return err
 	}
-	return Generate(domain, projectName)
+	// The runner belongs to the domain, and the table it starts with is the
+	// domain's own entity — the one make:domain would have written.
+	return Generate(domain, domain, projectName)
 }

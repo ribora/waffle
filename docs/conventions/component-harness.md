@@ -227,8 +227,9 @@ constructor does take the connection out of the container, which is exactly why
 it is not a leaf. Substitute both levels, for two different reasons: the typed
 client because that is the surface worth faking, and the connection with
 `grpcClient.Dead` so the boot stops reading the neighbour's host out of the
-environment. This shape recurs wherever a service adapts one transport to
-another — an http-to-grpc adapter looks the same.
+environment — and that second line is one `init` already wrote. This shape
+recurs wherever a service adapts one transport to another — an http-to-grpc
+adapter looks the same.
 
 ### What the marker cannot know
 
@@ -251,7 +252,13 @@ another — an http-to-grpc adapter looks the same.
 
 `Boot` fills the cut: everything that is a condition of booting rather than a choice the test makes belongs in `boot.go`, not in the scenario. It supplies the database, installs the recorders and hands them back on `App` — a recorder the scenario had to construct would be a seam the scenario had to be granted, for something the harness owns either way.
 
-`Dead` is the one line worth reading twice, because it is what people undo. It is there because **replacing a seam does not prune what feeds it**: `InitAppWith` is a flat eager sequence that skips a node only if that node itself was supplied, so the connection under a replaced typed client is still built and still reads its neighbour's host out of the environment. Reaching a dead connection panics, which says "the replacement did not take" louder than a silent call to a real neighbour.
+`Dead` is the one line worth reading twice, because it is what people undo. **`init` writes it for you** — one line per `grpc.ClientConnInterface` seam it finds — so this is a line to leave alone rather than a stub to build.
+
+It is there because **replacing a seam does not prune what feeds it**: `InitAppWith` is a flat eager sequence that skips a node only if that node itself was supplied, so the connection under a replaced typed client is still built and still reads its neighbour's host out of the environment. Reaching a dead connection panics, which says "the replacement did not take" louder than a silent call to a real neighbour.
+
+**Guard every fill with `if cut.X == nil`.** That is the seam by which a scenario overrides what `Boot` installs — a live fake instead of a dead connection, a hand-built double instead of the harness recorder — without `Boot` having to know which scenarios want one. Assigning unconditionally takes that away, and the scenario's own `Replacements` literal is silently discarded.
+
+One consequence of `di.For` worth expecting: it groups the consumers that share a connection, so the container has one field per *connection* rather than one per client, and that field is named after the first consumer of it. Four `Dead` lines can cover eight typed clients.
 
 ### `Noop()` is a recorder nobody queries
 
@@ -266,7 +273,7 @@ The scaffold therefore writes the recording one and leaves the choice on one lin
 | an amqp publisher | — | `amqp.NewPublisherRecorder()` — keys and payloads, `FailWith` |
 | `grpc.ClientConnInterface` | `grpcClient.Dead(name)` | — |
 
-**A log spy cannot be written outside `pry`.** `Option` is `func(Event)` and every option asserts to the package's unexported event type, so a foreign `Logger` is handed options it can never read. That is why `Recorder` lives there rather than in a test package.
+**`pry.Recorder()` is a driver, not a second logger.** It sits underneath the real logger, so a scenario asserts on records the production code built rather than on a parallel implementation of the same options.
 
 ### A mock is a declaration, a spy is an observation
 
@@ -300,6 +307,8 @@ err = w.app.Consumer.Deliver(ctx, delivery)   // nil settled, error requeued
 `Serve` is a method on `App`, and it answers with one `Clients` however many transports the service serves — two of the nine in sherpa serve both, and a file per transport could not coexist: each would declare `Clients` and `Serve` in the same package. What `init` leaves for you is the typed clients: `proto.NewFacilityServiceClient(grpc.Conn())` per handler, because which client belongs to which handler is not in the container.
 
 `waffleGrpc.Serve` runs the handlers over `bufconn` and chains the interceptors with **`UnaryChain`, the exact function the daemon uses**. That is the point of it being exported: interceptor order has caused a real production bug (see [tools/grpc](../tools/grpc.md)), and a harness that sorted its own copy would be checking its copy of the order rather than the service's.
+
+The **lists** come from the container for the same reason — `a.ServerInterceptorAsMiddlewareTag()` and its two siblings, not the members written out one by one. A tagged registration added later reaches the daemon and the suite together; written out, it would reach only the daemon, and the scenarios would go on passing against a chain that no longer ships.
 
 `waffleHttp.Serve` is the same idea over `httptest`. It returns a `URL` and a `Client` — an ordinary `*http.Client`, so a scenario writes an ordinary request. The router is the container's own, and `Router.Setup(mux)` is what the daemon calls too, so the routes and the middleware under test are the ones that ship. Both `InProcess` types close in `Clients.Close`.
 

@@ -18,7 +18,7 @@ go install gitlab.com/gorib/waffle/cmd/waffle@latest
 | `waffle make:domain:http <name>` | Add an HTTP handler for an existing domain |
 | `waffle make:domain:scribus [--batch] <name> <event> [routing-key]` | Add an AMQP consumer for an existing domain; `--batch` scaffolds a `BatchHandler` instead of a per-message `Handler` |
 | `waffle make:domain:migrate <name>` | Add database migrations for an existing domain |
-| `waffle make:domain:repository <type> <name> <entity>` | Add a secondary repository (`type` is currently only `sql`) |
+| `waffle make:domain:entity <name> <entity>` | Add an entity to an existing domain — model, repository interface, adapter, table and DI, the same set the domain's own entity gets. `--storage` picks the adapter and defaults to `sql`, the only one there is; an entity always gets a repository |
 | `waffle make:domain:migration <name> <description>` | Add a new SQL migration |
 | `waffle make:domain:command <name> <command>` | Add a CLI subcommand scoped to a domain |
 | `waffle make:converter <path>` | Scaffold a goverter convert.go at the given path |
@@ -118,7 +118,7 @@ The whisk generator keeps its own `whisk.yaml` beside it, on the same missing-is
 - [agents](agents.md)
 
 The remaining commands — `make:domain:http`, `make:domain:scribus`,
-`make:domain:repository`, `make:domain:migration`, `make:domain:command`,
+`make:domain:entity`, `make:domain:migration`, `make:domain:command`,
 `make:converter`, `tests:harness` and `tests:replacements` — have no
 page of their own. They
 follow the same rules as the ones above (project root detection, idempotent

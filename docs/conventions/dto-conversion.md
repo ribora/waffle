@@ -184,7 +184,7 @@ The CLI uses the last path segment as the Go package name (`convert`,
 `dto`, etc.). All commands are idempotent — running them on an existing
 file is a no-op.
 
-`make:domain:repository` (postgres) does *not* scaffold a goverter convert
+`make:domain:entity` (postgres) does *not* scaffold a goverter convert
 — the sql adapter uses a hand-written `stored<X>` struct with `Unwrap()`
 and `Inserts()` methods instead. See
 [make:domain](../cli/make-domain.md#domainuseradapterpostgresstored_usergo) for

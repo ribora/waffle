@@ -2,9 +2,11 @@ package command
 
 import (
 	"bufio"
+	"bytes"
 	"embed"
 	"errors"
 	"fmt"
+	"go/format"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -101,6 +103,20 @@ func (c *Command) Write(sources map[string]string, params any) error {
 	return nil
 }
 
+// Render is for the templates that do not become a file of their own — a block
+// appended to a file somebody else owns.
+func (c *Command) Render(source string, params any) ([]byte, error) {
+	tpl, err := template.New(filepath.Base(source)).Funcs(c.funcs).ParseFS(c.templates, source)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse template %s: %w", source, err)
+	}
+	var out bytes.Buffer
+	if err = tpl.Execute(&out, params); err != nil {
+		return nil, err
+	}
+	return out.Bytes(), nil
+}
+
 func (c *Command) write(source, target string, params any) (created bool, err error) {
 	// An unreadable target used to count as "already there" and was skipped in
 	// silence, which is the one case where skipping is wrong.
@@ -115,19 +131,41 @@ func (c *Command) write(source, target string, params any) (created bool, err er
 	if err != nil {
 		return false, fmt.Errorf("failed to parse template %s: %w", source, err)
 	}
+	var rendered bytes.Buffer
+	if err = tpl.Execute(&rendered, params); err != nil {
+		return false, err
+	}
+	// Rendering straight to the file made the template the source of formatting,
+	// and two copies of one template had already drifted apart on indentation.
+	out := rendered.Bytes()
+	if filepath.Ext(target) == ".go" {
+		formatted, err := format.Source(out)
+		if err != nil {
+			return false, fmt.Errorf("%s renders invalid Go: %w", source, err)
+		}
+		out = formatted
+	}
 	if err = os.MkdirAll(filepath.Dir(target), os.ModePerm); err != nil {
 		return false, fmt.Errorf("failed to create directory %s: %w", filepath.Dir(target), err)
 	}
-	fh, err := os.Create(target)
-	if err != nil {
+	if err = os.WriteFile(target, out, 0644); err != nil {
 		return false, fmt.Errorf("failed to create %s: %w", target, err)
 	}
-	//nolint:errcheck
-	defer fh.Close()
-	if err = tpl.Execute(fh, params); err != nil {
-		return false, err
-	}
 	return true, nil
+}
+
+// EnableStorage is the tail every command that writes a repository owes: the
+// stored struct carries a go:generate line with no tool behind it and the
+// adapter needs a sql.Db, so a command that writes one and stops here leaves a
+// project that does not build.
+func (c *Command) EnableStorage() error {
+	if err := c.EnsureTool("gitlab.com/gorib/sql/cmd/store"); err != nil {
+		return err
+	}
+	if err := c.UncommentModule("gitlab.com/gorib/waffle/config/service/sql"); err != nil {
+		return err
+	}
+	return c.UncommentModule("gitlab.com/gorib/waffle/config/tools/migrate")
 }
 
 func (c *Command) UncommentModule(modulePath string) error {

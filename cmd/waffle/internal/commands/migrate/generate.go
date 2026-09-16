@@ -9,13 +9,16 @@ import (
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/plural"
 )
 
-// Generate writes the migration runner (cmd/migrate/main.go), the bootstrap
-// SQL files and the DI registration for a domain.
-func Generate(domain, projectName string) error {
+// Generate writes the migration runner (cmd/migrate/main.go) and the DI
+// registration, which are per domain, plus the table for one entity. The runner
+// and the trigger function are found by suffix, so every entity after the first
+// adds its table and keeps the rest.
+func Generate(domain, entity, projectName string) error {
 	c := command.New("migrate-internal", "", templates, nil)
 	service := filepath.Base(projectName)
 	params := map[string]string{
 		"Domain":  domain,
+		"Entity":  entity,
 		"Project": projectName,
 		"Service": service,
 	}
@@ -35,8 +38,8 @@ func Generate(domain, projectName string) error {
 		},
 		{
 			template: filepath.Join("templates", "entity", "migration.sql.tpl"),
-			suffix:   fmt.Sprintf("_create_%s_table.sql", plural.Plural(domain)),
-			name:     fmt.Sprintf("%s_create_%s_table.sql", now.Format("20060102150405"), plural.Plural(domain)),
+			suffix:   fmt.Sprintf("_create_%s_table.sql", plural.Plural(entity)),
+			name:     fmt.Sprintf("%s_create_%s_table.sql", now.Format("20060102150405"), plural.Plural(entity)),
 		},
 	}
 	for _, m := range migrations {

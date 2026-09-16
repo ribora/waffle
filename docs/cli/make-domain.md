@@ -1,12 +1,20 @@
 # make:domain
 
-Generates the full domain layer for a new business entity: model, errors, service, postgres adapter, and DI configuration.
+Creates a domain and its first entity: errors and a management for the domain,
+then model, repository interface, postgres adapter, stored struct, DI and a table
+for the entity. Every entity added later gets that second list and nothing else —
+see [make:domain:entity](#a-second-entity).
 
 ## Usage
 
 ```sh
-waffle make:domain <name>
+waffle make:domain [--no-repository] <name>
 ```
+
+`--no-repository` stops the chain at its first link: the domain gets its errors,
+its management and the model, and no adapter, table or database module. The model
+is written either way, because a repository needs one and nothing needs a
+repository.
 
 Example:
 
@@ -49,31 +57,58 @@ var (
 
 ### Service
 
-**`domain/user/service/user.go`**
+**`domain/user/service/service.go`**
 
-The business logic layer. Accepts a repository interface and implements use cases:
+The management, and above it the repository interface of every entity the domain
+has. One file for the interfaces, one management per domain:
 
 ```go
 package service
 
 import (
     "context"
+
+    "gitlab.com/gorib/criteria"
+
     "mymodule/domain/user/model"
 )
 
 type UserRepository interface {
-    Get(ctx context.Context, id int) (*model.User, error)
-    Create(ctx context.Context, user *model.User) (*model.User, error)
+    Get(ctx context.Context, userId int) (*model.User, error)
+    Save(ctx context.Context, user *model.User) (*model.User, error)
+    List(ctx context.Context, query criteria.Expression, sort []string, page int, count int) ([]*model.User, error)
+    Count(ctx context.Context, query criteria.Expression) (int, error)
 }
 
-type UserService struct {
-    repo UserRepository
+func NewUserManagement(userRepository UserRepository) *userManagement {
+    return &userManagement{userRepository: userRepository}
 }
 
-func NewUserService(repo UserRepository) *UserService {
-    return &UserService{repo: repo}
+type userManagement struct {
+    userRepository UserRepository
 }
 ```
+
+How the management's methods are split across files is yours: by entity
+(`service_user.go`) or by use case (`billing.go`, `lifecycle.go`). The
+scaffolder writes neither, because it cannot tell which one a domain wants.
+
+### A second entity
+
+`waffle make:domain:entity user address` gives `address` the same set `user`
+got — model, adapter, stored struct, DI and its own table — and appends
+`AddressRepository` to the same `service.go`. The first entity of a domain and
+the tenth differ in nothing.
+
+An entity always gets a repository — that is what the command is for, and a
+model on its own is eight lines you would write faster than you would invoke
+anything. `--storage` picks the adapter rather than whether there is one, and
+`sql` is both the default and the only value so far.
+
+What it does not do is add the repository to the management: whether an entity's
+repository belongs there is a design decision, and a read model read only by a
+handler does not. The command prints the parameter to add, and `diogen` wires it
+by type as soon as it is there.
 
 ### Postgres adapter
 
@@ -157,17 +192,33 @@ Unlike `diogen` and `whisk`, `store` reads the file with `go/ast` alone and neve
 
 ### DI configuration
 
-The generated registrations are added inside `InitDi()` in `config/di/di.go`. The repository is wired to its interface with `di.Wire`, and the service is registered with `di.Define` (with `di.Alias` entries for any additional interfaces it must satisfy):
+Registrations go in files of their own under `config/di/`, one per thing
+registered, so nothing has to be merged into a file you are also editing:
+
+**`config/di/di_user_domain.go`** — the management.
 
 ```go
-di.Wire[service.UserRepository](postgres.NewUserRepository)
-di.Define(service.NewUserService)
+var userManagementInstance any
+
+func InitUserDomain() {
+    userManagementInstance = di.Define(service.NewUserManagement)
+}
 ```
 
-If the service implements multiple interfaces used by transport layers, add aliases:
+**`config/di/di_user_user_repository.go`** — the entity's repository, and one
+more like it per entity added later.
 
 ```go
-di.Define(service.NewUserService,
+func InitUserUserRepository() {
+    di.Wire[service.UserRepository](postgres.NewUserRepository)
+}
+```
+
+If the management has to satisfy the interfaces a transport declares, add the
+aliases to its registration:
+
+```go
+di.Define(service.NewUserManagement,
     di.Alias[grpc.UserManagement](),
     di.Alias[http.UserManagement](),
 )
@@ -175,16 +226,14 @@ di.Define(service.NewUserService,
 
 ## Post-generation steps
 
-```sh
-go get gitlab.com/gorib/sql/cmd/store
-make .tidy generate
-```
-
-The `store` tool is installed and `make generate` runs it against `stored_user.go` to produce the mapping methods.
+The command does these itself: it installs `gitlab.com/gorib/sql/cmd/store`,
+enables the `service/sql` and `tools/migrate` modules in `modules.go`, and runs
+`make .tidy generate` so `stored_user.go` gets its mapping methods. A project
+that had no database before is ready to run when the command returns.
 
 ## What to do next
 
-- Add fields to the model and stored struct
-- Implement additional repository methods
+- Add fields to the model and the stored struct, then `make generate`
+- Add another entity: `waffle make:domain:entity user address`
 - Add gRPC support: `waffle make:domain:grpc user`
-- Add migrations: `waffle make:domain:migrate user`
+- Add a migration of your own: `waffle make:domain:migration user add_status`

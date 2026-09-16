@@ -37,15 +37,18 @@ type shape struct {
 	Http     wiring
 }
 
+// Each field is one container getter, not a list of members: the collection is
+// a container field of its own, so the harness reads it whole and a tagged
+// registration added later reaches the suite without an edit here.
 type wiring struct {
-	Handlers     []string
-	Interceptors []string
-	Stream       []string
+	Handlers     string
+	Interceptors string
+	Stream       string
 	Mux          string
 	Router       string
 }
 
-func (w wiring) Present() bool { return len(w.Handlers) > 0 || w.Mux != "" }
+func (w wiring) Present() bool { return w.Handlers != "" || w.Mux != "" }
 
 type conn struct {
 	Field string
@@ -78,9 +81,39 @@ func read(container replacements.Container, seams []replacements.Seam) (shape, e
 	if err != nil {
 		return shape{}, err
 	}
-	out.Grpc = commandArgs(file, "NewGrpcCommand")
-	out.Http = commandArgs(file, "NewHttpCommand")
+	types := containerFields(file)
+	out.Grpc = commandArgs(file, types, "NewGrpcCommand")
+	out.Http = commandArgs(file, types, "NewHttpCommand")
 	return out, nil
+}
+
+// Field name to the name of its type, off the Application struct. Arguments to
+// the daemon's constructors are bare container fields, so this is what says
+// which of them is the interceptor chain and which is the handler list.
+func containerFields(file *ast.File) map[string]string {
+	out := map[string]string{}
+	for _, decl := range file.Decls {
+		generic, ok := decl.(*ast.GenDecl)
+		if !ok {
+			continue
+		}
+		for _, spec := range generic.Specs {
+			typed, ok := spec.(*ast.TypeSpec)
+			if !ok || typed.Name.Name != "Application" {
+				continue
+			}
+			structure, ok := typed.Type.(*ast.StructType)
+			if !ok {
+				continue
+			}
+			for _, field := range structure.Fields.List {
+				for _, name := range field.Names {
+					out[name.Name] = typeName(field.Type)
+				}
+			}
+		}
+	}
+	return out
 }
 
 // BaseGrpcClientConnInterfaceForContractProtoContractServiceClient → contract.
@@ -107,9 +140,9 @@ func neighbour(field string) string {
 	return strings.ToLower(after[:end])
 }
 
-// Read off the daemon's own construction call, so the harness copies the
-// interceptor order rather than holding a second opinion about it.
-func commandArgs(file *ast.File, constructor string) wiring {
+// Read off the daemon's own construction call, so the harness serves what the
+// daemon serves rather than holding a second opinion about it.
+func commandArgs(file *ast.File, types map[string]string, constructor string) wiring {
 	var out wiring
 	body := initAppWithBody(file)
 	if body == nil {
@@ -124,11 +157,8 @@ func commandArgs(file *ast.File, constructor string) wiring {
 			return true
 		}
 		for _, arg := range call.Args {
-			switch value := arg.(type) {
-			case *ast.CompositeLit:
-				out.assign(fields(value.Elts), typeName(value.Type))
-			case *ast.SelectorExpr:
-				out.single(field(value))
+			if name, ok := qualifiedBy(arg, "container"); ok {
+				out.assign(name, types[name])
 			}
 		}
 		return false
@@ -136,38 +166,23 @@ func commandArgs(file *ast.File, constructor string) wiring {
 	return out
 }
 
-func (w *wiring) assign(names []string, kind string) {
+// By the field's own type, not by position: every argument here is a bare
+// container field, and the constructors take more of them than these.
+func (w *wiring) assign(name, kind string) {
+	getter := exported(name)
 	switch {
-	case len(names) == 0:
+	case getter == "" || kind == "":
 	case strings.Contains(kind, "StreamInterceptor"):
-		w.Stream = names
+		w.Stream = getter
 	case strings.Contains(kind, "Interceptor"):
-		w.Interceptors = names
+		w.Interceptors = getter
 	case strings.Contains(kind, "ServiceHandler"):
-		w.Handlers = names
+		w.Handlers = getter
+	case strings.HasSuffix(kind, "Mux"):
+		w.Mux = getter
+	case strings.HasSuffix(kind, "Router"):
+		w.Router = getter
 	}
-}
-
-// By suffix, not by position: the rest of NewHttpCommand's arguments are bare
-// container fields too.
-func (w *wiring) single(name string) {
-	switch {
-	case name == "":
-	case strings.HasSuffix(name, "Mux"):
-		w.Mux = name
-	case strings.HasSuffix(name, "Router"):
-		w.Router = name
-	}
-}
-
-func fields(elts []ast.Expr) []string {
-	out := make([]string, 0, len(elts))
-	for _, elt := range elts {
-		if name := field(elt); name != "" {
-			out = append(out, name)
-		}
-	}
-	return out
 }
 
 // container.x reaches a test as the getter Application.X.

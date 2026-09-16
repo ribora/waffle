@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/pborman/getopt/v2"
-	"github.com/pressly/goose/v3"
 
 	"gitlab.com/gorib/sql"
 	"gitlab.com/gorib/waffle/app"
@@ -83,13 +82,5 @@ func (c *migrateCommand) Run(ctx context.Context) (err error) {
 	if err = db.Ping(); err != nil {
 		return fmt.Errorf("cannot connect to db: %w", err)
 	}
-	for _, migration := range c.migrations {
-		goose.SetBaseFS(migration)
-		goose.SetTableName("migrations")
-		err = goose.RunWithOptionsContext(ctx, args[0], db, "migrations", args[1:], goose.WithAllowMissing())
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	return run(ctx, db, c.migrations, args[0], args[1:])
 }

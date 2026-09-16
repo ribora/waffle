@@ -1,8 +1,7 @@
 package harness
 
 import (
-{{if .GrpcHandlers}}gribgrpc "gitlab.com/gorib/grpc/server"
-waffleGrpc "gitlab.com/gorib/waffle/tools/grpc"
+{{if .GrpcHandlers}}waffleGrpc "gitlab.com/gorib/waffle/tools/grpc"
 {{end}}{{if .HttpMux}}waffleHttp "gitlab.com/gorib/waffle/tools/http"
 {{end}})
 
@@ -27,16 +26,13 @@ c.grpc.Close()
 func (a *App) Serve() (*Clients, error) {
 clients := &Clients{}
 {{if .GrpcHandlers}}
+// The container's own collections, not a copy of them: a handler or an
+// interceptor added by di.Tag reaches the suite with no edit here, and the
+// order is the daemon's.
 grpc, err := waffleGrpc.Serve(
-[]waffleGrpc.ServiceHandler{
-{{range .GrpcHandlers}}a.{{.}}(),
-{{end}}},
-[]gribgrpc.Interceptor{
-{{range .GrpcInterceptors}}a.{{.}}(),
-{{end}}},
-{{if .GrpcStream}}[]gribgrpc.StreamInterceptor{
-{{range .GrpcStream}}a.{{.}}(),
-{{end}}},{{else}}nil,{{end}}
+a.{{.GrpcHandlers}}(),
+a.{{.GrpcInterceptors}}(),
+{{if .GrpcStream}}a.{{.GrpcStream}}(),{{else}}nil,{{end}}
 )
 if err != nil {
 return nil, err

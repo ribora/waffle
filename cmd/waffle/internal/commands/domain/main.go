@@ -18,7 +18,7 @@ var templates embed.FS
 
 func New() *cmd {
 	return &cmd{command.New("make:domain", "Make domain with entity, repository and management", templates, nil).
-		WithUsage("[--no-storage] <domain>")}
+		WithUsage("[--no-repository] <domain>")}
 }
 
 type cmd struct {
@@ -26,9 +26,11 @@ type cmd struct {
 }
 
 func (c *cmd) Run(ctx context.Context, args ...string) error {
-	noStorage := false
-	if i := slices.Index(args, "--no-storage"); i >= 0 {
-		noStorage = true
+	// The model is written either way — what the flag skips is the repository,
+	// and with it the table and the modules that serve one.
+	noRepository := false
+	if i := slices.Index(args, "--no-repository"); i >= 0 {
+		noRepository = true
 		args = append(args[:i], args[i+1:]...)
 	}
 
@@ -45,43 +47,43 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 	}
 	// Before the first write: eleven files and a go.mod edit stand between here
 	// and UncommentModule.
-	if !noStorage {
+	if !noRepository {
 		if err := c.RequireModules(); err != nil {
 			return err
 		}
 	}
 
 	params := map[string]any{
-		"Domain":      domain,
-		"Project":     projectName,
-		"WithStorage": !noStorage,
+		"Domain":         domain,
+		"Project":        projectName,
+		"WithRepository": !noRepository,
 	}
 
 	path := filepath.Join("domain", domain)
 	sources := map[string]string{
-		filepath.Join("templates", "model", "entity.go.tpl"):   filepath.Join(path, "model", domain+".go"),
 		filepath.Join("templates", "model", "errors.go.tpl"):   filepath.Join(path, "model", "errors.go"),
-		filepath.Join("templates", "service", "entity.go.tpl"): filepath.Join(path, "service", domain+".go"),
+		filepath.Join("templates", "service", "entity.go.tpl"): filepath.Join(path, "service", "service.go"),
 		filepath.Join("templates", "di.go.tpl"):                filepath.Join("config", "di", "di_"+domain+"_domain.go"),
 	}
 	if err := c.Write(sources, params); err != nil {
 		return err
 	}
 
-	if !noStorage {
-		if err := repository.GenerateForDomain(domain, projectName); err != nil {
+	// The domain's own entity goes through the same path as every later one, so
+	// the first entity and the second differ in nothing.
+	switch {
+	case noRepository:
+		if err := repository.WriteModel(domain, domain, projectName); err != nil {
 			return err
 		}
-		if err := migrate.Generate(domain, projectName); err != nil {
+	default:
+		if err := repository.GenerateEntity(domain, domain, projectName); err != nil {
 			return err
 		}
-		if err := c.EnsureTool("gitlab.com/gorib/sql/cmd/store"); err != nil {
+		if err := migrate.Generate(domain, domain, projectName); err != nil {
 			return err
 		}
-		if err := c.UncommentModule("gitlab.com/gorib/waffle/config/service/sql"); err != nil {
-			return err
-		}
-		if err := c.UncommentModule("gitlab.com/gorib/waffle/config/tools/migrate"); err != nil {
+		if err := c.EnableStorage(); err != nil {
 			return err
 		}
 	}

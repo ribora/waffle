@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/fatih/color"
 )
@@ -51,4 +52,17 @@ func ReportKept(paths ...string) {
 
 func reportAction(text string) {
 	_, _ = fmt.Fprintf(output, "  %s %s\n", addMark, text)
+}
+
+func ReportAction(text string) {
+	reportAction(text)
+}
+
+// For what the scaffolder will not write itself: the lines to paste, and where.
+// Printing beats guessing at a file whose shape is not ours.
+func ReportBlock(text, block string) {
+	_, _ = fmt.Fprintf(output, "  %s %s\n", warnMark, text)
+	for line := range strings.SplitSeq(strings.TrimRight(block, "\n"), "\n") {
+		_, _ = fmt.Fprintf(output, "      %s\n", line)
+	}
 }

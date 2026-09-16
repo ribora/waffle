@@ -1,6 +1,7 @@
 # make:domain:migrate
 
-Adds database migrations for an existing domain. Generates the migration package, the initial SQL files, and DI configuration.
+Sets up migrations for a domain that has none: the migration package, the
+bootstrap SQL and the DI registration.
 
 ## Usage
 
@@ -8,13 +9,14 @@ Adds database migrations for an existing domain. Generates the migration package
 waffle make:domain:migrate <name>
 ```
 
-Example:
+**In the ordinary flow you never run this.** `make:domain` and
+`make:domain:entity` both set the runner up and add the entity's table, and both
+are idempotent about it — the runner is recognised by the files already there
+rather than by a name that carries a timestamp.
 
-```sh
-waffle make:domain:migrate user
-```
-
-Run this after `waffle make:domain user`.
+What it is for is the domain that was made with `--no-repository` and now wants a
+schema without one. Run it, and the table it starts with is the domain's own
+entity.
 
 ## Generated files
 

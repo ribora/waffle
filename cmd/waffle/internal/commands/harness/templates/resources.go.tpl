@@ -4,15 +4,13 @@ package harness
 
 import (
 "context"
-{{if .Migrations}}dbSql "database/sql"
-"embed"
-{{end}}"os"
+"os"
 
-{{if .Migrations}}"github.com/pressly/goose/v3"
-{{end}}{{if .Redis}}"gitlab.com/gorib/redis/redistest"
+{{if .Redis}}"gitlab.com/gorib/redis/redistest"
 {{end}}{{if .Postgres}}"gitlab.com/gorib/sql/sqltest"
 {{end}}"gitlab.com/gorib/waffle/resource"
-{{range .Migrations}}{{.Alias}} "{{.Path}}"
+{{if .Migrations}}waffleMigrate "gitlab.com/gorib/waffle/tools/migrate"
+{{end}}{{range .Migrations}}{{.Alias}} "{{.Path}}"
 {{end}})
 {{if .Postgres}}
 // Without {{.Env}}_TEST_DSN a container is started and the next run reuses it.
@@ -22,7 +20,12 @@ sqltest.Env("{{.Env}}_TEST_DSN"),
 sqltest.Docker("postgres:18-alpine"),
 sqltest.Database("{{.Service}}_test"),
 sqltest.Ephemeral(),
-{{if .Migrations}}sqltest.Migrations(migrations),
+{{if .Migrations}}// The migrate command's own loop, so the schema under test is the one the
+// daemon builds. Order is yours: goose takes one source at a time, and a table
+// that hangs on another domain's trigger has to come after it.
+sqltest.Migrations(waffleMigrate.Up(
+{{range .Migrations}}{{.Alias}}.NewMigrations(),
+{{end}})),
 {{end}})
 {{end}}{{if .Redis}}
 // Without {{.Env}}_TEST_REDIS a container of this run's own is started, and
@@ -35,21 +38,7 @@ redistest.Docker("redis:8-alpine"),
 {{end}}
 // The registry. Adding a system is adding it here, and nothing else changes.
 var resources = resource.New({{range .Resources}}{{.}}, {{end}})
-{{if .Migrations}}
-func migrations(ctx context.Context, handle *dbSql.DB) error {
-for _, source := range []embed.FS{
-{{range .Migrations}}{{.Alias}}.NewMigrations(),
-{{end}}} {
-goose.SetBaseFS(source)
-goose.SetTableName("migrations")
-goose.SetLogger(goose.NopLogger())
-if err := goose.UpContext(ctx, handle, "migrations", goose.WithAllowMissing()); err != nil {
-return err
-}
-}
-return nil
-}
-{{end}}
+
 func Up(ctx context.Context) error { return resources.Up(ctx) }
 
 func Reset(ctx context.Context) error { return resources.Reset(ctx) }

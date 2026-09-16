@@ -23,6 +23,18 @@ type Replacements struct {
 	BaseGrpcClientConnInterfaceForContractProtoContractServiceClient baseGrpc.ClientConnInterface
 }
 
+// Diogen assigns every tagged collection to a field of its own and passes the
+// field. A fixture that inlined the literals would test a container shape the
+// generator does not produce.
+type Application struct {
+	sqlDb                                        sql.Db
+	pryLogger                                    pry.Logger
+	baseGrpcClientConnInterfaceForContractProtoContractServiceClient baseGrpc.ClientConnInterface
+	grpcCommandServiceHandlerAsServiceTag        []grpcCommand.ServiceHandler
+	serverInterceptorAsMiddlewareTag             []server.Interceptor
+	serverStreamInterceptorAsStreamMiddlewareTag []server.StreamInterceptor
+}
+
 func InitAppWith(replacements Replacements) (*Application, error) {
 	container.baseGrpcClientConnInterfaceForContractProtoContractServiceClient = replacements.BaseGrpcClientConnInterfaceForContractProtoContractServiceClient
 
@@ -33,11 +45,14 @@ func InitAppWith(replacements Replacements) (*Application, error) {
 		}
 		container.baseGrpcClientConnInterfaceForContractProtoContractServiceClient = s
 	}
+	container.grpcCommandServiceHandlerAsServiceTag = []grpcCommand.ServiceHandler{container.shopGrpcOrderServiceAsGrpcCommandServiceHandler}
+	container.serverInterceptorAsMiddlewareTag = []server.Interceptor{container.interceptorLogMWAsServerInterceptor}
+	container.serverStreamInterceptorAsStreamMiddlewareTag = []server.StreamInterceptor{container.interceptorStreamLogMWAsServerStreamInterceptor}
 	{
 		s := grpcCommand.NewGrpcCommand(
-			[]grpcCommand.ServiceHandler{container.shopGrpcOrderServiceAsGrpcCommandServiceHandler},
-			[]server.Interceptor{container.interceptorLogMWAsServerInterceptor},
-			[]server.StreamInterceptor{container.interceptorStreamLogMWAsServerStreamInterceptor},
+			container.grpcCommandServiceHandlerAsServiceTag,
+			container.serverInterceptorAsMiddlewareTag,
+			container.serverStreamInterceptorAsStreamMiddlewareTag,
 			container.appBaseCommandForGrpcCommandGrpcCommand,
 		)
 		container.grpcGrpcCommand = s
@@ -57,6 +72,12 @@ import (
 type Replacements struct {
 	PryLogger                                                    pry.Logger
 	BaseGrpcClientConnInterfaceForMediaProtoMediaServiceClient   baseGrpc.ClientConnInterface
+}
+
+type Application struct {
+	pryLogger        pry.Logger
+	httpServerMux    server.Mux
+	httpServerRouter server.Router
 }
 
 func InitAppWith(replacements Replacements) (*Application, error) {
@@ -83,11 +104,22 @@ type Replacements struct {
 	PryLogger pry.Logger
 }
 
+type Application struct {
+	sqlDb                                 sql.Db
+	pryLogger                             pry.Logger
+	grpcCommandServiceHandlerAsServiceTag []grpcCommand.ServiceHandler
+	serverInterceptorAsMiddlewareTag      []server.Interceptor
+	httpServerMux                         server.Mux
+	httpServerRouter                      server.Router
+}
+
 func InitAppWith(replacements Replacements) (*Application, error) {
+	container.grpcCommandServiceHandlerAsServiceTag = []grpcCommand.ServiceHandler{container.shopGrpcOrderServiceAsGrpcCommandServiceHandler}
+	container.serverInterceptorAsMiddlewareTag = []server.Interceptor{container.interceptorLogMWAsServerInterceptor}
 	{
 		s := grpcCommand.NewGrpcCommand(
-			[]grpcCommand.ServiceHandler{container.shopGrpcOrderServiceAsGrpcCommandServiceHandler},
-			[]server.Interceptor{container.interceptorLogMWAsServerInterceptor},
+			container.grpcCommandServiceHandlerAsServiceTag,
+			container.serverInterceptorAsMiddlewareTag,
 			nil,
 			container.appBaseCommandForGrpcCommandGrpcCommand,
 		)
@@ -115,11 +147,20 @@ type Replacements struct {
 	ScribusConsumer scribus.Consumer
 }
 
+type Application struct {
+	pryLogger                             pry.Logger
+	scribusConsumer                       scribus.Consumer
+	grpcCommandServiceHandlerAsServiceTag []grpcCommand.ServiceHandler
+	serverInterceptorAsMiddlewareTag      []server.Interceptor
+}
+
 func InitAppWith(replacements Replacements) (*Application, error) {
+	container.grpcCommandServiceHandlerAsServiceTag = []grpcCommand.ServiceHandler{container.shopGrpcOrderServiceAsGrpcCommandServiceHandler}
+	container.serverInterceptorAsMiddlewareTag = []server.Interceptor{container.interceptorLogMWAsServerInterceptor}
 	{
 		s := grpcCommand.NewGrpcCommand(
-			[]grpcCommand.ServiceHandler{container.shopGrpcOrderServiceAsGrpcCommandServiceHandler},
-			[]server.Interceptor{container.interceptorLogMWAsServerInterceptor},
+			container.grpcCommandServiceHandlerAsServiceTag,
+			container.serverInterceptorAsMiddlewareTag,
 			nil,
 			container.appBaseCommandForGrpcCommandGrpcCommand,
 		)
@@ -220,13 +261,18 @@ func TestInitWritesTheHarnessForAServiceWithADatabase(t *testing.T) {
 		`sqltest.Env("SHOP_TEST_DSN")`,
 		`sqltest.Database("shop_test")`,
 		"sqltest.Ephemeral()",
-		"sqltest.Migrations(migrations)",
+		"sqltest.Migrations(waffleMigrate.Up(",
 		"orderMigrate.NewMigrations()",
 		"resource.New(postgres)",
 	} {
 		if !strings.Contains(resources, want) {
 			t.Errorf("resources.go is missing %q:\n%s", want, resources)
 		}
+	}
+	// The loop belongs to the migrate command, so a harness that spells goose
+	// out again is one that can build a schema the daemon does not.
+	if strings.Contains(resources, "goose.") {
+		t.Errorf("resources.go drives goose itself:\n%s", resources)
 	}
 
 	boot := written(t, "tests/internal/harness/boot.go")
@@ -279,13 +325,18 @@ func TestInitWritesAGrpcServer(t *testing.T) {
 	body := written(t, "tests/internal/harness/serve.go")
 	for _, want := range []string{
 		"waffleGrpc.Serve(",
-		"a.ShopGrpcOrderServiceAsGrpcCommandServiceHandler()",
-		"a.InterceptorLogMWAsServerInterceptor()",
-		"a.InterceptorStreamLogMWAsServerStreamInterceptor()",
+		"a.GrpcCommandServiceHandlerAsServiceTag()",
+		"a.ServerInterceptorAsMiddlewareTag()",
+		"a.ServerStreamInterceptorAsStreamMiddlewareTag()",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("serve.go is missing %q:\n%s", want, body)
 		}
+	}
+	// A member by name means the list was copied, and a tagged registration
+	// added later would reach the daemon and not the suite.
+	if strings.Contains(body, "a.InterceptorLogMWAsServerInterceptor()") {
+		t.Errorf("the interceptor list was expanded instead of read whole:\n%s", body)
 	}
 	if strings.Contains(body, "waffleHttp") {
 		t.Errorf("a service that serves no HTTP got an HTTP server:\n%s", body)
@@ -304,7 +355,7 @@ func TestInitWritesBothTransportsIntoOneFile(t *testing.T) {
 	body := written(t, "tests/internal/harness/serve.go")
 	for _, want := range []string{
 		"waffleGrpc.Serve(",
-		"a.ShopGrpcOrderServiceAsGrpcCommandServiceHandler()",
+		"a.GrpcCommandServiceHandlerAsServiceTag()",
 		"waffleHttp.Serve(",
 		"a.HttpServerMux()",
 	} {

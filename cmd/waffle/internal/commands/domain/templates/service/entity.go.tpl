@@ -1,7 +1,7 @@
 package service
 
 import (
-{{- if .WithStorage }}
+{{- if .WithRepository }}
 	"context"
 
 	"gitlab.com/gorib/criteria"
@@ -9,14 +9,7 @@ import (
 
 	"{{ .Project }}/domain/{{ .Domain }}/model"
 )
-{{ if .WithStorage }}
-type {{ title .Domain }}Repository interface {
-	Get(ctx context.Context, {{ .Domain }}Id int) (*model.{{ title .Domain }}, error)
-	Save(ctx context.Context, {{ .Domain }} *model.{{ title .Domain }}) (*model.{{ title .Domain }}, error)
-	List(ctx context.Context, expr criteria.Expression, sort []string, page int, count int) ([]*model.{{ title .Domain }}, error)
-	Count(ctx context.Context, query criteria.Expression) (int, error)
-}
-
+{{ if .WithRepository }}
 func New{{ title .Domain }}Management(
 	{{ .Domain }}Repository {{ title .Domain }}Repository,
 ) *{{ .Domain }}Management {

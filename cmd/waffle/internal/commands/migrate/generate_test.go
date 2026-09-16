@@ -36,7 +36,7 @@ func TestExistingMigrationIsNotWrittenAgain(t *testing.T) {
 		}
 	}
 
-	if err := Generate("user", "example.com/svc"); err != nil {
+	if err := Generate("user", "user", "example.com/svc"); err != nil {
 		t.Fatal(err)
 	}
 
