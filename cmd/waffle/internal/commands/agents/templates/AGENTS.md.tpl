@@ -482,8 +482,8 @@ something to fill in by hand without saying so:
 | Add AMQP consumer | `waffle make:domain:scribus [--batch] <domain> <event> [routing-key]` — the key defaults to `<event>`; pass it when it is dotted (`order_paid order.paid`), and `--batch` for a `BatchHandler` |
 | Add an entity to a domain | `waffle make:domain:entity <domain> <entity>` — the same set the domain's own entity gets, table included; an entity always gets a repository, and `--storage` only picks which adapter (`sql` by default) |
 | Set up migrations for a domain that has none | `waffle make:domain:migrate <domain>` |
-| Add one migration to a domain that already has them | `waffle make:domain:migration <domain> <name>` |
-| Add CLI subcommand | `waffle make:domain:command <domain> <name>` |
+| Add one migration to a domain that already has them | `waffle make:domain:migration <domain> <description>` |
+| Add CLI subcommand | `waffle make:domain:command <domain> <command>` |
 | Add DTO converter (any path) | `waffle make:converter <path>` — also creates `pkg/goverter/convert.go` if it is missing |
 | Put the component harness in place | `waffle tests:harness` reports what is there, `waffle tests:harness init` writes the rest (Rule #11 step 3) |
 | See what a test may replace | `waffle tests:replacements` — every seam, marked `# leaf` and `# allowed` |
@@ -786,7 +786,7 @@ Rule #2 — `make generate && make audit && make`.
 | task | order |
 |---|---|
 | gRPC method on an existing domain | rpc in `api/proto/<x>/service.proto` → regenerate stubs (Rule #10) → method on `cmd/grpc/service.go` → the method on the **handler's** Management interface → implement it in `service/` → conversion in `cmd/grpc/convert/`, or by hand in the `grpc` package under `mapper: dto` |
-| database table | `waffle make:domain:migration <x> <name>` scaffolds the migration only → write the `.sql` → `model.X` → `stored<X>` in `adapter/postgres/stored_<x>.go` |
+| database table | `waffle make:domain:migration <domain> <description>` scaffolds the migration only → write the `.sql` → `model.X` → `stored<X>` in `adapter/postgres/stored_<x>.go` |
 | outbound client — the one shape with no command | `adapter/<name>.go` by hand, shaped like an existing one → `waffle make:converter domain/<x>/adapter/<name>/dto` → `di.Wire[<x>service.<Name>Client](<x>adapter.New<Name>Service, di.Args(...))` in `config/di/di.go`, with the interface declared by the consumer (Rule #3) |
 
 ## Rule #10 — what NOT to do

@@ -15,7 +15,7 @@ var templates embed.FS
 
 func New() *cmd {
 	return &cmd{command.New("make:domain:migration", "Add a new .sql migration to an existing domain", templates, nil).
-		WithUsage("<domain> <name>")}
+		WithUsage("<domain> <description>")}
 }
 
 type cmd struct {

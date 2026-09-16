@@ -170,6 +170,46 @@ func TestAgentsTemplateListsEveryCommand(t *testing.T) {
 	}
 }
 
+// The check above stops at the command code, so the operands after it drifted.
+var (
+	citedInvocation = regexp.MustCompile("`waffle ([a-z][a-z:]*)([^`]*)`")
+	// A whole operand: `domain/<x>/adapter/dto` is a `<path>`, not a slot `<x>`.
+	placeholder = regexp.MustCompile(`^<[a-z][a-z-]*>$`)
+)
+
+func TestDocsNameOperandsTheWayTheCommandsDo(t *testing.T) {
+	root := repoRoot(t)
+	cmds := newCommands()
+
+	files := append(markdownFiles(t), filepath.Join(root, "cmd/waffle", agentsTemplate))
+	for _, file := range files {
+		seen := map[string]bool{}
+		for _, m := range citedInvocation.FindAllStringSubmatch(read(t, file), -1) {
+			cmd := cmds.Get(m[1])
+			// An unknown command is TestDocsCiteRealCommands' to report.
+			if cmd == nil || seen[m[0]] {
+				continue
+			}
+			for _, name := range strings.Fields(m[2]) {
+				if !placeholder.MatchString(name) || strings.Contains(cmd.Usage(), name) {
+					continue
+				}
+				seen[m[0]] = true
+				rel, _ := filepath.Rel(root, file)
+				t.Errorf("%s documents `waffle %s%s`, but the command calls its operands %q",
+					rel, m[1], m[2], operands(cmd))
+				break
+			}
+		}
+	}
+}
+
+// Usage() carries examples on the lines after the first.
+func operands(cmd Command) string {
+	first, _, _ := strings.Cut(cmd.Usage(), "\n")
+	return strings.TrimPrefix(first, "usage: waffle "+cmd.Code()+" ")
+}
+
 func registered(cmds commands) []string {
 	var codes []string
 	for code := range cmds.All() {

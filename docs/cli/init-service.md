@@ -199,5 +199,5 @@ This rewrites `AGENTS.md` with the conventions of the new waffle version. Commit
 
 1. Add your environment variables to `.env`
 2. Call tool initializers in `config/di/di.go`
-3. Run `waffle make:domain <name>` to create your first domain
+3. Run `waffle make:domain <domain>` to create your first domain
 4. Run `make generate` after each DI change

@@ -13,14 +13,14 @@ go install gitlab.com/gorib/waffle/cmd/waffle@latest
 | Command | Description |
 |---------|-------------|
 | `waffle init:service` | Bootstrap a new microservice project |
-| `waffle make:domain <name>` | Add a domain (model, service, postgres adapter) |
-| `waffle make:domain:grpc <name>` | Add a gRPC handler for an existing domain |
-| `waffle make:domain:http <name>` | Add an HTTP handler for an existing domain |
-| `waffle make:domain:scribus [--batch] <name> <event> [routing-key]` | Add an AMQP consumer for an existing domain; `--batch` scaffolds a `BatchHandler` instead of a per-message `Handler` |
-| `waffle make:domain:migrate <name>` | Add database migrations for an existing domain |
-| `waffle make:domain:entity <name> <entity>` | Add an entity to an existing domain — model, repository interface, adapter, table and DI, the same set the domain's own entity gets. `--storage` picks the adapter and defaults to `sql`, the only one there is; an entity always gets a repository |
-| `waffle make:domain:migration <name> <description>` | Add a new SQL migration |
-| `waffle make:domain:command <name> <command>` | Add a CLI subcommand scoped to a domain |
+| `waffle make:domain <domain>` | Add a domain (model, service, postgres adapter) |
+| `waffle make:domain:grpc <domain>` | Add a gRPC handler for an existing domain |
+| `waffle make:domain:http <domain>` | Add an HTTP handler for an existing domain |
+| `waffle make:domain:scribus [--batch] <domain> <event> [routing-key]` | Add an AMQP consumer for an existing domain; `--batch` scaffolds a `BatchHandler` instead of a per-message `Handler` |
+| `waffle make:domain:migrate <domain>` | Add database migrations for an existing domain |
+| `waffle make:domain:entity <domain> <entity>` | Add an entity to an existing domain — model, repository interface, adapter, table and DI, the same set the domain's own entity gets. `--storage` picks the adapter and defaults to `sql`, the only one there is; an entity always gets a repository |
+| `waffle make:domain:migration <domain> <description>` | Add a new SQL migration |
+| `waffle make:domain:command <domain> <command>` | Add a CLI subcommand scoped to a domain |
 | `waffle make:converter <path>` | Scaffold a goverter convert.go at the given path |
 | `waffle tests:harness [init]` | Report the component harness, and write what is missing with `init` ([details](../conventions/component-harness.md)) |
 | `waffle tests:replacements [check] [--container=<path>]` | List everything the containers expose and what `replacements.allow` grants; `check` fails if a test replaces a field the list does not name |
