@@ -40,10 +40,20 @@ passing. The check that catches it is arithmetic: the number of red cases has to
 equal the number of known defects, and a mismatch means either a defect got
 frozen or a case is wrong.
 
-### What the two failures were, and what actually fixed them
+### The review surface, and the two failures that shaped it
 
-Rule #11 has been broken twice by agents that had it in front of them, and the
-two are worth reading together because the second one refutes the obvious fix.
+What makes Rule #11 enforceable is not its wording. It is a **review surface that
+does not depend on the author's compliance**, and it costs two glances:
+
+- `waffle.yaml`, production files and `CONTRIBUTING.md` do not appear in the diff
+  of a specification task — one look at the file list;
+- the number of red cases equals the number of known defects, and every
+  production file in the diff is named by a case that went red — two numbers and
+  a list.
+
+Neither was designed up front. Each came out of an incident where an agent broke
+the rule with the rule in front of it, and the second incident refutes the fix
+everyone reaches for first.
 
 **First: crossing into the platform's zone.** A session told only "build the
 scenarios per Rule #11" wrote the cases, went straight on to the harness and the
@@ -65,15 +75,12 @@ telling the two designs apart needs a failure *inside* the transaction at the
 declared-contract level, and no seam offers one. So the correct move had been to
 stop and report a gap, which the rule does say.
 
-**What did not work: more prose.** After the first failure the fix was a
-paragraph of argument, and one line of it made things worse — "run the check
-before you hand anything over" turns a red check into a list of the exact lines
-that would make it green. What worked was a **review surface that does not
-depend on the author's compliance**: `waffle.yaml` must never appear in the diff
-of a specification task, which costs a reviewer one glance at the file list.
-After the second failure the same surface was extended to production files and to
-`CONTRIBUTING.md`, and the red-count check gained its mirror — every production
-file in the diff is named by a case that went red.
+**Prose was tried first, and one line of it made things worse.** After the first
+failure the fix was a paragraph of argument, and in it "run the check before you
+hand anything over" turns a red check into a list of the exact lines that would
+make it green. The file-list surface replaced that paragraph. The second failure
+is what extended it to production files and to `CONTRIBUTING.md`, and what added
+the red-count check's mirror.
 
 The generalisation, now with two data points: **prose describing a state does not
 stop an agent with momentum. A prohibition needs either a mechanism or a surface
@@ -109,12 +116,12 @@ them.
   `interface{ A; B; C }` entry that `waffle tests:replacements` prints
   for a shared container field *is* that list of contracts.
 - **Adjudication of defects is the human's.** Deriving candidate defects from
-  code is the cheap half and it is wrong often: across the two services this was
+  code is the cheap half and it is wrong often: on the services this was first
   built on, several proposed defects turned out to be deliberate business rules
   and one could not be reproduced at all.
-- **The red-count check earns its place.** On both services, "the number of red
-  cases equals the number of known defects" caught a real mistake — once a
-  defect frozen as a green boundary, once a case that was simply wrong.
+- **The red-count check earns its place.** "The number of red cases equals the
+  number of known defects" has caught a real mistake more than once — a defect
+  frozen as a green boundary, and a case that was simply wrong.
 - **A case can fail to discriminate and still look complete.** Three cases
   pinning "the adapter is asked with the facility's own configuration" all used
   one facility with one provider, so an implementation holding a single
@@ -330,8 +337,9 @@ workflow that gets abandoned at the first step that does not work.
   `waffle/tools/http.Serve` over the container's own mux and router; the leaves
   that used to be hand-written per service — a logger, a consumer, a dead
   connection — are `pry.Recorder()`, `scribus.Recorder()` and `grpcClient.Dead()`.
-  Four services run on them. A run needs no configuration at all: without a DSN
-  the harness starts a postgres container and the next run reuses it.
+  Services run on them, which is what puts this under "available" rather than
+  under the list below. A run needs no configuration at all: without a DSN the
+  harness starts a postgres container and the next run reuses it.
 
 **Not available yet:**
 
@@ -350,15 +358,15 @@ inside a session; what has to survive the session is the specification itself, i
 the repository, and a link to the ticket where the delta was argued. Only the
 first of those is worth a machine check, and the bullet above is its honest form.
 
-What the two services showed, worth knowing before the third: the expensive
-parts were not the runner but the decisions around it — binding at the declared
-contract rather than one layer below, discovering that replacing a seam does not
-prune what feeds it, and noticing that most cases need no clock at all if
-fixture dates are set relative to now. Those are written down in Rule #11 so the
-third service does not rediscover them.
+What the first services through this showed, worth knowing before yours: the
+expensive parts were not the runner but the decisions around it — binding at the
+declared contract rather than one layer below, discovering that replacing a seam
+does not prune what feeds it, and noticing that most cases need no clock at all
+if fixture dates are set relative to now. Those are written down in Rule #11 so
+they are not rediscovered.
 
 The extraction itself taught one thing worth repeating: **what deserved to be
 shared was not the silent stand-in but the recording one.** A silent leaf is
-three lines written on the spot; a spy is the part that gets rewritten badly, or
-cannot be written at all — a log spy is impossible outside `pry`, because the
-options only unpack inside that package. `Noop()` is a recorder nobody queries.
+three lines written on the spot; a spy is the part that gets rewritten badly —
+and every service that needed one wrote its own until these existed. `Noop()` is
+a recorder nobody queries.
