@@ -47,13 +47,8 @@ type oneKeyBatch struct{ key string }
 func (h oneKeyBatch) Keys() []string          { return []string{h.key} }
 func (h oneKeyBatch) Run([]amqp.Source) error { return nil }
 
-func logger(t *testing.T) pry.Logger {
-	t.Helper()
-	l, err := pry.New("warn")
-	if err != nil {
-		t.Fatal(err)
-	}
-	return l
+func logger(*testing.T) pry.Logger {
+	return pry.Noop()
 }
 
 func single(t *testing.T, consumer Consumer) *scribusCommand {

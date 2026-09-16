@@ -85,11 +85,16 @@ import (
     "gitlab.com/gorib/di"
     "gitlab.com/gorib/env"
     "gitlab.com/gorib/pry"
+    pryzerolog "gitlab.com/gorib/pry/zerolog"
 )
 
 func InitDi() {
     di.Wire[pry.Logger](func() (pry.Logger, error) {
-        return pry.New(env.Value("LOGLEVEL", "info"))
+        level, err := pry.ParseLevel(env.Value("LOGLEVEL", "info"))
+        if err != nil {
+            return nil, err
+        }
+        return pry.New(level, pryzerolog.New(pryzerolog.Plain())), nil
     })
 
     // Add domain registrations here

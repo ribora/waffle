@@ -5,6 +5,7 @@ import (
 	"gitlab.com/gorib/env"
 	"gitlab.com/gorib/pry"
 	"gitlab.com/gorib/pry/channels"
+	pryzerolog "gitlab.com/gorib/pry/zerolog"
 )
 
 func InitPry() {
@@ -16,6 +17,10 @@ func InitPry() {
 		if err != nil {
 			return nil, err
 		}
-		return pry.New(env.Value("LOGLEVEL", "info"), pry.ToChannels(sentry))
+		level, err := pry.ParseLevel(env.Value("LOGLEVEL", "info"))
+		if err != nil {
+			return nil, err
+		}
+		return pry.New(level, pryzerolog.New(pryzerolog.Plain()), pry.ToSinks(sentry)), nil
 	}, di.Fallback())
 }

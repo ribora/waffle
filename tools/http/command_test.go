@@ -36,10 +36,7 @@ func (probeRouter) Setup(mux server.Mux) {
 func documentFrom(t *testing.T) string {
 	t.Helper()
 
-	logger, err := pry.New("error")
-	if err != nil {
-		t.Fatal(err)
-	}
+	logger := pry.Noop()
 	path := filepath.Join(t.TempDir(), "openapi.yaml")
 
 	cmd := NewHttpCommand(
