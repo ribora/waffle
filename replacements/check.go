@@ -98,7 +98,7 @@ func Verify(root string, found Inspection, cfg Config) (Report, error) {
 		seam, known := byField[group.Field]
 		if !known {
 			return report, fmt.Errorf("%s: Replacements has no field %s — the container is out of date, "+
-				"run go generate ./...", group.Pos[0], group.Field)
+				"and go generate ./... rewrites it", group.Pos[0], group.Field)
 		}
 		denied := deniedTypes(seam, cfg)
 		if len(denied) == 0 {
