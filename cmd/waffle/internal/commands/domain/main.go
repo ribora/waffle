@@ -5,11 +5,8 @@ import (
 	"embed"
 	"fmt"
 	"os/exec"
-	"path/filepath"
 	"slices"
 
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/migrate"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/repository"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
 )
 
@@ -53,36 +50,10 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 		}
 	}
 
-	params := map[string]any{
-		"Domain":         domain,
-		"Project":        projectName,
-		"WithRepository": !noRepository,
-	}
-
-	path := filepath.Join("domain", domain)
-	sources := map[string]string{
-		filepath.Join("templates", "model", "errors.go.tpl"):   filepath.Join(path, "model", "errors.go"),
-		filepath.Join("templates", "service", "entity.go.tpl"): filepath.Join(path, "service", "service.go"),
-		filepath.Join("templates", "di.go.tpl"):                filepath.Join("config", "di", "di_"+domain+"_domain.go"),
-	}
-	if err := c.Write(sources, params); err != nil {
+	if err := Generate(domain, projectName, !noRepository); err != nil {
 		return err
 	}
-
-	// The domain's own entity goes through the same path as every later one, so
-	// the first entity and the second differ in nothing.
-	switch {
-	case noRepository:
-		if err := repository.WriteModel(domain, domain, projectName); err != nil {
-			return err
-		}
-	default:
-		if err := repository.GenerateEntity(domain, domain, projectName); err != nil {
-			return err
-		}
-		if err := migrate.Generate(domain, domain, projectName); err != nil {
-			return err
-		}
+	if !noRepository {
 		if err := c.EnableStorage(); err != nil {
 			return err
 		}

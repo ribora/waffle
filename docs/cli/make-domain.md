@@ -190,6 +190,26 @@ Unlike `diogen` and `whisk`, `store` reads the file with `go/ast` alone and neve
 | `Updates()` writes a column you meant to keep | only `readonly` fields are excluded | add `store:",readonly"` |
 | stale `_gen.go` for a struct you renamed or deleted | `store` only writes, never cleans up | delete the file by hand |
 
+### Migrations
+
+**`domain/user/cmd/migrate/main.go`**
+
+The package whose `NewMigrations()` returns the embedded SQL, collected by the
+`migrate` command from every domain that has one. Its DI registration is
+**`config/di/di_user_migrate.go`**.
+
+Two SQL files come with it, both named by the minute they were created:
+
+**`domain/user/cmd/migrate/migrations/<timestamp>_create_update_at_function.sql`**
+
+The trigger function the tables hang on. Written once per domain and recognised
+afterwards by its name, so a second entity does not get a second copy.
+
+**`domain/user/cmd/migrate/migrations/<timestamp>_create_users_table.sql`**
+
+The entity's table. Every entity added later brings one of these and nothing
+else from this section.
+
 ### DI configuration
 
 Registrations go in files of their own under `config/di/`, one per thing
