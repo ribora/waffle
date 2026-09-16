@@ -138,16 +138,21 @@ The first command fails on a structural conflict, the second on drift — code c
 
 ### Media types
 
-The document describes a JSON API, and there is no option to change it. The
-error renderer is why: its body is an open map, and `encoding/xml` cannot
-marshal a map, so a document declaring XML could never be honest about the error
-responses of the same route.
+**A route can answer XML.** `server.OK` writes JSON and `server.XML` writes XML,
+and the schema generator reads `encoding/xml` tags — element names, attributes,
+namespaces, a `lines>line` wrapped array, `XMLName` — so one struct is described
+for both serializations. The full tag mapping is the [XML
+section](https://gitlab.com/gorib/http#xml) of the `http` README.
 
-The success format is a decision in the handler — `server.OK` writes JSON,
-`server.XML` writes XML — and nothing in the generator can read that back. A
-route that answers something else edits its own `content` in the document by
-hand: `Reconcile` only ever adds `application/json` and leaves every other media
-type alone.
+What the generator **writes** into `content` is `application/json`, and only
+that. The error renderer is why: its body is an open map, `encoding/xml` cannot
+marshal a map, and a document declaring XML for a route could not then be honest
+about that route's error responses.
+
+So an XML route declares its own `content` by hand, once. `Reconcile` only ever
+adds `application/json` and leaves every other media type exactly where it is —
+a hand-written media type survives every later run, like the rest of the prose
+you own.
 
 ### Or as a test
 
