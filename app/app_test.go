@@ -44,13 +44,8 @@ type awareStub struct {
 
 func (a *awareStub) SetCommands(c Commands) { a.got = c }
 
-func logger(t *testing.T) pry.Logger {
-	t.Helper()
-	l, err := pry.New("error")
-	if err != nil {
-		t.Fatal(err)
-	}
-	return l
+func logger(*testing.T) pry.Logger {
+	return pry.Noop()
 }
 
 func application(t *testing.T, commands ...Command) *app {
@@ -355,16 +350,12 @@ func TestRunUntilStopExitCodes(t *testing.T) {
 }
 
 func runChild(mode string) {
-	log, err := pry.New("error")
-	if err != nil {
-		panic(err)
-	}
 	a, err := Init([]Command{command("serve", func(context.Context) error {
 		if mode == "failure" {
 			return errors.New("boom")
 		}
 		return nil
-	})}, log, hilton.Noop())
+	})}, pry.Noop(), hilton.Noop())
 	if err != nil {
 		panic(err)
 	}
