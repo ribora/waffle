@@ -116,12 +116,31 @@ a verdict**, and none is a boundary until it has one:
 - **?** no verdict, so not part of the boundary. Only the human who owns the
   behaviour moves it. Do not guess, and do not mark ✓ because the code is old.
 
+**The verdict belongs to the baseline, not to the specification.** It is the
+state of a review, and the baseline is the document that carries one; the
+committed cases say what the service does. So no verdict tags on scenarios —
+`@open`, `@intended`, `@defect` — and no legend explaining them in a feature
+header. A tag like that is review state in the repository: it stops being true
+the moment a decision is taken anywhere else, and a stale one reads as current.
+A specification is not a task tracker.
+
+What the committed case carries instead is the **reason**: the rule as it stands,
+in the present tense, and what it excludes. Not a log — no dated decision
+entries, no "fixed on <date>" lines. Three of those and the reader has a history
+to work through instead of a rule, and the prose stops being read; a rule that
+changes is **rewritten**, not appended to, because who decided it and when is in
+the history and in the ticket. A ✗ case is red, and its comment says what the
+service does today and that the case describes the behaviour that is wanted, so
+nobody reads that red as a broken test.
+
 **Adjudication is the human's.** Deriving cases is the cheap half, and expect to
 be wrong about which are defects — a deliberate business rule reads exactly like
 one.
 
-**When a defect is fixed the case flips ✗ → ✓** and its prose is rewritten to
-describe the fixed behaviour, with one line saying what used to be wrong.
+**When a defect is fixed the case flips ✗ → ✓ in the baseline** and its prose is
+rewritten to describe the behaviour as it now stands. What used to be wrong is
+kept only in the durable form — the implementation the case excludes — and not as
+a note about a past state.
 
 **Do not state counts you will not maintain.** "22 cases, 6 defects" in a header
 is wrong within two edits, and a stale count reads as current.
@@ -213,7 +232,8 @@ implementation detail the specification should not fix.
 committed, so a reference to it or to its numbering points at a file the reader
 does not have. Titles describe behaviour — `Create refuses an empty code`, not
 `F2 Create refuses an empty code` — and a comment carries the reason itself
-rather than a pointer to where the reason was argued.
+rather than a pointer to where the reason was argued. A verdict tag is such a
+pointer: it names a review the reader cannot open. Step 0 says where it lives.
 
 **Language.** Step text and case titles are English — a closed vocabulary, half
 of it wire identifiers. The **reasoning** — case comments and the delta list —
@@ -460,7 +480,7 @@ something to fill in by hand without saying so:
 | Add inbound gRPC | `waffle make:domain:grpc <domain>` |
 | Add inbound HTTP | `waffle make:domain:http <domain>` |
 | Add AMQP consumer | `waffle make:domain:scribus [--batch] <domain> <event> [routing-key]` — the key defaults to `<event>`; pass it when it is dotted (`order_paid order.paid`), and `--batch` for a `BatchHandler` |
-| Add secondary repository | `waffle make:domain:repository <type> <name> <entity>` (`type` is `sql`) |
+| Add an entity to a domain | `waffle make:domain:entity <domain> <entity>` — the same set the domain's own entity gets, table included; an entity always gets a repository, and `--storage` only picks which adapter (`sql` by default) |
 | Set up migrations for a domain that has none | `waffle make:domain:migrate <domain>` |
 | Add one migration to a domain that already has them | `waffle make:domain:migration <domain> <name>` |
 | Add CLI subcommand | `waffle make:domain:command <domain> <name>` |
