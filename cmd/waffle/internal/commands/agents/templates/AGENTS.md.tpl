@@ -674,7 +674,7 @@ type createOrder struct {
 ```
 
 A field with a `scan` tag comes from that scope; a field without one comes from
-the body. Read it with `server.Into[T](src)`, or register the handler with
+the body. Read it with `scan.Into[T](src)`, or register the handler with
 `server.Bind` to receive the parsed `*T` directly.
 
 ### Custom validators are a convention, not configuration
