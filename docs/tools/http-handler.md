@@ -23,10 +23,10 @@ func (r *router) Setup(mux server.Mux) {
 
 ## Parsing and validating requests
 
-`server.Into` parses the request into a DTO via its whisk-generated `Parse`, then runs `Validate()` if the type defines it:
+`scan.Into` parses the request into a DTO via its whisk-generated `Parse`, then runs `Validate()` if the type defines it:
 
 ```go
-req, err := server.Into[createRequest](src)
+req, err := scan.Into[createRequest](src)
 if err != nil {
     return nil, err
 }
@@ -198,7 +198,7 @@ func (h *userHandler) Get(src server.Source) (server.Renderer, error) {
 }
 
 func (h *userHandler) Create(src server.Source) (server.Renderer, error) {
-    req, err := server.Into[createRequest](src)
+    req, err := scan.Into[createRequest](src)
     if err != nil {
         return nil, err
     }
@@ -236,7 +236,7 @@ di.Define(service.NewUserService,
 
 ## Guidelines
 
-- **Parse request bodies with `server.Into[T](src)`** — never read `src.Body()` and unmarshal by hand.
+- **Parse request bodies with `scan.Into[T](src)`** — never read `src.Body()` and unmarshal by hand.
 - **No logging in handlers** — errors propagate to the framework, which logs and renders them. Log only when you need extra context specific to this handler.
 - **No `json` tags in `model/`** — DTOs with json tags belong in `cmd/http`.
 - **Context**: pass `src.Context()` to all service calls — it carries the session populated by the session middleware.

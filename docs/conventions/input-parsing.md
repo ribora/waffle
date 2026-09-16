@@ -42,11 +42,15 @@ type createOrder struct {
 
 whisk writes `<file>_whisk_gen.go` next to the source. A field with a `scan` tag comes from that scope, a field without one comes from the body, and scoped lookups are applied after the body so they win.
 
-Read it with `scan.Into`, or with the transport's own helper — `server.Into` and `server.Bind` for HTTP:
+Read it with `scan.Into`, whatever the source is — the function belongs to whisk
+rather than to a transport, which is the same reason the tags do:
 
 ```go
 req, err := scan.Into[createOrder](src)
 ```
+
+For HTTP there is one step less: `server.Bind` runs it for you and hands the
+handler the parsed request.
 
 `Into` runs `Parse`, then `Validate` if the type has one, and returns on the first error.
 
@@ -109,7 +113,7 @@ type createOrder struct {
     Items    []string `json:"items"          validate:"required,unique,dive,required"`
 }
 
-req, err := server.Into[createOrder](src)
+req, err := scan.Into[createOrder](src)
 ```
 
 **Without it**, the same contract in the handler:
@@ -127,34 +131,34 @@ func parseCreateOrder(src server.Source) (*createOrder, error) {
         Items []string `json:"items"`
     }
     if err := json.Unmarshal(src.Body(), &body); err != nil {
-        return nil, failure.BadRequest("malformed body")
+        return nil, failure.Wrap("%w: malformed body", scan.ErrPayload)
     }
 
     out := &createOrder{Email: body.Email, Items: body.Items}
     out.Currency = src.Lookup("query", "currency")
 
     if out.Currency == "" {
-        return nil, failure.BadRequest("currency is required")
+        return nil, failure.Wrap("%w: currency is required", scan.ErrPayload)
     }
     if !validate.IsCurrency(out.Currency) {
-        return nil, failure.BadRequest("currency is not a currency")
+        return nil, failure.Wrap("%w: currency is not a currency", scan.ErrPayload)
     }
     if out.Email == "" {
-        return nil, failure.BadRequest("email is required")
+        return nil, failure.Wrap("%w: email is required", scan.ErrPayload)
     }
     if !validate.IsEmail(out.Email) {
-        return nil, failure.BadRequest("email is not an email")
+        return nil, failure.Wrap("%w: email is not an email", scan.ErrPayload)
     }
     if len(out.Items) == 0 {
-        return nil, failure.BadRequest("items is required")
+        return nil, failure.Wrap("%w: items is required", scan.ErrPayload)
     }
     seen := make(map[string]bool, len(out.Items))
     for _, item := range out.Items {
         if item == "" {
-            return nil, failure.BadRequest("items contains an empty value")
+            return nil, failure.Wrap("%w: items contains an empty value", scan.ErrPayload)
         }
         if seen[item] {
-            return nil, failure.BadRequest("items must be unique")
+            return nil, failure.Wrap("%w: items must be unique", scan.ErrPayload)
         }
         seen[item] = true
     }
