@@ -56,7 +56,7 @@ func params(domain, entity, projectName string) map[string]string {
 // across the package and not only at the path it would land on.
 func writeModel(c *command.Command, domain, entity string, params map[string]string) error {
 	dir := filepath.Join("domain", domain, "model")
-	declared := title(entity)
+	declared := command.Title(entity)
 	if where, found := command.Declares(dir, declared); found {
 		command.KeptAs("model."+declared, where)
 		return nil

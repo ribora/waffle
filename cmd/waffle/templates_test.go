@@ -14,7 +14,7 @@ import (
 	"testing"
 	"text/template"
 
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/plural"
+	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
 )
 
 // Nothing compiles or parses the scaffolder's templates, so a broken one is
@@ -24,8 +24,10 @@ import (
 
 var (
 	// {{ .X }}, {{ title .X }}, {{- if .X }}
-	tplField  = regexp.MustCompile(`\{\{-?\s*(?:\w+\s+)?\.(\w+)`)
-	tplToggle = regexp.MustCompile(`\{\{-?\s*if\s+\.(\w+)`)
+	tplField = regexp.MustCompile(`\{\{-?\s*(?:\w+\s+)?\.(\w+)`)
+	// {{ .X.Y }} — a param that is a record rather than a scalar.
+	tplSubField = regexp.MustCompile(`\{\{-?\s*(?:\w+\s+)?\.(\w+)\.(\w+)`)
+	tplToggle   = regexp.MustCompile(`\{\{-?\s*if\s+\.(\w+)`)
 	// The block, because what a list holds is decided by how the body reads it:
 	// a bare {{.}} wants strings, {{.Field}} wants records.
 	tplRange = regexp.MustCompile(`(?s)\{\{-?\s*range\s+\.(\w+)\s*-?\}\}(.*?)\{\{-?\s*end\s*-?\}\}`)
@@ -57,19 +59,37 @@ func commandDirs(t *testing.T) []string {
 }
 
 func templatesIn(t *testing.T, dir string) []string {
+	return matching(t, dir, ".go.tpl", ".gofrag.tpl")
+}
+
+func matching(t *testing.T, dir string, suffixes ...string) []string {
 	t.Helper()
 	var out []string
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() || !strings.HasSuffix(path, ".go.tpl") {
+		if err != nil || info.IsDir() {
 			return err
 		}
-		out = append(out, path)
+		for _, suffix := range suffixes {
+			if strings.HasSuffix(path, suffix) {
+				out = append(out, path)
+				return nil
+			}
+		}
 		return nil
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	return out
+}
+
+// A .gofrag.tpl is appended to a file somebody else owns, so it has no package
+// clause. The suffix is what says so — a .go.tpl must parse on its own.
+func asFile(path, rendered string) string {
+	if strings.HasSuffix(path, ".gofrag.tpl") {
+		return "package fragment\n\n" + rendered
+	}
+	return rendered
 }
 
 // Every map[string]string / map[string]any literal in the package, which is how
@@ -143,6 +163,15 @@ func values(fields []string, body string, toggles bool) map[string]any {
 		}
 		out[f] = "thing"
 	}
+	// A record, because the scalar above fails on the first field access.
+	for _, m := range tplSubField.FindAllStringSubmatch(body, -1) {
+		record, ok := out[m[1]].(map[string]any)
+		if !ok {
+			record = map[string]any{}
+			out[m[1]] = record
+		}
+		record[m[2]] = "thing"
+	}
 	for _, m := range tplToggle.FindAllStringSubmatch(body, -1) {
 		out[m[1]] = toggles
 	}
@@ -171,10 +200,7 @@ func list(fields []string, block string, filled bool) any {
 }
 
 func funcs() template.FuncMap {
-	return template.FuncMap{
-		"plural": plural.Plural,
-		"title":  func(w string) string { return strings.ToUpper(w[:1]) + w[1:] },
-	}
+	return command.Funcs()
 }
 
 func TestTemplatesUseOnlySuppliedParams(t *testing.T) {
@@ -222,13 +248,123 @@ func TestTemplatesRenderToGo(t *testing.T) {
 					if err := tpl.Execute(&out, values(fields, string(body), toggles)); err != nil {
 						t.Fatalf("toggles=%v: render: %v", toggles, err)
 					}
-					src := out.String()
+					src := asFile(path, out.String())
 					if _, err := parser.ParseFile(token.NewFileSet(), "rendered.go", src, 0); err != nil {
 						t.Errorf("toggles=%v: rendered output is not Go: %v\n%s", toggles, err, src)
 					}
 				}
 			})
 		}
+	}
+}
+
+// ValidateName accepts order_item, and an unfolded template spells it Order_item.
+func TestTemplatesFoldMultiWordNames(t *testing.T) {
+	root := repoRoot(t)
+	for _, dir := range commandDirs(t) {
+		for _, path := range templatesIn(t, dir) {
+			rel, _ := filepath.Rel(root, path)
+			t.Run(rel, func(t *testing.T) {
+				body, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				tpl, err := template.New(filepath.Base(path)).Funcs(funcs()).Parse(string(body))
+				if err != nil {
+					t.Fatalf("template does not parse: %v", err)
+				}
+				var out bytes.Buffer
+				if err := tpl.Execute(&out, multiWord(referencedFields(string(body)), string(body))); err != nil {
+					t.Fatalf("render: %v", err)
+				}
+				for _, name := range identifiersIn(t, asFile(path, out.String())) {
+					// The sentinel, not any underscore: `package {{.Package}}_test`
+					// writes its own.
+					if strings.Contains(name, multiWordOperand) {
+						t.Errorf("renders the identifier %s — the operand is not folded", name)
+					}
+				}
+			})
+		}
+	}
+}
+
+const multiWordOperand = "two_words"
+
+// Only the operands ValidateName accepts: a .Package is a directory that exists.
+func multiWord(fields []string, body string) map[string]any {
+	out := values(fields, body, true)
+	for _, operand := range []string{"Domain", "Entity", "Event"} {
+		if _, ok := out[operand]; ok {
+			out[operand] = multiWordOperand
+		}
+	}
+	return out
+}
+
+func identifiersIn(t *testing.T, src string) []string {
+	t.Helper()
+	file, err := parser.ParseFile(token.NewFileSet(), "rendered.go", src, 0)
+	if err != nil {
+		t.Fatalf("rendered output is not Go: %v\n%s", err, src)
+	}
+	var out []string
+	ast.Inspect(file, func(n ast.Node) bool {
+		if ident, ok := n.(*ast.Ident); ok && ident.Name != "_" {
+			out = append(out, ident.Name)
+		}
+		return true
+	})
+	return out
+}
+
+// Not Go, and the reason ValidateName refuses a hyphen: order-item is not a
+// proto identifier.
+var (
+	protoPackage = regexp.MustCompile(`(?m)^package\s+(\S*);`)
+	protoService = regexp.MustCompile(`(?m)^service\s+(\S*)\s*\{`)
+	protoIdent   = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+)
+
+func TestProtoTemplatesTakeEveryNameValidateNameAccepts(t *testing.T) {
+	root := repoRoot(t)
+	checked := 0
+	for _, dir := range commandDirs(t) {
+		for _, path := range matching(t, dir, ".proto.tpl") {
+			rel, _ := filepath.Rel(root, path)
+			body, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tpl, err := template.New(filepath.Base(path)).Funcs(funcs()).Parse(string(body))
+			if err != nil {
+				t.Fatalf("%s does not parse: %v", rel, err)
+			}
+
+			for _, domain := range []string{"user", "order_item", "u2"} {
+				if err := command.ValidateName("domain", domain); err != nil {
+					t.Fatalf("the corpus is wrong: %v", err)
+				}
+				var out bytes.Buffer
+				if err := tpl.Execute(&out, map[string]any{"Domain": domain, "Project": "example.com/svc"}); err != nil {
+					t.Fatalf("%s: render: %v", rel, err)
+				}
+				for what, found := range map[string]*regexp.Regexp{"package": protoPackage, "service": protoService} {
+					m := found.FindStringSubmatch(out.String())
+					if m == nil {
+						continue
+					}
+					checked++
+					if !protoIdent.MatchString(m[1]) {
+						t.Errorf("%s renders %s %q for the domain %q, which is not a proto identifier",
+							rel, what, m[1], domain)
+					}
+				}
+			}
+		}
+	}
+	if checked == 0 {
+		t.Error("no proto declaration was checked — the templates moved, not the rule")
 	}
 }
 

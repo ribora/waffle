@@ -73,9 +73,9 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 // scaffolder's to decide — a read model read only by a handler does not.
 // diogen wires it by type as soon as the parameter is there.
 func reportWiring(domain, entity string) {
-	name := title(entity)
+	name := command.Title(entity)
 	command.ReportBlock(
-		fmt.Sprintf("to reach it from the management, add to New%sManagement in domain/%s/service/service.go:", title(domain), domain),
+		fmt.Sprintf("to reach it from the management, add to New%sManagement in domain/%s/service/service.go:", command.Title(domain), domain),
 		fmt.Sprintf("%sRepository %sRepository", entity, name),
 	)
 }

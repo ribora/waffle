@@ -1,13 +1,13 @@
 package di
 
 import (
-	cmd{{ title .Command }} "{{ .Project }}/domain/{{ .Domain }}/cmd/{{ .Command }}"
+	cmd{{ .Command.Upper }} "{{ .Project }}/domain/{{ .Domain }}/cmd/{{ .Command.Raw }}"
 
 	"gitlab.com/gorib/di"
 	"gitlab.com/gorib/waffle/app"
 )
 
-func Init{{ title .Domain }}{{ title .Command }}() {
-	di.Wire[cmd{{ title .Command }}.{{ title .Domain }}Management]({{ .Domain }}ManagementInstance)
-	di.Define(cmd{{ title .Command }}.New{{ title .Command }}Command, di.Tag(app.CommandTag))
+func Init{{ title .Domain }}{{ .Command.Upper }}() {
+	di.Wire[cmd{{ .Command.Upper }}.{{ title .Domain }}Management]({{ camel .Domain }}ManagementInstance)
+	di.Define(cmd{{ .Command.Upper }}.New{{ .Command.Upper }}Command, di.Tag(app.CommandTag))
 }

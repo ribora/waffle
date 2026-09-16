@@ -8,15 +8,15 @@ import (
 type {{ title .Domain }}Management interface {
 }
 
-func New{{ title .Domain }}Service({{ .Domain }}Management {{ title .Domain }}Management) *{{ .Domain }}Service {
-	return &{{ .Domain }}Service{ {{- .Domain }}Management: {{ .Domain }}Management}
+func New{{ title .Domain }}Service({{ camel .Domain }}Management {{ title .Domain }}Management) *{{ camel .Domain }}Service {
+	return &{{ camel .Domain }}Service{ {{- camel .Domain }}Management: {{ camel .Domain }}Management}
 }
 
-type {{ .Domain }}Service struct {
+type {{ camel .Domain }}Service struct {
 	proto.{{ title .Domain }}ServiceServer
-	{{ .Domain }}Management {{ title .Domain }}Management
+	{{ camel .Domain }}Management {{ title .Domain }}Management
 }
 
-func (s *{{ .Domain }}Service) Start(server grpc.ServiceRegistrar) {
+func (s *{{ camel .Domain }}Service) Start(server grpc.ServiceRegistrar) {
 	proto.Register{{ title .Domain }}ServiceServer(server, s)
 }

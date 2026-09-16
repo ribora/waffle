@@ -483,7 +483,7 @@ something to fill in by hand without saying so:
 | Add an entity to a domain | `waffle make:domain:entity <domain> <entity>` — the same set the domain's own entity gets, table included; an entity always gets a repository, and `--storage` only picks which adapter (`sql` by default) |
 | Set up migrations for a domain that has none | `waffle make:domain:migrate <domain>` |
 | Add one migration to a domain that already has them | `waffle make:domain:migration <domain> <description>` |
-| Add CLI subcommand | `waffle make:domain:command <domain> <command>` |
+| Add CLI subcommand | `waffle make:domain:command <domain> <command>` — the name may be hyphenated (`sweep-otp`), and the command registers as `<domain>:<name>` so it cannot collide with `grpc`, `http`, `migrate`, `cron` or `scribus` |
 | Add DTO converter (any path) | `waffle make:converter <path>` — also creates `pkg/goverter/convert.go` if it is missing |
 | Put the component harness in place | `waffle tests:harness` reports what is there, `waffle tests:harness init` writes the rest (Rule #11 step 3) |
 | See what a test may replace | `waffle tests:replacements` — every seam, marked `# leaf` and `# allowed` |

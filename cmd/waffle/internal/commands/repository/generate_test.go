@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
 )
 
 const project = "example.com/svc"
@@ -23,7 +25,7 @@ func domainDir(t *testing.T, domain string) {
 		t.Fatal(err)
 	}
 	body := "package service\n\nimport (\n\t\"" + project + "/domain/" + domain + "/model\"\n)\n\n" +
-		"var _ = model." + title(domain) + "{}\n\nfunc New" + title(domain) + "Management() *" + domain + "Management {\n" +
+		"var _ = model." + command.Title(domain) + "{}\n\nfunc New" + command.Title(domain) + "Management() *" + domain + "Management {\n" +
 		"\treturn &" + domain + "Management{}\n}\n\ntype " + domain + "Management struct{}\n"
 	if err := os.WriteFile(filepath.Join("domain", domain, "service", "service.go"), []byte(body), 0644); err != nil {
 		t.Fatal(err)
@@ -53,7 +55,7 @@ func assertEntity(t *testing.T, domain, entity string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(body), "type "+title(entity)+"Repository interface") {
+	if !strings.Contains(string(body), "type "+command.Title(entity)+"Repository interface") {
 		t.Errorf("%s/%s has no interface in service.go:\n%s", domain, entity, body)
 	}
 }
@@ -75,6 +77,65 @@ func TestEveryEntityGetsTheSameFiles(t *testing.T) {
 
 // The interface belongs in service.go, beside the management that takes it, and
 // not in a file of its own.
+// The file name keeps the underscore, every identifier folds it.
+func TestAMultiWordEntityFolds(t *testing.T) {
+	domainDir(t, "warehouse")
+	if err := GenerateEntity("warehouse", "unit_type", project); err != nil {
+		t.Fatal(err)
+	}
+
+	for path, want := range map[string][]string{
+		filepath.Join("domain", "warehouse", "model", "unit_type.go"): {"type UnitType struct"},
+		filepath.Join("domain", "warehouse", "adapter", "postgres", "stored_unit_type.go"): {
+			"type storedUnitType struct", "_         *model.UnitType",
+		},
+		filepath.Join("domain", "warehouse", "adapter", "postgres", "unit_type.go"): {
+			"unitTypeTable = sql.Table(\"unit_types\")",
+			"func NewUnitTypeRepository(",
+			"type unitTypeRepository struct",
+			"unitTypeId int",
+			"model.ErrUnitTypeNotFound",
+		},
+		filepath.Join("config", "di", "di_warehouse_unit_type_repository.go"): {
+			"func InitWarehouseUnitTypeRepository()",
+			"di.Wire[service.UnitTypeRepository](postgres.NewUnitTypeRepository)",
+		},
+		filepath.Join("domain", "warehouse", "service", "service.go"): {
+			"type UnitTypeRepository interface",
+			"unitType *model.UnitType",
+		},
+	} {
+		body, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, line := range want {
+			if !strings.Contains(string(body), line) {
+				t.Errorf("%s does not contain %q:\n%s", filepath.ToSlash(path), line, body)
+			}
+		}
+	}
+}
+
+// A title that does not fold turns this guard off without failing anything.
+func TestAMultiWordEntityIsNotDeclaredTwice(t *testing.T) {
+	domainDir(t, "warehouse")
+	if err := GenerateEntity("warehouse", "unit_type", project); err != nil {
+		t.Fatal(err)
+	}
+	if err := GenerateEntity("warehouse", "unit_type", project); err != nil {
+		t.Fatal(err)
+	}
+
+	body, err := os.ReadFile(filepath.Join("domain", "warehouse", "service", "service.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(string(body), "type UnitTypeRepository interface"); n != 1 {
+		t.Errorf("service.go declares UnitTypeRepository %d times:\n%s", n, body)
+	}
+}
+
 func TestTheInterfaceLandsInServiceGo(t *testing.T) {
 	domainDir(t, "order")
 	if err := GenerateEntity("order", "line", project); err != nil {

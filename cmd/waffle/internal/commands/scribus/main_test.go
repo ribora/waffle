@@ -11,6 +11,7 @@ import (
 	"testing"
 	"text/template"
 
+	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
 	"gitlab.com/gorib/waffle/tools/scribus"
 )
 
@@ -24,17 +25,16 @@ func render(t *testing.T, mode, key string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tpl, err := template.New("handler").Funcs(template.FuncMap{
-		"title": func(w string) string { return strings.ToUpper(w[:1]) + w[1:] },
-	}).Parse(string(body))
+	tpl, err := template.New("handler").Funcs(command.Funcs()).Parse(string(body))
 	if err != nil {
 		t.Fatalf("parse %s template: %v", mode, err)
 	}
 
 	var out bytes.Buffer
+	// ValidateName refuses orderPaid: the fixture must render what can be entered.
 	err = tpl.Execute(&out, map[string]string{
 		"Domain":  "user",
-		"Event":   "orderPaid",
+		"Event":   "order_paid",
 		"Key":     key,
 		"Project": "example.com/svc",
 	})
@@ -88,7 +88,7 @@ func TestKeysReturnTheRoutingKey(t *testing.T) {
 		if !strings.Contains(src, `[]string{"order.paid"}`) {
 			t.Errorf("%s template does not bind the routing key:\n%s", mode, src)
 		}
-		if strings.Contains(src, `[]string{"orderPaid"}`) {
+		if strings.Contains(src, `[]string{"order_paid"}`) {
 			t.Errorf("%s template still binds the event name as the key", mode)
 		}
 	}

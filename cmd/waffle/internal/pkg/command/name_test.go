@@ -50,6 +50,66 @@ func TestValidateNameNamesTheOperand(t *testing.T) {
 	}
 }
 
+// One operand, six roles. A single-word name spells the same in all of them,
+// which is what keeps an upgrade from renaming commands a project already has.
+func TestParseCommandName(t *testing.T) {
+	for _, want := range []CommandName{
+		{Raw: "recalc", Snake: "recalc", Pkg: "recalc", Lower: "recalc", Upper: "Recalc", Words: "recalc"},
+		{Raw: "sweep-otp", Snake: "sweep_otp", Pkg: "sweepotp", Lower: "sweepOtp", Upper: "SweepOtp", Words: "sweep otp"},
+		{Raw: "sweep_otp", Snake: "sweep_otp", Pkg: "sweepotp", Lower: "sweepOtp", Upper: "SweepOtp", Words: "sweep otp"},
+		{Raw: "pay-recurrent-fee", Snake: "pay_recurrent_fee", Pkg: "payrecurrentfee", Lower: "payRecurrentFee", Upper: "PayRecurrentFee", Words: "pay recurrent fee"},
+		{Raw: "lock-2fa", Snake: "lock_2fa", Pkg: "lock2fa", Lower: "lock2fa", Upper: "Lock2fa", Words: "lock 2fa"},
+	} {
+		got, err := ParseCommandName("command", want.Raw)
+		if err != nil {
+			t.Errorf("%q was refused: %v", want.Raw, err)
+			continue
+		}
+		if got != want {
+			t.Errorf("%q:\n got %+v\nwant %+v", want.Raw, got, want)
+		}
+	}
+}
+
+// A hyphen is the difference from ValidateName; everything else it refused is
+// still refused, because the name still becomes a package and two identifiers.
+func TestParseCommandNameRefusals(t *testing.T) {
+	invalid := map[string]string{
+		"empty":            "",
+		"flag":             "--help",
+		"short flag":       "-h",
+		"leading hyphen":   "-sweep",
+		"trailing hyphen":  "sweep-",
+		"doubled hyphen":   "sweep--otp",
+		"trailing under":   "sweep_",
+		"dot":              "order.paid",
+		"leading digit":    "2fa",
+		"uppercase":        "sweepOtp",
+		"space":            "sweep otp",
+		"slash":            "../etc",
+		"keyword":          "type",
+		"keyword 2":        "range",
+		"separators alone": "-",
+	}
+	for what, name := range invalid {
+		if _, err := ParseCommandName("command", name); err == nil {
+			t.Errorf("%s (%q) was accepted", what, name)
+		}
+	}
+}
+
+func TestParseCommandNameNamesTheOperand(t *testing.T) {
+	_, err := ParseCommandName("command", "Sweep")
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	for _, want := range []string{"command", "Sweep"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not mention %q", err, want)
+		}
+	}
+}
+
 func TestRejectFlags(t *testing.T) {
 	if err := RejectFlags([]string{"user", "order_paid"}); err != nil {
 		t.Errorf("positionals were refused: %v", err)

@@ -11,19 +11,19 @@ type {{ title .Domain }}Management interface {
 }
 
 func NewRouter(
-	{{ .Domain }}Management {{ title .Domain }}Management,
+	{{ camel .Domain }}Management {{ title .Domain }}Management,
 	standard *middleware.Standard,
 	logger pry.Logger,
 ) httpServer.Router {
 	return &router{
-		{{ .Domain }}Management: {{ .Domain }}Management,
+		{{ camel .Domain }}Management: {{ camel .Domain }}Management,
 		standard:                standard,
 		logger:                  logger,
 	}
 }
 
 type router struct {
-	{{ .Domain }}Management {{ title .Domain }}Management
+	{{ camel .Domain }}Management {{ title .Domain }}Management
 	standard                 *middleware.Standard
 	logger                   pry.Logger
 }

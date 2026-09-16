@@ -9,5 +9,5 @@ import (
 
 func Init{{ title .Domain }}{{ title .Event }}Scribus() {
 	di.Wire[scribus.Handler](scribus{{ title .Domain }}.New{{ title .Event }}Command, di.Tag(scribus.CommandTag))
-	di.Wire[scribus{{ title .Domain }}.{{ title .Domain }}Management]({{ .Domain }}ManagementInstance)
+	di.Wire[scribus{{ title .Domain }}.{{ title .Domain }}Management]({{ camel .Domain }}ManagementInstance)
 }

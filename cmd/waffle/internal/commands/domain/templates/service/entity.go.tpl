@@ -11,31 +11,31 @@ import (
 )
 {{ if .WithRepository }}
 func New{{ title .Domain }}Management(
-	{{ .Domain }}Repository {{ title .Domain }}Repository,
-) *{{ .Domain }}Management {
-	return &{{ .Domain }}Management{
-		{{ .Domain }}Repository: {{ .Domain }}Repository,
+	{{ camel .Domain }}Repository {{ title .Domain }}Repository,
+) *{{ camel .Domain }}Management {
+	return &{{ camel .Domain }}Management{
+		{{ camel .Domain }}Repository: {{ camel .Domain }}Repository,
 	}
 }
 
-type {{ .Domain }}Management struct {
-	{{ .Domain }}Repository {{ title .Domain }}Repository
+type {{ camel .Domain }}Management struct {
+	{{ camel .Domain }}Repository {{ title .Domain }}Repository
 }
 
-func (m *{{ .Domain }}Management) Get{{ title .Domain }}(ctx context.Context, {{ .Domain }}Id int) (*model.{{ title .Domain }}, error) {
-	return m.{{ .Domain }}Repository.Get(ctx, {{ .Domain }}Id)
+func (m *{{ camel .Domain }}Management) Get{{ title .Domain }}(ctx context.Context, {{ camel .Domain }}Id int) (*model.{{ title .Domain }}, error) {
+	return m.{{ camel .Domain }}Repository.Get(ctx, {{ camel .Domain }}Id)
 }
 
-func (m *{{ .Domain }}Management) List(ctx context.Context, expr criteria.Expression) ([]*model.{{ title .Domain }}, error) {
-	return m.{{ .Domain }}Repository.List(ctx, expr, nil, 0, 0)
+func (m *{{ camel .Domain }}Management) List(ctx context.Context, expr criteria.Expression) ([]*model.{{ title .Domain }}, error) {
+	return m.{{ camel .Domain }}Repository.List(ctx, expr, nil, 0, 0)
 }
 
-func (m *{{ .Domain }}Management) ListPaged(ctx context.Context, expr criteria.Expression, sort []string, page, count int) ([]*model.{{ title .Domain }}, int, error) {
-	items, err := m.{{ .Domain }}Repository.List(ctx, expr, sort, page, count)
+func (m *{{ camel .Domain }}Management) ListPaged(ctx context.Context, expr criteria.Expression, sort []string, page, count int) ([]*model.{{ title .Domain }}, int, error) {
+	items, err := m.{{ camel .Domain }}Repository.List(ctx, expr, sort, page, count)
 	if err != nil {
 		return nil, 0, err
 	}
-	total, err := m.{{ .Domain }}Repository.Count(ctx, expr)
+	total, err := m.{{ camel .Domain }}Repository.Count(ctx, expr)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -44,9 +44,9 @@ func (m *{{ .Domain }}Management) ListPaged(ctx context.Context, expr criteria.E
 {{- else }}
 var _ = model.{{ title .Domain }}{}
 
-func New{{ title .Domain }}Management() *{{ .Domain }}Management {
-	return &{{ .Domain }}Management{}
+func New{{ title .Domain }}Management() *{{ camel .Domain }}Management {
+	return &{{ camel .Domain }}Management{}
 }
 
-type {{ .Domain }}Management struct{}
+type {{ camel .Domain }}Management struct{}
 {{- end }}

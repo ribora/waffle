@@ -27,6 +27,70 @@ func ValidateName(kind, name string) error {
 	return nil
 }
 
+// One name, which a CLI token spells differently from a Go package.
+type CommandName struct {
+	Raw   string // sweep-otp — the CLI token and the directory
+	Snake string // sweep_otp — the DI registration's file name
+	Pkg   string // sweepotp — a Go package name carries no separator
+	Lower string // sweepOtp — the unexported identifier
+	Upper string // SweepOtp — the exported identifier and the import alias
+	Words string // sweep otp — the generated description
+}
+
+// Separators only between words, so two spellings cannot derive one package.
+var commandShape = regexp.MustCompile(`^[a-z][a-z0-9]*([-_][a-z0-9]+)*$`)
+
+func ParseCommandName(kind, name string) (CommandName, error) {
+	switch {
+	case name == "":
+		return CommandName{}, fmt.Errorf("%s is empty", kind)
+	case !commandShape.MatchString(name):
+		return CommandName{}, fmt.Errorf("%s %q must be lowercase words joined by - or _: a letter, then letters or digits", kind, name)
+	}
+
+	words := strings.FieldsFunc(name, separator)
+	out := CommandName{
+		Raw:   name,
+		Snake: strings.Join(words, "_"),
+		Pkg:   strings.Join(words, ""),
+		Words: strings.Join(words, " "),
+		Lower: Camel(name),
+		Upper: Title(name),
+	}
+
+	// A keyword is one word, so Pkg and Lower are the same check.
+	if token.IsKeyword(out.Pkg) {
+		return CommandName{}, fmt.Errorf("%s %q is a Go keyword", kind, name)
+	}
+	return out, nil
+}
+
+// Folding, not just uppercasing: ValidateName accepts order_item.
+func Title(name string) string {
+	return upper(Camel(name))
+}
+
+func Camel(name string) string {
+	words := strings.FieldsFunc(name, separator)
+	if len(words) == 0 {
+		return ""
+	}
+	out := words[0]
+	for _, word := range words[1:] {
+		out += upper(word)
+	}
+	return out
+}
+
+func upper(word string) string {
+	if word == "" {
+		return ""
+	}
+	return strings.ToUpper(word[:1]) + word[1:]
+}
+
+func separator(r rune) bool { return r == '-' || r == '_' }
+
 // Called once a command has taken the flags it knows, so an unrecognised flag
 // fails instead of becoming a positional.
 func RejectFlags(args []string) error {

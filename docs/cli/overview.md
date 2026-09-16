@@ -20,7 +20,7 @@ go install gitlab.com/gorib/waffle/cmd/waffle@latest
 | `waffle make:domain:migrate <domain>` | Add database migrations for an existing domain |
 | `waffle make:domain:entity <domain> <entity>` | Add an entity to an existing domain — model, repository interface, adapter, table and DI, the same set the domain's own entity gets. `--storage` picks the adapter and defaults to `sql`, the only one there is; an entity always gets a repository |
 | `waffle make:domain:migration <domain> <description>` | Add a new SQL migration |
-| `waffle make:domain:command <domain> <command>` | Add a CLI subcommand scoped to a domain |
+| `waffle make:domain:command <domain> <command>` | Add a CLI subcommand scoped to a domain, registered as `<domain>:<command>` |
 | `waffle make:converter <path>` | Scaffold a goverter convert.go at the given path |
 | `waffle tests:harness [init]` | Report the component harness, and write what is missing with `init` ([details](../conventions/component-harness.md)) |
 | `waffle tests:replacements [check] [--container=<path>]` | List everything the containers expose and what `replacements.allow` grants; `check` fails if a test replaces a field the list does not name |
@@ -31,12 +31,17 @@ exits non-zero, so a `make` target that calls one stops.
 
 ### Names
 
-A domain, entity, event or command name becomes a Go identifier — the domain
-generator emits `var <name>ManagementInstance` and `Init<Name>Domain` — as well as
-a directory and, for migrations, part of a SQL identifier. So it has to be a
+A domain, entity or event name becomes a Go identifier — the domain generator
+emits `var <name>ManagementInstance` and `Init<Name>Domain` — as well as a
+directory and, for migrations, part of a SQL identifier. So it has to be a
 lowercase Go identifier: a letter, then letters, digits or underscores, and not a
 Go keyword. `user`, `order_item` and `user2` are fine; `user-profile`, `2fa`,
 `User` and `type` are refused.
+
+A name of several words is folded into each identifier it reaches, and kept as
+written wherever it is not one. `waffle make:domain:entity warehouse unit_type`
+writes `model/unit_type.go` and `adapter/postgres/stored_unit_type.go`, declaring
+`UnitType` and `storedUnitType`, against a table called `unit_types`.
 
 The check runs before anything is written, together with the check that
 `config/di/modules.go` exists. A command that cannot finish leaves no files
@@ -47,6 +52,29 @@ Two operands are not identifiers and follow their own rules: the `<path>` of
 `make:converter` has to stay inside the project, and the `<description>` of
 `make:domain:migration` is one file-name segment, so it may hold dashes and dots
 but not a separator.
+
+### Command names
+
+A command name is the third, because most of what it becomes is a word somebody
+types. `waffle make:domain:command media sweep-otp` derives every role from the
+one operand:
+
+| Role | Spelling |
+|---|---|
+| the CLI token | `media:sweep-otp` |
+| the directory | `domain/media/cmd/sweep-otp/` |
+| the package | `sweepotp` |
+| the identifiers | `NewSweepOtpCommand`, `sweepOtpCommand` |
+| the registration | `config/di/di_media_sweep_otp.go`, `InitMediaSweepOtp` |
+
+So it takes lowercase words joined by `-` or `_`: `recalc`, `sweep-otp` and
+`pay_recurrent_fee` are accepted, `sweepOtp`, `2fa` and a trailing separator are
+not. The package carries no separator because Go package names do not.
+
+The token is prefixed with its domain, which is not decoration. The framework's
+own commands are bare words — `grpc`, `http`, `migrate`, `cron`, `scribus` — in
+the same registry, and a second command answering to one of them fails
+`app.Init`: the binary refuses to start, taking every other command with it.
 
 ### Routing keys
 
@@ -87,12 +115,13 @@ The `make generate` step re-runs code generators (DI container, stored struct ma
 
 ### Template functions
 
-Templates have access to two extra functions beyond the standard library:
+Templates have access to three extra functions beyond the standard library:
 
 | Function | Example |
 |----------|---------|
 | `plural` | `plural "user"` → `"users"` |
-| `title` | `title "user_profile"` → `"User_profile"` |
+| `title` | `title "user_profile"` → `"UserProfile"` |
+| `camel` | `camel "user_profile"` → `"userProfile"` |
 
 ## waffle.yaml
 

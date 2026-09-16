@@ -14,30 +14,30 @@ import (
 )
 
 var (
-	{{ .Entity }}Table = sql.Table("{{ plural .Entity }}")
+	{{ camel .Entity }}Table = sql.Table("{{ plural .Entity }}")
 )
 
 func New{{ title .Entity }}Repository(
 	db sql.Db,
 	logger pry.Logger,
-) (*{{ .Entity }}Repository, error) {
+) (*{{ camel .Entity }}Repository, error) {
 	repo, err := sql.NewRepository[stored{{ title .Entity }}](db)
 	if err != nil {
 		return nil, err
 	}
-	return &{{ .Entity }}Repository{
+	return &{{ camel .Entity }}Repository{
 		repo:   repo,
 		logger: logger,
 	}, nil
 }
 
-type {{ .Entity }}Repository struct {
+type {{ camel .Entity }}Repository struct {
 	repo   sql.Repository[stored{{ title .Entity }}]
 	logger pry.Logger
 }
 
-func (r *{{ .Entity }}Repository) Get(ctx context.Context, {{ .Entity }}Id int) (*model.{{ title .Entity }}, error) {
-	stored, err := r.repo.Get(ctx, sql.Select().From({{ .Entity }}Table).Where(criteria.And("id", "eq", {{ .Entity }}Id)))
+func (r *{{ camel .Entity }}Repository) Get(ctx context.Context, {{ camel .Entity }}Id int) (*model.{{ title .Entity }}, error) {
+	stored, err := r.repo.Get(ctx, sql.Select().From({{ camel .Entity }}Table).Where(criteria.And("id", "eq", {{ camel .Entity }}Id)))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, model.Err{{ title .Entity }}NotFound
@@ -48,13 +48,13 @@ func (r *{{ .Entity }}Repository) Get(ctx context.Context, {{ .Entity }}Id int) 
 	return stored.Unwrap(), nil
 }
 
-func (r *{{ .Entity }}Repository) Save(ctx context.Context, {{ .Entity }} *model.{{ title .Entity }}) (_ *model.{{ title .Entity }}, err error) {
-	stored := newStored{{ title .Entity }}({{ .Entity }})
-	if {{ .Entity }}.Id != 0 {
-		stored, err = r.repo.Get(ctx, sql.Update(stored.Updates()).Table({{ .Entity }}Table).Where(criteria.And("id", "eq", {{ .Entity }}.Id)))
+func (r *{{ camel .Entity }}Repository) Save(ctx context.Context, {{ camel .Entity }} *model.{{ title .Entity }}) (_ *model.{{ title .Entity }}, err error) {
+	stored := newStored{{ title .Entity }}({{ camel .Entity }})
+	if {{ camel .Entity }}.Id != 0 {
+		stored, err = r.repo.Get(ctx, sql.Update(stored.Updates()).Table({{ camel .Entity }}Table).Where(criteria.And("id", "eq", {{ camel .Entity }}.Id)))
 	} else {
 		fields, values := stored.Inserts()
-		stored, err = r.repo.Get(ctx, sql.Insert(fields...).Into({{ .Entity }}Table).Values(values...))
+		stored, err = r.repo.Get(ctx, sql.Insert(fields...).Into({{ camel .Entity }}Table).Values(values...))
 	}
 	if err != nil {
 		r.logger.Error(err, pry.Ctx(ctx))
@@ -63,8 +63,8 @@ func (r *{{ .Entity }}Repository) Save(ctx context.Context, {{ .Entity }} *model
 	return stored.Unwrap(), nil
 }
 
-func (r *{{ .Entity }}Repository) List(ctx context.Context, expr criteria.Expression, sort []string, page int, count int) ([]*model.{{ title .Entity }}, error) {
-	stored, err := r.repo.Select(ctx, sql.Select().From({{ .Entity }}Table).Where(expr).Sort(sort...).Page(page, count))
+func (r *{{ camel .Entity }}Repository) List(ctx context.Context, expr criteria.Expression, sort []string, page int, count int) ([]*model.{{ title .Entity }}, error) {
+	stored, err := r.repo.Select(ctx, sql.Select().From({{ camel .Entity }}Table).Where(expr).Sort(sort...).Page(page, count))
 	if err != nil {
 		r.logger.Error(err, pry.Ctx(ctx))
 		return nil, sql.ErrQueryFailed
@@ -74,6 +74,6 @@ func (r *{{ .Entity }}Repository) List(ctx context.Context, expr criteria.Expres
 	}), nil
 }
 
-func (r *{{ .Entity }}Repository) Count(ctx context.Context, query criteria.Expression) (int, error) {
-	return r.repo.Count(ctx, sql.Count().From({{ .Entity }}Table).Where(query))
+func (r *{{ camel .Entity }}Repository) Count(ctx context.Context, query criteria.Expression) (int, error) {
+	return r.repo.Count(ctx, sql.Count().From({{ camel .Entity }}Table).Where(query))
 }

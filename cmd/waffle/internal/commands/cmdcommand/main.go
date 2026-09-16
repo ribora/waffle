@@ -5,7 +5,6 @@ import (
 	"embed"
 	"fmt"
 	"os/exec"
-	"path/filepath"
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
 )
@@ -26,32 +25,21 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 	if err := c.Operands(args, 2, 2); err != nil {
 		return err
 	}
-	if err := command.ValidateName("domain", args[0]); err != nil {
-		return err
-	}
-	if err := command.ValidateName("command", args[1]); err != nil {
-		return err
-	}
 	domain := args[0]
-	cmdName := args[1]
+	if err := command.ValidateName("domain", domain); err != nil {
+		return err
+	}
+	// Not ValidateName: a CLI token may have hyphens.
+	name, err := command.ParseCommandName("command", args[1])
+	if err != nil {
+		return err
+	}
 	projectName, err := c.FindProjectName()
 	if err != nil {
 		return err
 	}
 
-	params := map[string]string{
-		"Domain":  domain,
-		"Command": cmdName,
-		"Project": projectName,
-	}
-
-	path := filepath.Join("domain", domain)
-	sources := map[string]string{
-		filepath.Join("templates", "main.go.tpl"): filepath.Join(path, "cmd", cmdName, "main.go"),
-		filepath.Join("templates", "di.go.tpl"):   filepath.Join("config", "di", "di_"+domain+"_"+cmdName+".go"),
-	}
-
-	if err := c.Write(sources, params); err != nil {
+	if err := Generate(domain, name, projectName); err != nil {
 		return err
 	}
 

@@ -9,5 +9,5 @@ import (
 
 func Init{{ title .Domain }}Http() {
 	di.Wire[httpServer.Router](http{{ title .Domain }}.NewRouter)
-	di.Wire[http{{ title .Domain }}.{{ title .Domain }}Management]({{ .Domain }}ManagementInstance)
+	di.Wire[http{{ title .Domain }}.{{ title .Domain }}Management]({{ camel .Domain }}ManagementInstance)
 }

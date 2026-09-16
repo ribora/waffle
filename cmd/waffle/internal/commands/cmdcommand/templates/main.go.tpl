@@ -1,4 +1,4 @@
-package {{ .Command }}
+package {{ .Command.Pkg }}
 
 import (
 	"context"
@@ -14,21 +14,22 @@ type {{ title .Domain }}Management interface {
 	// Methods consumed by this command go here.
 }
 
-func New{{ title .Command }}Command(
-	{{ .Domain }}Management {{ title .Domain }}Management,
-) *{{ .Command }}Command {
-	return &{{ .Command }}Command{
-		BaseCommand:             app.NewCommand("{{ .Command }}", "{{ title .Command }} {{ .Domain }}"),
-		{{ .Domain }}Management: {{ .Domain }}Management,
+func New{{ .Command.Upper }}Command(
+	{{ camel .Domain }}Management {{ title .Domain }}Management,
+) *{{ .Command.Lower }}Command {
+	return &{{ .Command.Lower }}Command{
+		// Prefixed: a bare name can collide with a framework command, and app.Init fails.
+		BaseCommand:             app.NewCommand("{{ .Domain }}:{{ .Command.Raw }}", "{{ title .Command.Words }} {{ .Domain }}"),
+		{{ camel .Domain }}Management: {{ camel .Domain }}Management,
 	}
 }
 
-type {{ .Command }}Command struct {
+type {{ .Command.Lower }}Command struct {
 	app.BaseCommand
-	{{ .Domain }}Management {{ title .Domain }}Management
+	{{ camel .Domain }}Management {{ title .Domain }}Management
 }
 
-func (c *{{ .Command }}Command) Run(ctx context.Context) error {
+func (c *{{ .Command.Lower }}Command) Run(ctx context.Context) error {
 	if err := c.Usage(ctx); err != nil {
 		return err
 	}
@@ -38,7 +39,7 @@ func (c *{{ .Command }}Command) Run(ctx context.Context) error {
 
 // Own option set, and argv from the context rather than os.Args: cron runs
 // commands inside this same binary, and the global flag set is shared.
-func (c *{{ .Command }}Command) Usage(ctx context.Context) error {
+func (c *{{ .Command.Lower }}Command) Usage(ctx context.Context) error {
 	opts := getopt.New()
 	var help bool
 	opts.FlagLong(&help, "help", 'h', "Display this help message")

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"golang.org/x/tools/imports"
 
@@ -18,7 +17,7 @@ const serviceFile = "service.go"
 // them: in service.go, above the management that takes them.
 func appendInterface(c *command.Command, domain, entity string, params map[string]string) error {
 	dir := filepath.Join("domain", domain, "service")
-	declared := title(entity) + "Repository"
+	declared := command.Title(entity) + "Repository"
 	if where, found := command.Declares(dir, declared); found {
 		command.KeptAs("service."+declared, where)
 		return nil
@@ -72,8 +71,4 @@ func insertBeforeFirstFunc(body, block []byte) []byte {
 	out.WriteString("\n")
 	out.Write(bytes.Join(lines[at:], []byte("\n")))
 	return out.Bytes()
-}
-
-func title(word string) string {
-	return strings.ToUpper(word[:1]) + word[1:]
 }

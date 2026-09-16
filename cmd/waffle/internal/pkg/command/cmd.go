@@ -23,17 +23,21 @@ func New(name, description string, templates embed.FS, funcs template.FuncMap) *
 		name:        name,
 		description: description,
 		templates:   templates,
-		funcs: template.FuncMap{
-			"plural": plural.Plural,
-			"title": func(word string) string {
-				return strings.ToUpper(word[:1]) + word[1:]
-			},
-		},
+		funcs: Funcs(),
 	}
 	for n, f := range funcs {
 		c.funcs[n] = f
 	}
 	return c
+}
+
+// Exported so a test renders with the scaffolder's functions, not a copy.
+func Funcs() template.FuncMap {
+	return template.FuncMap{
+		"plural": plural.Plural,
+		"title":  Title,
+		"camel":  Camel,
+	}
 }
 
 type Command struct {
