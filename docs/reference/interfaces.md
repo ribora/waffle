@@ -1,6 +1,8 @@
 # Interface Reference
 
-Complete listing of every exported interface in waffle.
+Every exported interface a service implements or is handed — waffle's own, plus
+the ones from gorib packages it meets through waffle. The import path is in a
+comment wherever it is not waffle's.
 
 ---
 
@@ -66,7 +68,93 @@ type HttpCommand interface {
 
 Marker interface for the HTTP server command. Registered under `app.CommandTag`.
 
-HTTP middleware is a `server.Layer` (`func(next server.Handler) server.Handler`), not a tool-specific interface. The standard chain ships as `*middleware.Standard` and is applied in the router's `Setup` via `mux.Use(standard.All()...)`; see [tools/http](../tools/http.md#middleware).
+### Router
+
+```go
+// gitlab.com/gorib/http/server
+type Router interface {
+    Setup(mux Mux)
+}
+```
+
+The one interface a service implements for every domain that serves HTTP, scaffolded by `waffle make:domain:http`. Wire it with `di.Wire[server.Router](http.NewRouter)`. `Setup` applies the middleware chain and registers routes; the same method is what the component harness calls, so a scenario exercises the routes that ship. See [tools/http](../tools/http.md#registering-routes).
+
+### Mux
+
+```go
+// gitlab.com/gorib/http/server
+type Mux interface {
+    http.Handler
+
+    Use(layers ...Layer)
+    Group(prefix string, layers ...Layer) Mux
+
+    Get(path string, layers ...Layer)
+    Post(path string, layers ...Layer)
+    Put(path string, layers ...Layer)
+    Patch(path string, layers ...Layer)
+    Delete(path string, layers ...Layer)
+    Handle(method, path string, layers ...Layer)
+
+    Routes() []RouteMeta
+}
+```
+
+What `Setup` receives. chi-backed, so patterns are `{id}`, `{id:[0-9]+}` and a trailing `/*`. `Group` snapshots the layers and prefix at the call, after which parent and child diverge. `Routes()` is the route table the OpenAPI generator reads — which is why a route registered with `server.Bind` reaches the document and one registered with `server.Handle` does not, having no types to report.
+
+### Handler and Layer
+
+```go
+// gitlab.com/gorib/http/server
+type Handler func(src Source) (Renderer, error)
+type Layer   = func(next Handler) Handler
+```
+
+Not interfaces, but the two shapes everything else composes around. A handler returning a nil renderer and a nil error renders 204.
+
+`Layer` is a type **alias**, so a named function type — `middleware.Compress`, your own auth layer — is assignable without conversion. Middleware is therefore a `Layer` and not a tool-specific interface; the standard chain ships as `*middleware.Standard` and goes on with `mux.Use(standard.All()...)`. Its order is load-bearing at three points — see [tools/http](../tools/http.md#middleware).
+
+`server.Handle` adapts a handler into a layer; `server.Bind` does the same for a typed `func(ctx, *Req) (*Response[Res], error)` and records the two types on the route.
+
+### Source
+
+```go
+// gitlab.com/gorib/http/server
+type Source interface {
+    scan.Source // Lookup, LookupAll, Body, Context
+
+    Path(key string) string
+    Query(key string) string
+    QueryAll(key string) []string
+    Header(key string) string
+    HeaderAll(key string) []string
+    Cookie(key string) string
+    Form(key string) string
+    FormAll(key string) []string
+
+    Request() *http.Request
+    SetRequest(*http.Request)
+}
+```
+
+The request, as an interface. You are handed one rather than implementing it. The embedded `scan.Source` is what lets a whisk-generated `Parse` read an HTTP request exactly as it reads an AMQP delivery; the typed accessors above it are for what has no generated `Parse` — middleware, and handlers written by hand. Query, form and body reads are cached, so a middleware and a handler cannot race for the body reader.
+
+### Renderer
+
+```go
+// gitlab.com/gorib/http/server
+type Renderer interface {
+    Render(w http.ResponseWriter) error
+    WriteBody(w io.Writer) error
+
+    Status() int
+    Headers() http.Header
+    Body() any
+    Stream() func(w io.Writer) error
+}
+```
+
+What a handler returns. `*Response[Res]` implements it, built by `server.OK`, `Created`, `Accepted`, `NoContent`, `JSON`/`XML`/`Text`/`HTML`, or `StreamWith` for a body written incrementally. Implement it yourself only for a format none of those cover — the error middleware renders errors, so a handler never formats one.
 
 ---
 
@@ -232,3 +320,65 @@ type Ephemeral interface {
 ```
 
 Optional. A resource with something to remove when the run ends — `sqltest.Ephemeral()` drops its database. Call `Set.Down` once per process, from `TestMain`.
+
+---
+
+## pry package
+
+### Logger
+
+```go
+// gitlab.com/gorib/pry
+type Logger interface {
+    Trace(message any, opts ...Option)
+    Debug(message any, opts ...Option)
+    Info(message any, opts ...Option)
+    Warn(message any, opts ...Option)
+    Error(message any, opts ...Option)
+}
+```
+
+What the framework hands every component, and what a handler or service takes as a constructor argument. `pry.Noop()` and `pry.Recorder()` both satisfy it, so a test needs nothing else. The options are `pry.Err(err)`, `pry.Ctx(ctx)` and `pry.Field(key, value)`; an `error` passed as the `message` wins over `Err` and leaves the message empty.
+
+### Driver
+
+```go
+// gitlab.com/gorib/pry
+type Driver interface {
+    Log(Record)
+}
+```
+
+Renders a record. `pry/zerolog` is the default and `pry/slog` the alternative; only the package you import links its library. The level gate, the fan-out to sinks and `Close` belong to the logger, which is why a driver is one method. A driver that also implements `io.Closer` is closed by `Logger.Close`.
+
+`pry.Recorder()` is a driver — it sits under the real logger, so a scenario asserts on records the production path built.
+
+### Sink
+
+```go
+// gitlab.com/gorib/pry
+type Sink interface {
+    Write(Record)
+    Close() error
+}
+```
+
+A side channel receiving every record the logger emits, off the calling goroutine. `channels.Sentry` is the one that ships. A sink sees only what the logger emits — the level gate runs before the record is built, so it cannot ask for anything below the logger's own level.
+
+### Record
+
+Not an interface, but the value both of the above receive:
+
+```go
+// gitlab.com/gorib/pry
+type Record struct {
+    Level   Level
+    Message string
+    Err     error
+    Attrs   []Attr
+    Ctx     context.Context
+    Session *session.Session
+}
+```
+
+`Session` is a copy taken when `pry.Ctx` ran: transport middleware mutates the one in the context in place, and a sink reads the record from another goroutine.

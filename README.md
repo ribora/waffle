@@ -49,6 +49,6 @@ And leaving is as cheap as arriving. Delete a `//go:generate` line and the file 
 - [Component harness](docs/conventions/component-harness.md) — The resource seam, real postgres and elasticsearch, recorders instead of silent stand-ins
 
 ### Reference
-- [Interfaces](docs/reference/interfaces.md) — Full interface listing for all packages
+- [Interfaces](docs/reference/interfaces.md) — Every interface a service implements or is handed
 - [Running locally](docs/reference/running-locally.md) — What each module needs running and in `.env`
 - [Environment Variables](docs/reference/environment.md) — All env vars read by waffle tools
