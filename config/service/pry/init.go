@@ -13,7 +13,7 @@ func InitPry() {
 		dsn := env.Value("SENTRY_DSN", "")
 		environment := env.Value("ENVIRONMENT", "noenv")
 		service := env.Value("SERVICE", "nocontour")
-		sentry, err := channels.Sentry("error", channels.WithSentryConnection(dsn, environment, channels.WithSentryService(service)))
+		sentry, err := channels.Sentry(env.Value("SENTRY_LEVEL", "error"), channels.WithSentryConnection(dsn, environment, channels.WithSentryService(service)))
 		if err != nil {
 			return nil, err
 		}

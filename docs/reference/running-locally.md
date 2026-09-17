@@ -13,7 +13,7 @@ about what the framework asks for.
 | Blank import | Needs running | Required in `.env` | Optional |
 |---|---|---|---|
 | `config/app` | — | — | — |
-| `config/service/pry` | — | — | `LOGLEVEL` (`info`), `ENVIRONMENT` (`noenv`), `SERVICE` (`nocontour`), `SENTRY_DSN` |
+| `config/service/pry` | — | — | `LOGLEVEL` (`info`), `SENTRY_LEVEL` (`error`), `ENVIRONMENT` (`noenv`), `SERVICE` (`nocontour`), `SENTRY_DSN` |
 | `config/service/hilton/otel` | an OTLP collector, or nothing | — | `OTEL_EXPORTER_OTLP_ENDPOINT`, `SERVICE`, `ENVIRONMENT`, `HOSTNAME` |
 | `config/service/sql` | PostgreSQL | `DB_DRIVER`, `DB_DSN` | — |
 | `config/service/redis` | Redis | `REDIS_HOST` | `REDIS_PORT` (`6379`), `REDIS_PASSWORD`, `REDIS_DB` (`0`) |

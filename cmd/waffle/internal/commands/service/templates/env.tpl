@@ -8,6 +8,7 @@ ENVIRONMENT=local
 # logging — config/service/pry
 LOGLEVEL=debug
 SENTRY_DSN=
+SENTRY_LEVEL=error
 
 # tracing and metrics — config/service/hilton/otel
 # empty endpoint means spans and metrics go nowhere

@@ -37,6 +37,7 @@ A variable is only read if the module that reads it is enabled — every one bel
 |----------|----------|---------|-------------|
 | `LOGLEVEL` | no | `info` | `trace`, `debug`, `info`, `warn` or `error` |
 | `SENTRY_DSN` | no | empty | Empty disables the Sentry channel without disabling the logger |
+| `SENTRY_LEVEL` | no | `error` | What reaches Sentry. Cannot be lower than `LOGLEVEL`: the level gate runs before the record is built, so a record the logger never emits cannot reach a sink |
 | `ENVIRONMENT` | no | `noenv` | Reported to Sentry |
 | `SERVICE` | no | `nocontour` | Reported to Sentry as the server name |
 
