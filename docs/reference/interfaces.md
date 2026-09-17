@@ -381,4 +381,4 @@ type Record struct {
 }
 ```
 
-`Session` is a copy taken when `pry.Ctx` ran: transport middleware mutates the one in the context in place, and a sink reads the record from another goroutine.
+`Session` is a copy taken when `pry.Ctx` ran. Its fields are all write-once, so the copy is safe to read from a sink's goroutine. The trace context is not among them — a sink reads that from `Ctx` via `session.TraceparentFromContext`, because it is rewritten per span.
