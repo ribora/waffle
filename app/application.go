@@ -128,10 +128,8 @@ func (a *app) Run() error {
 	)
 	defer span.End()
 
-	if s := session.FromContext(ctx); s != nil {
-		if tp := hilton.FormatTraceparent(span.SpanContext()); tp != "" {
-			s.Traceparent = tp
-		}
+	if tp := hilton.FormatTraceparent(span.SpanContext()); tp != "" {
+		ctx = session.WithTraceparent(ctx, tp)
 	}
 
 	start := time.Now()

@@ -216,11 +216,10 @@ func TestTheSpanReachesTheSession(t *testing.T) {
 	if hilton.ProviderFromContext(cmd.seen) != provider {
 		t.Error("the command cannot start its own spans on the app's provider")
 	}
-	s := session.FromContext(cmd.seen)
-	if s == nil {
+	if s := session.FromContext(cmd.seen); s == nil {
 		t.Fatal("no session in the context")
 	}
-	if s.Traceparent == "" {
+	if session.TraceparentFromContext(cmd.seen) == "" {
 		t.Error("no traceparent, so a downstream call starts a trace of its own")
 	}
 }

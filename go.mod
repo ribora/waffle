@@ -17,8 +17,8 @@ require (
 	gitlab.com/gorib/http v1.11.13
 	gitlab.com/gorib/pry v1.4.0
 	gitlab.com/gorib/redis v1.2.6
-	gitlab.com/gorib/session v1.1.2
-	gitlab.com/gorib/sql v1.5.1
+	gitlab.com/gorib/session v1.2.0
+	gitlab.com/gorib/sql v1.6.0
 	gitlab.com/gorib/whisk v1.3.1
 	golang.org/x/tools v0.49.0
 	google.golang.org/grpc v1.83.1
@@ -58,7 +58,7 @@ require (
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/rs/zerolog v1.35.1 // indirect
 	github.com/sethvargo/go-retry v0.4.0 // indirect
-	gitlab.com/gorib/criteria v1.0.2 // indirect
+	gitlab.com/gorib/criteria v1.1.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.45.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.45.0 // indirect
