@@ -24,9 +24,9 @@ service-specific notes go there and not here.
 
 Two kinds of thing are below, and they are read differently. **Rule #11 is a
 protocol** — it decides what you are allowed to be doing right now, so it comes
-first and it has to be held, not looked up. **Rules #1–#10 are a reference** for
-the framework's conventions; go to the one you need. The numbers are identifiers,
-not a reading order.
+first and it has to be held, not looked up. **The other rules are a reference**
+for the framework's conventions; go to the one you need. The numbers are
+identifiers, not a reading order.
 
 Held in mind, all of it:
 
@@ -533,7 +533,7 @@ config/
 domain/<x>/
   model/                             Domain types (no external deps)
   service/                           Business logic + interfaces (depends on model only)
-  adapter/                           Outbound (postgres, gRPC clients, HTTP clients)
+  adapter/                           Outbound (postgres, gRPC clients, HTTP clients) — and the only door to another domain (Rule #12)
     postgres/                        sql repository (uses stored<X> with Unwrap/Inserts)
     <name>.go                        Other outbound adapters (flat files in adapter/)
   cmd/
@@ -552,13 +552,85 @@ domain/<x>/
       main.go                        NewMigrations() — embeds *.sql
       migrations/*.sql
 pkg/
-  goverter/convert.go                Project-wide conversion whitelist (see Rule #6)
+  goverter/convert.go                Project-wide conversion whitelist (see Rule #6) — imports no domain (Rule #12)
 ```
 
 The `mapper` key in `waffle.yaml` decides conversions. Default `goverter`: each
 transport gets a `convert/` package as shown above. `dto`: no `convert/` package
 is scaffolded — write conversions by hand (inline in the handler, or a `dto.go`
 you add to its package).
+
+## Rule #12 — a domain is reached only through an adapter
+
+`adapter/` is the one door out of a domain, and the neighbour's `model/` is the
+one thing behind it:
+
+- **Types.** Nothing outside a domain may import it. The exceptions are
+  `domain/<x>/adapter/**`, which may import `domain/<y>/model` and nothing else
+  of `<y>`; a composition root — whatever carries a `//go:generate diogen` line
+  and the container it writes, so a second binary's root and a domain that
+  registers itself both count, or a directory named by
+  `boundaries.Roots(...)` where there is no directive; and `tests/`, which boots
+  the real thing. `pkg/`, `lib/`, `api/` — anything else — may not reach a
+  domain at all.
+- **Behaviour.** A registration may answer `domain/<x>`'s interface with
+  `domain/<y>`'s package only when the interface is in `domain/<x>/adapter/**`
+  and the answer is `domain/<y>/service`. `config/di/` may *import* anything —
+  it is the composition root — but this is what it may *wire*.
+- **Layers, inside one domain.** `adapter/**` is imported only from another
+  adapter — not from `service/`, which declares what it needs and lets DI answer
+  it; naming an adapter is how a seam is lost. `cmd/**` is imported only from
+  inside `cmd/**` — a transport is private. `model/` is open to the whole
+  domain. `config/di/` is not in a domain and is bound by neither.
+
+`pkg/` is the one people reach for: it is plumbing every domain may import, so
+domain logic parked there is a boundary nobody can see. The rule is about being
+outside every domain, though, not about the directory's name.
+
+Both halves are needed, because a coupling can hide from either one. A borrowed
+method whose signature is all primitives (`Cancel(ctx, id) error`) can be
+declared in `rent/service` and wired to `invoice/service` with no import
+anywhere — which is why the check reads `di.Wire`, `di.Define` and `di.Alias`
+as well as import lines. A handle counts as its constructor: `di.Wire[X](h)`
+where `h = di.Define(otherDomain.NewY)` is the same crossing written in two
+files.
+
+The legal shape: the adapter declares the interface it needs (Rule #3), imports
+the neighbour's model only for the types in that interface, and translates them
+into its own.
+
+```go
+// domain/rent/adapter/invoice.go
+package adapter
+
+import (
+	invoiceModel "{{ .ModulePath }}/domain/invoice/model"
+	"{{ .ModulePath }}/domain/rent/model"
+)
+
+// Declared here, implemented by invoice/service, wired in config/di/di.go.
+type InvoiceManagement interface {
+	CreateInvoice(ctx context.Context, customerId int, amount money.Money) (*invoiceModel.Invoice, error)
+}
+
+func (s *invoiceService) toDomain(invoice *invoiceModel.Invoice) *model.Invoice { ... }
+```
+
+```go
+// config/di/di.go — the neighbour's service answers the adapter's interface
+di.Define(invoiceService.NewInvoiceManagement,
+    di.Alias[invoiceGrpc.InvoiceManagement](),
+    di.Alias[rentAdapter.InvoiceManagement](),   // the only cross-domain shape
+)
+```
+
+Behaviour crosses through the interface; types cross directly and stop at
+`toDomain`. Past that line the neighbour's model does not appear.
+
+`boundaries.Check()` runs as an ordinary test from
+`config/diogen/boundaries_test.go`, so `make` fails on anything else. There is no
+exceptions file: a crossing that would need one is a design question for the
+platform engineer, not a line of configuration.
 
 ## Rule #3 — naming conventions (strict)
 
@@ -580,7 +652,8 @@ carefully before touching it.
 
 ```go
 di.Wire[Interface](constructor, ...opts)        // bind concrete to interface
-di.Define(constructor, ...opts)                  // bind without interface
+di.Define(constructor, ...opts)                  // bind without interface; answers with a handle
+di.Wire[Interface](handle)                       // bind a handle di.Define answered with
 di.Tag(SomeTag)                                  // mark for collection
 di.Tags[T](SomeTag)                              // collect all values tagged
 di.For[Consumer]()                               // scope binding to one consumer
@@ -796,6 +869,9 @@ Rule #2 — `make generate && make audit && make`.
 - ❌ Add `replace` directives in `go.mod` — coordinate gorib version bumps instead
 - ❌ Touch `di_gen.go`, `*_goverter_gen.go`, `*_whisk_gen.go`, `stored_*_gen.go`, `*_mock*.go` — they're generated
 - ❌ Wrap stdlib types in custom abstractions inside `domain/<x>/model/` — model stays pure Go types
+- ❌ Import a domain from anywhere outside it but `config/` and `tests/` — only another domain's `adapter/` may, and only its `model/` (Rule #12)
+- ❌ Wire a neighbour's package to an interface that is not in your own `adapter/` — the registration crosses the boundary even though no import does (Rule #12)
+- ❌ Import `domain/<x>/adapter/**` from anywhere but another adapter, or `domain/<x>/cmd/**` from outside `cmd/` — `config/di` is what reaches them (Rule #12)
 - ❌ Pass `context.Background()` deeper than the entrypoint — propagate ctx from caller
 - ❌ `panic(err)` anywhere past the entrypoint — return the error
 

@@ -16,6 +16,7 @@ A component test boots the **real container** over **real infrastructure** and r
 | `tests/suite_test.go` | `TestMain` — `Env` before, `Down` after |
 | `tests/boot_test.go` | the boot smoke test, written before any case |
 | `config/diogen/replacements_test.go` | `replacements.Check()` as an ordinary test |
+| `config/diogen/boundaries_test.go` | `boundaries.Check()` as an ordinary test |
 
 Go beside Go in `tests/`, and `tests/feature/` left for the `.feature` files alone — only one of the two is a specification, and it is read by someone who does not read the other. The registry and the cut are separate files because they change for different reasons: one when a system appears, one when a seam does.
 

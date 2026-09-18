@@ -31,6 +31,30 @@ di.Define(heraldGrpc.NewNotificationService, di.Tag(grpcCommand.ServiceTag))
 di.Define(heraldGrpc.NewErrorHandler, di.Tag(grpcCommand.MiddlewareTag))
 ```
 
+`di.Define` answers with a **handle**, and `di.Wire` takes one in place of a
+constructor. That is how `waffle make:domain` splits a domain's wiring across
+files: the management is defined once, and each transport wires the handle it
+gets from the file next door.
+
+```go
+// config/di/di_user_domain.go
+var userManagementInstance any
+
+func InitUserDomain() {
+    userManagementInstance = di.Define(userService.NewUserManagement)
+}
+
+// config/di/di_user_grpc.go
+func InitUserGrpc() {
+    di.Wire[userGrpc.UserManagement](userManagementInstance)
+}
+```
+
+The handle carries the registration, not the value — passing anything else to
+`di.Wire` compiles and fails at `InitApp` (see [What generation refuses](#what-generation-refuses-and-what-it-would-have-been)).
+A handle that names another domain's package is checked like an alias: see the
+[boundary rule](../architectures.md#the-boundary-rule).
+
 Use `di.Alias` when the same concrete instance must satisfy multiple interfaces:
 
 ```go
@@ -257,6 +281,10 @@ di.Define(service.NewUserService,
     di.Alias[grpc.UserManagement](),
 )
 ```
+
+An alias that names another domain's package is the one place a cross-domain
+dependency exists without an import, so it is checked: see the [boundary
+rule](../architectures.md#the-boundary-rule).
 
 ### Tagged (collected into a slice)
 
