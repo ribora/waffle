@@ -1,3 +1,5 @@
+.PHONY: all audit .tidy generate replacements build run
+
 all: .tidy generate build
 
 audit:
@@ -18,3 +20,6 @@ replacements:
 
 build:
 	@[ -d cmd ] && go build -ldflags "-w" -o bin/ ./cmd/...
+
+run: .tidy generate
+	@go run ./cmd/app $(ARGS)

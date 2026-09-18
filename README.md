@@ -13,7 +13,7 @@ And leaving is as cheap as arriving. Delete a `//go:generate` line and the file 
 ### Getting Started
 - [Introduction](docs/introduction.md) — What waffle is, ecosystem map, architecture overview
 - [Recommended architectures](docs/architectures.md) — Single service, modular monolith, service fleet, and what it takes to change your mind
-- [Getting Started](docs/getting-started.md) — Install the CLI, create a service, first run
+- [Getting Started](docs/getting-started.md) — Install the CLI, scaffold a service, first route answering `curl`
 - [What is optional](docs/opting-out.md) — What each tool replaces, the mandatory core, and the cost of skipping
 
 ### Core
@@ -36,6 +36,7 @@ And leaving is as cheap as arriving. Delete a `//go:generate` line and the file 
 - [gRPC Handler](docs/tools/grpc-handler.md) — Handler struct, bare interfaces, error mapping
 - [Migrate](docs/tools/migrate.md) — Database migrations, multiple sources, goose subcommands
 - [Scribus](docs/tools/scribus.md) — RabbitMQ consumer, single and batch handler modes
+- [Outbox](docs/tools/outbox.md) — Events that commit with the change that caused them
 - [Cron](docs/tools/cron.md) — Running other commands on a schedule
 - [Hilton](docs/tools/hilton.md) — Tracing and metrics behind one interface
 

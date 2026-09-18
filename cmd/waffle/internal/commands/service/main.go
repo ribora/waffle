@@ -66,6 +66,9 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 	if err := c.EnsureTool("gitlab.com/gorib/di/cmd/diogen"); err != nil {
 		return err
 	}
+	if err := c.EnsureTool("gitlab.com/gorib/waffle/cmd/waffle"); err != nil {
+		return err
+	}
 	info, err := exec.Command("make", ".tidy", "generate").CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%v: %v", err, string(info))

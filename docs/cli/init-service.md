@@ -5,11 +5,15 @@ Bootstraps a complete microservice project from scratch.
 ## Usage
 
 ```sh
-mkdir my-service && cd my-service
+mkdir catalog && cd catalog
+go mod init catalog
 waffle init:service
 ```
 
-The command prompts for the service name, then generates the full project layout.
+The command takes no operands: it reads the module path from `go.mod`, so the
+module has to exist first. The last segment of that path is the service name and
+also becomes a Go package name in `api/`, so it has to be a plain identifier —
+`catalog`, not `my-service`.
 
 ## Generated files
 
@@ -173,8 +177,15 @@ Standard targets:
 |--------|-------------|
 | `make generate` | Run all code generators (DI, store) |
 | `make .tidy` | `go mod tidy` |
-| `make build` | Build the binary |
-| `make run` | `go run ./cmd/app` |
+| `make build` | Build the binary into `bin/` |
+| `make run ARGS=<command>` | `.tidy generate`, then `go run ./cmd/app <command>` |
+| `make audit` | `golangci-lint run` |
+| `make replacements` | Refuse any seam a test replaces that `waffle.yaml` does not allow |
+| `make all` | `.tidy generate build` |
+
+`run` tidies and regenerates first — the same pair every scaffolding command
+runs — so a new import or a new registration is in the binary that starts. The
+subcommand goes in `ARGS` because make reads a bare word as a target of its own.
 
 ## Post-generation steps
 
@@ -182,10 +193,11 @@ After writing all files, `init:service` runs:
 
 ```sh
 go get -tool gitlab.com/gorib/di/cmd/diogen@latest
+go get -tool gitlab.com/gorib/waffle/cmd/waffle@latest
 make .tidy generate
 ```
 
-This installs the DI code generator and produces the initial `diogen/di_gen.go` so the project compiles immediately. It also writes `AGENTS.md` (+ symlinks `CLAUDE.md`, `.cursorrules`) with the current framework conventions for AI coding agents — see [agents](agents.md).
+This installs the DI code generator, puts `waffle` behind the scaffolded `./waffle` script that `make replacements` calls, and produces the initial `diogen/di_gen.go` so the project compiles immediately. It also writes `AGENTS.md` (+ symlinks `CLAUDE.md`, `.cursorrules`) with the current framework conventions for AI coding agents — see [agents](agents.md).
 
 ## Keeping AGENTS.md in sync
 

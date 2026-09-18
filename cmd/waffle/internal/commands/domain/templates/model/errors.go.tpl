@@ -1,9 +1,9 @@
 package model
 
 import (
-	"errors"
+	"gitlab.com/gorib/failure"
 )
 
 var (
-	Err{{ title .Domain }}NotFound = errors.New("{{ .Domain }} is not found")
+	Err{{ title .Domain }}NotFound = failure.New("{{ .Domain }} is not found")
 )
