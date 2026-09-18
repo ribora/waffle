@@ -12,6 +12,7 @@ And leaving is as cheap as arriving. Delete a `//go:generate` line and the file 
 
 ### Getting Started
 - [Introduction](docs/introduction.md) — What waffle is, ecosystem map, architecture overview
+- [Recommended architectures](docs/architectures.md) — Single service, modular monolith, service fleet, and what it takes to change your mind
 - [Getting Started](docs/getting-started.md) — Install the CLI, create a service, first run
 - [What is optional](docs/opting-out.md) — What each tool replaces, the mandatory core, and the cost of skipping
 
