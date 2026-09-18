@@ -83,6 +83,14 @@ construct what you need in order, and call `app.Init(commands, logger,
 provider)`. The generated container is not special — `config/diogen/di.go` is a
 hand-written adapter over it, and you can replace both.
 
+Two things about the [boundary rule](architectures.md#the-boundary-rule). It
+finds a composition root by diogen's `//go:generate` line, so without one there
+is nothing to find — name yours in the test that runs the check,
+`boundaries.Check(boundaries.Roots("config/di"))`, and it reaches every domain as
+before. And it loses the half of the rule that reads registrations: with no
+`di.Wire` to read, a cross-domain dependency written as a hand-rolled constructor
+call is caught only if it also crosses by import.
+
 ## whisk
 
 **Instead of** tags on a struct:
