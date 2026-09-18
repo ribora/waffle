@@ -142,7 +142,7 @@ func (a *app) Run() error {
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(hilton.StatusError, err.Error())
-		attrs = append(attrs, hilton.Attr("error.type", fmt.Sprintf("%T", err)))
+		attrs = append(attrs, hilton.Attr("error.type", errorType(err)))
 	}
 	duration.Record(ctx, took, attrs...)
 
