@@ -8,6 +8,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"gitlab.com/gorib/waffle/internal/gomod"
 	"gitlab.com/gorib/waffle/replacements"
 )
 
@@ -21,7 +22,7 @@ type Config struct {
 
 // ProjectConfig loads waffle.yaml; a missing file is identical to all-defaults.
 func (c *Command) ProjectConfig(projectName string) (Config, error) {
-	root, err := findModuleRoot()
+	root, err := gomod.Root()
 	if err != nil {
 		return Config{}, err
 	}

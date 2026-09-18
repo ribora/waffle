@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"gitlab.com/gorib/waffle/internal/gomod"
 	"gopkg.in/yaml.v3"
 )
 
@@ -68,35 +69,6 @@ func LoadConfig(root string) (Config, error) {
 	return file.Replacements, nil
 }
 
-func Module(root string) (string, error) {
-	goMod, err := os.ReadFile(filepath.Join(root, "go.mod"))
-	if err != nil {
-		return "", fmt.Errorf("failed to read go.mod: %w", err)
-	}
-	for line := range strings.Lines(string(goMod)) {
-		if p, found := strings.CutPrefix(strings.TrimSpace(line), "module "); found {
-			return strings.TrimSpace(p), nil
-		}
-	}
-	return "", errors.New("go.mod declares no module path")
-}
+func Module(root string) (string, error) { return gomod.Path(root) }
 
-// Walks up, so a test may call the check from wherever its package sits.
-func ModuleRoot() (string, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", fmt.Errorf("failed to get current working directory: %w", err)
-	}
-	for {
-		if _, err := os.Stat(filepath.Join(cwd, "go.mod")); err == nil {
-			return cwd, nil
-		} else if !errors.Is(err, os.ErrNotExist) {
-			return "", fmt.Errorf("failed to stat go.mod: %w", err)
-		}
-		parent := filepath.Dir(cwd)
-		if parent == cwd {
-			return "", errors.New("failed to find go.mod")
-		}
-		cwd = parent
-	}
-}
+func ModuleRoot() (string, error) { return gomod.Root() }

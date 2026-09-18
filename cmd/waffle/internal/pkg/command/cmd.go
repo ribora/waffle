@@ -1,7 +1,6 @@
 package command
 
 import (
-	"bufio"
 	"bytes"
 	"embed"
 	"errors"
@@ -15,7 +14,7 @@ import (
 	"text/template"
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/plural"
-	"gitlab.com/gorib/waffle/replacements"
+	"gitlab.com/gorib/waffle/internal/gomod"
 )
 
 func New(name, description string, templates embed.FS, funcs template.FuncMap) *Command {
@@ -263,7 +262,7 @@ func assignment(line string) (string, bool) {
 // EnsureTool adds module via `go get -tool` only if go.mod doesn't already
 // list it — safe (and network-free) to call on every scaffold.
 func (c *Command) EnsureTool(module string) error {
-	root, err := findModuleRoot()
+	root, err := gomod.Root()
 	if err != nil {
 		return err
 	}
@@ -281,37 +280,16 @@ func (c *Command) EnsureTool(module string) error {
 	return nil
 }
 
-func findModuleRoot() (string, error) {
-	return replacements.ModuleRoot()
-}
-
 func (c *Command) FindProjectName() (string, error) {
-	root, err := findModuleRoot()
+	root, err := gomod.Root()
 	if err != nil {
 		return "", err
 	}
-	goMod, err := os.OpenFile(filepath.Join(root, "go.mod"), os.O_RDONLY, os.ModePerm)
-	if err != nil {
-		return "", fmt.Errorf("failed to open go.mod file: %w", err)
-	}
-	//nolint:errcheck
-	defer goMod.Close()
-
-	sc := bufio.NewScanner(goMod)
-	for sc.Scan() {
-		line := sc.Text()
-		if pkg, found := strings.CutPrefix(line, "module "); found {
-			return pkg, nil
-		}
-	}
-	if err := sc.Err(); err != nil {
-		return "", fmt.Errorf("failed to read go.mod file: %w", err)
-	}
-	return "", errors.New("go.mod is invalid")
+	return gomod.Path(root)
 }
 
 // ModuleRoot is the directory holding go.mod, for a command that reads or writes
 // a file at the root rather than one relative to the working directory.
 func ModuleRoot() (string, error) {
-	return findModuleRoot()
+	return gomod.Root()
 }
