@@ -61,6 +61,39 @@ W3C `traceparent` is propagated across all boundaries via the active
 `hilton.Propagator`. A batch AMQP consumer takes its parent from one message and
 links to the rest, so no message's trace loses the connection.
 
+## `error.type`
+
+Every duration above carries `error.type` when the operation did not succeed,
+and omits the key entirely when it did — one present on every success is one
+nobody can group by.
+
+The value is chosen the same way everywhere, in order of preference:
+
+1. the transport's own classification, when it has one — the gRPC code, the HTTP
+   status, Elasticsearch's exception type, a Redis reply code;
+2. `failure.Type()` when the error is a `*failure.Error` — a slug derived from
+   the sentinel's format string, so the cardinality is bounded by the number of
+   declared sentinels;
+3. `_OTHER`, which is semconv's own fallback.
+
+Never the Go type of the error: it classifies nothing, and it changes whenever
+someone changes how the error is wrapped.
+
+| Layer | Values |
+|-------|--------|
+| HTTP server, client | the status (`404`, `502`), else the failure type, else `_OTHER` |
+| gRPC server, client | the code (`NotFound`, `Unavailable`) |
+| AMQP consumer | the failure type, else `_OTHER`; a caught panic is `panic` |
+| Redis | `no_rows`, `wrong_type`, `cluster`, `auth`, `timeout`, `connect`, … else `_OTHER` |
+| SQL | `conflict`, `deadlock`, `no_rows`, `bad_request`, `internal`, `connect`, `tx`, else `_OTHER` |
+| Elasticsearch | the cluster's exception type (`index_not_found_exception`), else `wrong_response`, `unknown_response` or `_OTHER` |
+| CLI command | `usage`, else the failure type, else `_OTHER` |
+
+A lookup that found nothing is counted but not failed: SQL's `ErrNoRows` and
+Redis's `redis.Nil` both report `no_rows` on `db.client.operation.duration` and
+neither marks its span as an error, so a cold cache does not read as an outage.
+`db.system.name` tells the two apart.
+
 ## Custom instrumentation
 
 Inside a request-handling code path:
