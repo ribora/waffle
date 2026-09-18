@@ -571,7 +571,7 @@ func TestInitLeavesRedisOutWhenTheContainerHasNone(t *testing.T) {
 	}
 }
 
-func TestInitWritesTheSuiteAndTheAllowListTest(t *testing.T) {
+func TestInitWritesTheSuiteAndTheChecks(t *testing.T) {
 	module(t, grpcContainer, nil)
 
 	if err := New().Run(t.Context(), "init"); err != nil {
@@ -586,6 +586,9 @@ func TestInitWritesTheSuiteAndTheAllowListTest(t *testing.T) {
 	}
 	if body := written(t, "config/diogen/replacements_test.go"); !strings.Contains(body, "replacements.Check()") {
 		t.Errorf("the allow-list test is missing:\n%s", body)
+	}
+	if body := written(t, "config/diogen/boundaries_test.go"); !strings.Contains(body, "boundaries.Check()") {
+		t.Errorf("the domain-boundary test is missing:\n%s", body)
 	}
 }
 

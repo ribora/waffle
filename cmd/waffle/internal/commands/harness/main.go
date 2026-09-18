@@ -170,6 +170,7 @@ func (c *cmd) plan() (map[string]string, map[string]any, error) {
 		tpl("suite_test.go.tpl"):        filepath.Join(testsDir, "suite_test.go"),
 		tpl("boot_test.go.tpl"):         filepath.Join(testsDir, "boot_test.go"),
 		tpl("replacements_test.go.tpl"): filepath.Join(container.Dir, "replacements_test.go"),
+		tpl("boundaries_test.go.tpl"):   filepath.Join(container.Dir, "boundaries_test.go"),
 	}
 	// Both when the service serves both — two of nine in sherpa do, and two files
 	// could not coexist: each would declare Clients and Serve in one package.
