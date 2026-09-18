@@ -41,5 +41,7 @@ func InitHttp() {
 	di.Wire[app.BaseCommand](func() app.BaseCommand {
 		return app.NewCommand("http", "Start web server")
 	}, di.For[http.HttpCommand]())
-	di.Wire[http.HttpCommand](http.NewHttpCommand, di.Tag(app.CommandTag))
+	di.Wire[http.HttpCommand](http.NewHttpCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
+		"routers": di.Tags[server.Router](http.RouterTag),
+	}))
 }

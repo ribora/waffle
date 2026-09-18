@@ -39,7 +39,13 @@ return nil, err
 }
 clients.grpc = grpc
 {{end}}{{if .HttpMux}}
-clients.InProcess = waffleHttp.Serve(a.{{.HttpMux}}(), a.{{.HttpRouter}}())
+// The collection, for the same reason: a router added by di.Tag reaches the
+// suite with no edit here.
+web, err := waffleHttp.Serve(a.{{.HttpMux}}(), a.{{.HttpRouters}}())
+if err != nil {
+return nil, err
+}
+clients.InProcess = web
 {{end}}
 return clients, nil
 }

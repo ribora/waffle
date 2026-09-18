@@ -1,6 +1,7 @@
 package harness
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -45,7 +46,7 @@ type wiring struct {
 	Interceptors string
 	Stream       string
 	Mux          string
-	Router       string
+	Routers      string
 }
 
 func (w wiring) Present() bool { return w.Handlers != "" || w.Mux != "" }
@@ -84,6 +85,11 @@ func read(container replacements.Container, seams []replacements.Seam) (shape, e
 	types := containerFields(file)
 	out.Grpc = commandArgs(file, types, "NewGrpcCommand")
 	out.Http = commandArgs(file, types, "NewHttpCommand")
+	if out.Http.Mux != "" && out.Http.Routers == "" {
+		return shape{}, fmt.Errorf("%s passes no []server.Router to NewHttpCommand: the http "+
+			"command collects its routers now — register each one with di.Define(NewRouter, "+
+			"di.Tag(http.RouterTag)) and regenerate the container", container.File)
+	}
 	return out, nil
 }
 
@@ -170,18 +176,22 @@ func commandArgs(file *ast.File, types map[string]string, constructor string) wi
 // container field, and the constructors take more of them than these.
 func (w *wiring) assign(name, kind string) {
 	getter := exported(name)
+	collection := strings.HasPrefix(kind, "[]")
+	elem := strings.TrimPrefix(kind, "[]")
 	switch {
 	case getter == "" || kind == "":
-	case strings.Contains(kind, "StreamInterceptor"):
+	case strings.Contains(elem, "StreamInterceptor"):
 		w.Stream = getter
-	case strings.Contains(kind, "Interceptor"):
+	case strings.Contains(elem, "Interceptor"):
 		w.Interceptors = getter
-	case strings.Contains(kind, "ServiceHandler"):
+	case strings.Contains(elem, "ServiceHandler"):
 		w.Handlers = getter
-	case strings.HasSuffix(kind, "Mux"):
+	case strings.HasSuffix(elem, "Mux"):
 		w.Mux = getter
-	case strings.HasSuffix(kind, "Router"):
-		w.Router = getter
+	// Only as a collection: a single Router left unassigned reaches read(),
+	// which refuses it by name rather than scaffolding a broken serve.go.
+	case strings.HasSuffix(elem, "Router") && collection:
+		w.Routers = getter
 	}
 }
 
@@ -194,7 +204,7 @@ func exported(name string) string {
 
 func typeName(expr ast.Expr) string {
 	if array, ok := expr.(*ast.ArrayType); ok {
-		expr = array.Elt
+		return "[]" + typeName(array.Elt)
 	}
 	if selector, ok := expr.(*ast.SelectorExpr); ok {
 		return selector.Sel.Name

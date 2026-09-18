@@ -16,13 +16,17 @@ import (
 	"gitlab.com/gorib/waffle/app"
 )
 
+type routerTag struct{}
+
+var RouterTag = routerTag{}
+
 type HttpCommand interface {
 	app.Command
 }
 
 func NewHttpCommand(
 	mux server.Mux,
-	router server.Router,
+	routers []server.Router,
 	command app.BaseCommand,
 	addr net.Addr,
 	logger pry.Logger,
@@ -31,7 +35,7 @@ func NewHttpCommand(
 	return &httpCommand{
 		BaseCommand: command,
 		mux:         mux,
-		router:      router,
+		routers:     routers,
 		addr:        addr,
 		logger:      logger,
 		opts:        opts,
@@ -42,7 +46,7 @@ type httpCommand struct {
 	app.BaseCommand
 
 	mux         server.Mux
-	router      server.Router
+	routers     []server.Router
 	addr        net.Addr
 	logger      pry.Logger
 	opts        []server.Option
@@ -55,17 +59,25 @@ func (c *httpCommand) Run(ctx context.Context) error {
 	if err := c.Usage(ctx); err != nil {
 		return err
 	}
+	if err := Setup(c.mux, c.routers); err != nil {
+		return err
+	}
 	if c.openapiPath != "" {
-		c.router.Setup(c.mux)
 		warns, err := openapi.Reconcile(c.mux.Routes(), c.openapiPath, c.Name())
 		for _, w := range warns {
 			c.logger.Warn(fmt.Sprintf("openapi: %s", w))
 		}
 		return err
 	}
-	c.server = server.NewServer(c.mux, c.router, c.addr, c.logger, c.opts...)
+	c.server = server.NewServer(c.mux, setupDone{}, c.addr, c.logger, c.opts...)
 	return c.server.Serve(ctx)
 }
+
+// NewServer calls Setup itself, and the routers already ran: a second pass
+// would register every route twice.
+type setupDone struct{}
+
+func (setupDone) Setup(server.Mux) {}
 
 func (c *httpCommand) Usage(ctx context.Context) error {
 	opts := getopt.New()

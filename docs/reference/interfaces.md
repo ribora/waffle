@@ -77,7 +77,7 @@ type Router interface {
 }
 ```
 
-The one interface a service implements for every domain that serves HTTP, scaffolded by `waffle make:domain:http`. Wire it with `di.Wire[server.Router](http.NewRouter)`. `Setup` applies the middleware chain and registers routes; the same method is what the component harness calls, so a scenario exercises the routes that ship. See [tools/http](../tools/http.md#registering-routes).
+The one interface a service implements for every domain that serves HTTP, scaffolded by `waffle make:domain:http`. Register it under the collection — `di.Define(http.NewRouter, di.Tag(httpCommand.RouterTag))` — and every domain's routes land on one mux. `Setup` applies the middleware chain and registers routes; the same method is what the component harness calls, so a scenario exercises the routes that ship. See [tools/http](../tools/http.md#registering-routes).
 
 ### Mux
 

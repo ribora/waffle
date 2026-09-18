@@ -218,11 +218,11 @@ func (h *userHandler) Create(src server.Source) (server.Renderer, error) {
 
 ## Wiring in DI
 
-The handler and router are both concrete types — use `di.Define`:
+The handler and router are both concrete types — use `di.Define`, and tag the router so the `http` command collects it:
 
 ```go
 di.Define(http.NewUserHandler)
-di.Define(api.NewRouter)
+di.Define(api.NewRouter, di.Tag(httpCommand.RouterTag))
 ```
 
 The service dependency (`UserManagement`) is resolved automatically from the registered aliases. If the service struct satisfies multiple interfaces, declare them with `di.Alias` when registering the service:

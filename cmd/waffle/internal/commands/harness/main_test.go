@@ -1,10 +1,16 @@
 package harness
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
+
+	waffleHttp "gitlab.com/gorib/waffle/tools/http"
 )
 
 const grpcContainer = `package diogen
@@ -75,6 +81,33 @@ type Replacements struct {
 }
 
 type Application struct {
+	pryLogger                   pry.Logger
+	httpServerMux               server.Mux
+	httpServerRouterAsRouterTag []server.Router
+}
+
+func InitAppWith(replacements Replacements) (*Application, error) {
+	container.httpServerRouterAsRouterTag = []server.Router{container.mediaHttpRouterAsServerRouter}
+	{
+		s := httpCommand.NewHttpCommand(container.httpServerMux, container.httpServerRouterAsRouterTag, container.pryLogger)
+		container.httpHttpCommand = s
+	}
+	return container, nil
+}
+`
+
+const singleRouterContainer = `package diogen
+
+import (
+	pry "gitlab.com/gorib/pry"
+	httpCommand "gitlab.com/gorib/waffle/tools/http"
+)
+
+type Replacements struct {
+	PryLogger pry.Logger
+}
+
+type Application struct {
 	pryLogger        pry.Logger
 	httpServerMux    server.Mux
 	httpServerRouter server.Router
@@ -97,6 +130,7 @@ import (
 	grpcCommand "gitlab.com/gorib/waffle/tools/grpc"
 	httpCommand "gitlab.com/gorib/waffle/tools/http"
 	server "gitlab.com/gorib/grpc/server"
+	httpServer "gitlab.com/gorib/http/server"
 )
 
 type Replacements struct {
@@ -110,7 +144,7 @@ type Application struct {
 	grpcCommandServiceHandlerAsServiceTag []grpcCommand.ServiceHandler
 	serverInterceptorAsMiddlewareTag      []server.Interceptor
 	httpServerMux                         server.Mux
-	httpServerRouter                      server.Router
+	httpServerRouterAsRouterTag           []httpServer.Router
 }
 
 func InitAppWith(replacements Replacements) (*Application, error) {
@@ -126,7 +160,7 @@ func InitAppWith(replacements Replacements) (*Application, error) {
 		container.grpcGrpcCommand = s
 	}
 	{
-		s := httpCommand.NewHttpCommand(container.httpServerMux, container.httpServerRouter, container.pryLogger)
+		s := httpCommand.NewHttpCommand(container.httpServerMux, container.httpServerRouterAsRouterTag, container.pryLogger)
 		container.httpHttpCommand = s
 	}
 	return container, nil
@@ -358,6 +392,7 @@ func TestInitWritesBothTransportsIntoOneFile(t *testing.T) {
 		"a.GrpcCommandServiceHandlerAsServiceTag()",
 		"waffleHttp.Serve(",
 		"a.HttpServerMux()",
+		"a.HttpServerRouterAsRouterTag()",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("serve.go is missing %q:\n%s", want, body)
@@ -390,13 +425,81 @@ func TestInitWritesAnHttpServerAndAnEmptyResourceSet(t *testing.T) {
 	}
 
 	server := written(t, "tests/internal/harness/serve.go")
-	for _, want := range []string{"waffleHttp.Serve(", "a.HttpServerMux()", "a.HttpServerRouter()"} {
+	for _, want := range []string{"waffleHttp.Serve(", "a.HttpServerMux()", "a.HttpServerRouterAsRouterTag()"} {
 		if !strings.Contains(server, want) {
 			t.Errorf("serve.go is missing %q:\n%s", want, server)
 		}
 	}
 	if strings.Contains(server, "waffleGrpc") {
 		t.Errorf("a service that serves no gRPC got a gRPC server:\n%s", server)
+	}
+}
+
+// Nothing here compiles what it scaffolds, so the call is read against the
+// real signature instead.
+func TestInitWritesAServeCallThatFitsTheHelper(t *testing.T) {
+	module(t, httpContainer, nil)
+
+	if err := New().Run(t.Context(), "init"); err != nil {
+		t.Fatalf("init: %v", err)
+	}
+
+	call, bound := serveCall(t, "tests/internal/harness/serve.go", "waffleHttp")
+	signature := reflect.TypeOf(waffleHttp.Serve)
+	if len(call.Args) != signature.NumIn() {
+		t.Errorf("serve.go passes %d arguments, Serve takes %d", len(call.Args), signature.NumIn())
+	}
+	if bound != signature.NumOut() {
+		t.Errorf("serve.go binds %d results, Serve returns %d", bound, signature.NumOut())
+	}
+}
+
+func serveCall(t *testing.T, name, pkg string) (call *ast.CallExpr, bound int) {
+	t.Helper()
+	file, err := parser.ParseFile(token.NewFileSet(), filepath.FromSlash(name), nil, parser.SkipObjectResolution)
+	if err != nil {
+		t.Fatalf("serve.go does not parse: %v", err)
+	}
+
+	ast.Inspect(file, func(n ast.Node) bool {
+		assign, ok := n.(*ast.AssignStmt)
+		if !ok || len(assign.Rhs) != 1 {
+			return true
+		}
+		found, ok := assign.Rhs[0].(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		selector, ok := found.Fun.(*ast.SelectorExpr)
+		if !ok || selector.Sel.Name != "Serve" {
+			return true
+		}
+		if x, ok := selector.X.(*ast.Ident); !ok || x.Name != pkg {
+			return true
+		}
+		call, bound = found, len(assign.Lhs)
+		return false
+	})
+	if call == nil {
+		t.Fatalf("serve.go has no %s.Serve call", pkg)
+	}
+	return call, bound
+}
+
+// The alternative is silent: no router recognised reads as a service serving
+// no HTTP at all, and the suite loses its client.
+func TestInitRefusesAContainerWiredToASingleRouter(t *testing.T) {
+	module(t, singleRouterContainer, nil)
+
+	err := New().Run(t.Context(), "init")
+
+	if err == nil {
+		t.Fatal("a container that predates the collection was accepted")
+	}
+	for _, want := range []string{"NewHttpCommand", "RouterTag"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the error does not name %s: %v", want, err)
+		}
 	}
 }
 

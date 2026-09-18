@@ -26,7 +26,7 @@ app, err := harness.Boot(ctx, diogen.Replacements{ /* the cut */ })
 clients, err := app.Serve()
 ```
 
-What goes into the files is read off the generated container: a `gitlab.com/gorib/sql.Db` seam means postgres and every `domain/*/cmd/migrate` it finds, a `gitlab.com/gorib/redis.Db` seam means redis; `NewGrpcCommand` and `NewHttpCommand` decide the transports and hand over the handler and interceptor lists the daemon itself uses; every `grpc.ClientConnInterface` seam becomes a `grpcClient.Dead(...)` line.
+What goes into the files is read off the generated container: a `gitlab.com/gorib/sql.Db` seam means postgres and every `domain/*/cmd/migrate` it finds, a `gitlab.com/gorib/redis.Db` seam means redis; `NewGrpcCommand` and `NewHttpCommand` decide the transports and hand over the handler, interceptor and router lists the daemon itself uses; every `grpc.ClientConnInterface` seam becomes a `grpcClient.Dead(...)` line.
 
 No `--with=postgres,elastic`, and there never will be: a flag closes the set, and elastic 7 against elastic 8 is not even a different system, just a different class for the same one. What the container cannot say — a second resource, extra environment, which typed client belongs to which handler — is left as a named gap.
 
@@ -308,9 +308,9 @@ err = w.app.Consumer.Deliver(ctx, delivery)   // nil settled, error requeued
 
 `waffleGrpc.Serve` runs the handlers over `bufconn` and chains the interceptors with **`UnaryChain`, the exact function the daemon uses**. That is the point of it being exported: interceptor order has caused a real production bug (see [tools/grpc](../tools/grpc.md)), and a harness that sorted its own copy would be checking its copy of the order rather than the service's.
 
-The **lists** come from the container for the same reason — `a.ServerInterceptorAsMiddlewareTag()` and its two siblings, not the members written out one by one. A tagged registration added later reaches the daemon and the suite together; written out, it would reach only the daemon, and the scenarios would go on passing against a chain that no longer ships.
+The **lists** come from the container for the same reason — `a.ServerInterceptorAsMiddlewareTag()` and its two siblings, and the router collection beside them, not the members written out one by one. A tagged registration added later reaches the daemon and the suite together; written out, it would reach only the daemon, and the scenarios would go on passing against a chain that no longer ships.
 
-`waffleHttp.Serve` is the same idea over `httptest`. It returns a `URL` and a `Client` — an ordinary `*http.Client`, so a scenario writes an ordinary request. The router is the container's own, and `Router.Setup(mux)` is what the daemon calls too, so the routes and the middleware under test are the ones that ship. Both `InProcess` types close in `Clients.Close`.
+`waffleHttp.Serve` is the same idea over `httptest`. It returns a `URL` and a `Client` — an ordinary `*http.Client`, so a scenario writes an ordinary request. The routers are the container's own collection, and `Setup` is the same function the daemon runs, so the routes, the collision check and the middleware under test are the ones that ship — including its two errors, which is why `Serve` returns one. Both `InProcess` types close in `Clients.Close`.
 
 ## Rules that came from being wrong
 

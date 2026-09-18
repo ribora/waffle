@@ -157,7 +157,7 @@ func (c *cmd) plan() (map[string]string, map[string]any, error) {
 		"GrpcInterceptors": found.Grpc.Interceptors,
 		"GrpcStream":       found.Grpc.Stream,
 		"HttpMux":          found.Http.Mux,
-		"HttpRouter":       found.Http.Router,
+		"HttpRouters":      found.Http.Routers,
 	}
 
 	// tests/feature holds the .feature files alone: only one of the two is a

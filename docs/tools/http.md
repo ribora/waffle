@@ -16,7 +16,7 @@ import (
 )
 ```
 
-This pulls in the registrations from [`config/tools/http/init.go`](../../config/tools/http/init.go): the `http` command, the listen address, the server mux, and the standard middleware chain (compress, health, session, tracing, log, error, recover). Use the manual form — copy those registrations into your `InitDi()` — only when you need to override one.
+This pulls in the registrations from [`config/tools/http/init.go`](../../config/tools/http/init.go): the `http` command, the listen address, the server mux, the collection of routers, and the standard middleware chain (compress, health, session, tracing, log, error, recover). Use the manual form — copy those registrations into your `InitDi()` — only when you need to override one.
 
 Run `make generate`, then start the server:
 
@@ -58,11 +58,20 @@ func (r *router) Setup(mux server.Mux) {
 }
 ```
 
-Route patterns use chi syntax — `{id}`, `{id:[0-9]+}`, trailing `/*` wildcard. Register the router in DI:
+Route patterns use chi syntax — `{id}`, `{id:[0-9]+}`, trailing `/*` wildcard. Register the router under `RouterTag`:
 
 ```go
-di.Wire[server.Router](http.NewRouter)
+di.Define(userHttp.NewRouter, di.Tag(httpCommand.RouterTag))
 ```
+
+## One server, every domain's routes
+
+The command collects the tag, so every domain that serves HTTP registers its own router and they all go onto one mux, in the order the tag collects them — the same shape `grpc.ServiceTag` has. Splitting a service into an `http:customer` and an `http:admin` command is a decision about audiences, not something the wiring forces on two domains.
+
+Two things follow from sharing a mux, and both are checked before the listener opens:
+
+- **A pattern claimed twice is an error**, naming the method, the path and both routers. chi keeps the last registration and says nothing, so left unchecked the domain that loses is simply unreachable. Two domains that both want `/users` need a prefix, and a router takes one itself: `mux.Group("/billing")` returns a sub-mux sharing the chi router and the route list. Nothing hands out a prefix per domain — a domain is not always a path.
+- **An empty collection is an error** (`ErrNoRouters`). A daemon with no routers boots, listens and 404s everything; the usual cause is a domain still registering with `di.Wire[server.Router]`, which now satisfies nothing.
 
 ## OpenAPI
 

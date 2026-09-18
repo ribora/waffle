@@ -112,7 +112,9 @@ di.Wire[app.BaseCommand](
     func() app.BaseCommand { return app.NewCommand("http", "Start web server") },
     di.For[whttp.HttpCommand](),
 )
-di.Wire[whttp.HttpCommand](whttp.NewHttpCommand, di.Tag(app.CommandTag))
+di.Wire[whttp.HttpCommand](whttp.NewHttpCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
+    "routers": di.Tags[server.Router](whttp.RouterTag),
+}))
 ```
 
 ### Diogen adapter

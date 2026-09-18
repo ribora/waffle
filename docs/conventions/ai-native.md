@@ -334,7 +334,7 @@ workflow that gets abandoned at the first step that does not work.
   `redis/redistest` and `elastic/elastictest`; the in-process servers are
   `waffle/tools/grpc.Serve`,
   chaining interceptors with the same `UnaryChain` the daemon uses, and
-  `waffle/tools/http.Serve` over the container's own mux and router; the leaves
+  `waffle/tools/http.Serve` over the container's own mux and routers; the leaves
   that used to be hand-written per service — a logger, a consumer, a dead
   connection — are `pry.Recorder()`, `scribus.Recorder()` and `grpcClient.Dead()`.
   Services run on them, which is what puts this under "available" rather than

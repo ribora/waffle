@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -32,8 +33,18 @@ func (probeRouter) Setup(mux server.Mux) {
 	))
 }
 
+type auditRouter struct{}
+
+func (auditRouter) Setup(mux server.Mux) {
+	mux.Post("/audits", server.Bind(
+		func(ctx context.Context, req *probeReq) (*server.Response[probeReq], error) {
+			return server.OK(req), nil
+		},
+	))
+}
+
 // The command is the platform's only caller of Reconcile.
-func documentFrom(t *testing.T) string {
+func documentFrom(t *testing.T, routers ...server.Router) string {
 	t.Helper()
 
 	logger := pry.Noop()
@@ -41,7 +52,7 @@ func documentFrom(t *testing.T) string {
 
 	cmd := NewHttpCommand(
 		server.New(),
-		probeRouter{},
+		routers,
 		app.NewCommand("http", "test"),
 		nil,
 		logger,
@@ -60,10 +71,56 @@ func documentFrom(t *testing.T) string {
 }
 
 func TestOpenapiFlagWritesTheDocument(t *testing.T) {
-	got := documentFrom(t)
+	got := documentFrom(t, probeRouter{})
 	for _, want := range []string{"openapi: 3.1.0", "/things", model.ContentTypeJson} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q:\n%s", want, got)
+		}
+	}
+}
+
+func TestOpenapiFlagWritesEveryRoutersRoutes(t *testing.T) {
+	got := documentFrom(t, probeRouter{}, auditRouter{})
+	for _, want := range []string{"/things", "/audits"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q:\n%s", want, got)
+		}
+	}
+}
+
+// An unconverted di.Wire[server.Router] leaves the collection empty, and the
+// container still generates and compiles: this is the only thing that says so.
+func TestRunRefusesAnEmptyCollection(t *testing.T) {
+	logger := pry.Noop()
+	cmd := NewHttpCommand(server.New(), nil, app.NewCommand("http", "test"), nil, logger)
+
+	ctx := app.NewContextWithCommand("http", []string{"http"}, hilton.Noop(), logger)
+	err := cmd.Run(ctx)
+
+	if !errors.Is(err, ErrNoRouters) {
+		t.Fatalf("run: %v", err)
+	}
+}
+
+func TestRunRefusesTwoRoutersClaimingOneRoute(t *testing.T) {
+	logger := pry.Noop()
+	cmd := NewHttpCommand(
+		server.New(),
+		[]server.Router{probeRouter{}, echoRouter{}},
+		app.NewCommand("http", "test"),
+		nil,
+		logger,
+	)
+
+	ctx := app.NewContextWithCommand("http", []string{"http"}, hilton.Noop(), logger)
+	err := cmd.Run(ctx)
+
+	if err == nil {
+		t.Fatal("the daemon started with two routers on one route")
+	}
+	for _, want := range []string{"POST /things", "probeRouter", "echoRouter"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the error does not name %s: %v", want, err)
 		}
 	}
 }
