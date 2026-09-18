@@ -794,7 +794,7 @@ Rule #2 — `make generate && make audit && make`.
 - ❌ `protoc` directly — proto generation is driven by the project's proto step (in-module: `go generate ./api/...`; monorepo with `proto_dir` outside the module: a central step such as `make -C <api-dir>`)
 - ❌ Manual `go mod tidy` after every edit — `make .tidy` does it consistently
 - ❌ Add `replace` directives in `go.mod` — coordinate gorib version bumps instead
-- ❌ Touch `di_gen.go`, `*_goverter_gen.go`, `*_whisk_gen.go`, `*_store_gen.go`, `*_mock*.go` — they're generated
+- ❌ Touch `di_gen.go`, `*_goverter_gen.go`, `*_whisk_gen.go`, `stored_*_gen.go`, `*_mock*.go` — they're generated
 - ❌ Wrap stdlib types in custom abstractions inside `domain/<x>/model/` — model stays pure Go types
 - ❌ Pass `context.Background()` deeper than the entrypoint — propagate ctx from caller
 - ❌ `panic(err)` anywhere past the entrypoint — return the error
