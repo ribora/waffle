@@ -68,6 +68,9 @@ const (
 	generator = "diogen"
 )
 
+// diogen's own default, resolved from the module root like any relative -output.
+const defaultOutput = "di_gen.go"
+
 // The harness reaches domain/*/cmd/migrate for the schema it boots against, and
 // nothing in the code says so.
 var exempt = []string{"tests"}
@@ -181,9 +184,11 @@ func container(file *ast.File) (output string, found bool) {
 			}) {
 				continue
 			}
-			if output, named := flagValue(fields, "-output"); named {
-				return output, true
+			output, named := flagValue(fields, "-output")
+			if !named {
+				output = defaultOutput
 			}
+			return output, true
 		}
 	}
 	return "", false
@@ -191,11 +196,13 @@ func container(file *ast.File) (output string, found bool) {
 
 func flagValue(fields []string, name string) (string, bool) {
 	for i, f := range fields {
-		switch {
-		case f == name && i+1 < len(fields):
-			return fields[i+1], true
-		case strings.HasPrefix(f, name+"="):
-			return strings.TrimPrefix(f, name+"="), true
+		for _, flag := range []string{name, "-" + name} {
+			switch {
+			case f == flag && i+1 < len(fields):
+				return fields[i+1], true
+			case strings.HasPrefix(f, flag+"="):
+				return strings.TrimPrefix(f, flag+"="), true
+			}
 		}
 	}
 	return "", false

@@ -24,10 +24,11 @@ func TestPassesWhatTheAdaptersReach(t *testing.T) {
 			"domain/rent/adapter/rf/sberbank -> domain/rent/adapter/rf",
 			"domain/rent/cmd/grpc -> domain/rent/cmd/grpc/convert",
 		}},
-		// Where the directive finds the root wherever it sits, and where there is
-		// no directive and the test names it instead.
+		// Where the directive finds the root wherever it sits, where it names no
+		// output, and where there is no directive and the test names it instead.
 		{dir: "two_roots"},
 		{dir: "root_inside_domain"},
+		{dir: "root_without_output"},
 		{dir: "root_without_diogen", opts: []Option{Roots("config/di")}},
 	} {
 		t.Run(c.dir, func(t *testing.T) {
@@ -184,6 +185,20 @@ func TestSkipsTestFiles(t *testing.T) {
 	for _, c := range inspect(t, "adapter_to_model") {
 		if strings.Contains(c.From, "service") {
 			t.Fatalf("a _test.go was read: %s at %s", c, c.Pos)
+		}
+	}
+}
+
+func TestReadsEverySpellingOfTheOutputFlag(t *testing.T) {
+	const want = "config/diogen/di_gen.go"
+	for _, fields := range [][]string{
+		{"diogen", "-output", want, "$GOFILE"},
+		{"diogen", "-output=" + want, "$GOFILE"},
+		{"diogen", "--output", want, "$GOFILE"},
+		{"diogen", "--output=" + want, "$GOFILE"},
+	} {
+		if got, named := flagValue(fields, "-output"); !named || got != want {
+			t.Errorf("flagValue(%v) = %q, %v", fields, got, named)
 		}
 	}
 }
