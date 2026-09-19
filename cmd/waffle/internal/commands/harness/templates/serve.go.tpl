@@ -41,7 +41,7 @@ clients.grpc = grpc
 {{end}}{{if .HttpMux}}
 // The collection, for the same reason: a router added by di.Tag reaches the
 // suite with no edit here.
-web, err := waffleHttp.Serve(a.{{.HttpMux}}(), a.{{.HttpRouters}}())
+web, err := waffleHttp.Serve(a.{{.HttpMux}}(), a.{{.HttpGlobal}}(), a.{{.HttpRouters}}())
 if err != nil {
 return nil, err
 }

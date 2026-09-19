@@ -26,6 +26,7 @@ type HttpCommand interface {
 
 func NewHttpCommand(
 	mux server.Mux,
+	global Global,
 	routers []server.Router,
 	command app.BaseCommand,
 	addr net.Addr,
@@ -35,6 +36,7 @@ func NewHttpCommand(
 	return &httpCommand{
 		BaseCommand: command,
 		mux:         mux,
+		global:      global,
 		routers:     routers,
 		addr:        addr,
 		logger:      logger,
@@ -46,6 +48,7 @@ type httpCommand struct {
 	app.BaseCommand
 
 	mux         server.Mux
+	global      Global
 	routers     []server.Router
 	addr        net.Addr
 	logger      pry.Logger
@@ -59,7 +62,7 @@ func (c *httpCommand) Run(ctx context.Context) error {
 	if err := c.Usage(ctx); err != nil {
 		return err
 	}
-	if err := Setup(c.mux, c.routers); err != nil {
+	if err := Setup(c.mux, c.global, c.routers); err != nil {
 		return err
 	}
 	if c.openapiPath != "" {

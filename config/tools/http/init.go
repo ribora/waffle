@@ -28,7 +28,7 @@ func InitHttp() {
 	di.Wire[middleware.Error](middleware.NewErrorRenderer, di.Fallback())
 	di.Wire[middleware.Recover](middleware.NewRecover, di.Fallback())
 
-	di.Wire[*middleware.Standard](middleware.NewStandard)
+	di.Wire[http.Global](middleware.NewStandard, di.Fallback())
 
 	di.Wire[net.Addr](net.ResolveTCPAddr, di.For[http.HttpCommand](), di.Args(map[string]any{
 		"network": "tcp",

@@ -46,6 +46,7 @@ type wiring struct {
 	Interceptors string
 	Stream       string
 	Mux          string
+	Global       string
 	Routers      string
 }
 
@@ -89,6 +90,11 @@ func read(container replacements.Container, seams []replacements.Seam) (shape, e
 		return shape{}, fmt.Errorf("%s passes no []server.Router to NewHttpCommand: the http "+
 			"command collects its routers now — register each one with di.Define(NewRouter, "+
 			"di.Tag(http.RouterTag)) and regenerate the container", container.File)
+	}
+	if out.Http.Mux != "" && out.Http.Global == "" {
+		return shape{}, fmt.Errorf("%s passes no http.Global to NewHttpCommand: the global "+
+			"middleware chain belongs to the server now, not to a router — regenerate the "+
+			"container and take *middleware.Standard out of your routers", container.File)
 	}
 	return out, nil
 }
@@ -192,6 +198,8 @@ func (w *wiring) assign(name, kind string) {
 	// which refuses it by name rather than scaffolding a broken serve.go.
 	case strings.HasSuffix(elem, "Router") && collection:
 		w.Routers = getter
+	case strings.HasSuffix(elem, "Global"):
+		w.Global = getter
 	}
 }
 

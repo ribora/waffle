@@ -83,11 +83,38 @@ type Replacements struct {
 type Application struct {
 	pryLogger                   pry.Logger
 	httpServerMux               server.Mux
+	httpCommandGlobal           httpCommand.Global
 	httpServerRouterAsRouterTag []server.Router
 }
 
 func InitAppWith(replacements Replacements) (*Application, error) {
 	container.httpServerRouterAsRouterTag = []server.Router{container.mediaHttpRouterAsServerRouter}
+	{
+		s := httpCommand.NewHttpCommand(container.httpServerMux, container.httpCommandGlobal, container.httpServerRouterAsRouterTag, container.pryLogger)
+		container.httpHttpCommand = s
+	}
+	return container, nil
+}
+`
+
+const noGlobalContainer = `package diogen
+
+import (
+	pry "gitlab.com/gorib/pry"
+	httpCommand "gitlab.com/gorib/waffle/tools/http"
+)
+
+type Replacements struct {
+	PryLogger pry.Logger
+}
+
+type Application struct {
+	pryLogger                   pry.Logger
+	httpServerMux               server.Mux
+	httpServerRouterAsRouterTag []server.Router
+}
+
+func InitAppWith(replacements Replacements) (*Application, error) {
 	{
 		s := httpCommand.NewHttpCommand(container.httpServerMux, container.httpServerRouterAsRouterTag, container.pryLogger)
 		container.httpHttpCommand = s
@@ -144,6 +171,7 @@ type Application struct {
 	grpcCommandServiceHandlerAsServiceTag []grpcCommand.ServiceHandler
 	serverInterceptorAsMiddlewareTag      []server.Interceptor
 	httpServerMux                         server.Mux
+	httpCommandGlobal                     httpCommand.Global
 	httpServerRouterAsRouterTag           []httpServer.Router
 }
 
@@ -160,7 +188,7 @@ func InitAppWith(replacements Replacements) (*Application, error) {
 		container.grpcGrpcCommand = s
 	}
 	{
-		s := httpCommand.NewHttpCommand(container.httpServerMux, container.httpServerRouterAsRouterTag, container.pryLogger)
+		s := httpCommand.NewHttpCommand(container.httpServerMux, container.httpCommandGlobal, container.httpServerRouterAsRouterTag, container.pryLogger)
 		container.httpHttpCommand = s
 	}
 	return container, nil
@@ -392,6 +420,7 @@ func TestInitWritesBothTransportsIntoOneFile(t *testing.T) {
 		"a.GrpcCommandServiceHandlerAsServiceTag()",
 		"waffleHttp.Serve(",
 		"a.HttpServerMux()",
+		"a.HttpCommandGlobal()",
 		"a.HttpServerRouterAsRouterTag()",
 	} {
 		if !strings.Contains(body, want) {
@@ -425,7 +454,7 @@ func TestInitWritesAnHttpServerAndAnEmptyResourceSet(t *testing.T) {
 	}
 
 	server := written(t, "tests/internal/harness/serve.go")
-	for _, want := range []string{"waffleHttp.Serve(", "a.HttpServerMux()", "a.HttpServerRouterAsRouterTag()"} {
+	for _, want := range []string{"waffleHttp.Serve(", "a.HttpServerMux()", "a.HttpCommandGlobal()", "a.HttpServerRouterAsRouterTag()"} {
 		if !strings.Contains(server, want) {
 			t.Errorf("serve.go is missing %q:\n%s", want, server)
 		}
@@ -500,6 +529,19 @@ func TestInitRefusesAContainerWiredToASingleRouter(t *testing.T) {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("the error does not name %s: %v", want, err)
 		}
+	}
+}
+
+func TestInitRefusesAContainerWithNoGlobalChain(t *testing.T) {
+	module(t, noGlobalContainer, nil)
+
+	err := New().Run(t.Context(), "init")
+
+	if err == nil {
+		t.Fatal("a container that keeps the chain in its routers was accepted")
+	}
+	if !strings.Contains(err.Error(), "http.Global") {
+		t.Errorf("the error does not name the seam: %v", err)
 	}
 }
 

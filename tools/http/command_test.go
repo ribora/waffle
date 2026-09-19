@@ -52,6 +52,7 @@ func documentFrom(t *testing.T, routers ...server.Router) string {
 
 	cmd := NewHttpCommand(
 		server.New(),
+		nil,
 		routers,
 		app.NewCommand("http", "test"),
 		nil,
@@ -92,7 +93,7 @@ func TestOpenapiFlagWritesEveryRoutersRoutes(t *testing.T) {
 // container still generates and compiles: this is the only thing that says so.
 func TestRunRefusesAnEmptyCollection(t *testing.T) {
 	logger := pry.Noop()
-	cmd := NewHttpCommand(server.New(), nil, app.NewCommand("http", "test"), nil, logger)
+	cmd := NewHttpCommand(server.New(), nil, nil, app.NewCommand("http", "test"), nil, logger)
 
 	ctx := app.NewContextWithCommand("http", []string{"http"}, hilton.Noop(), logger)
 	err := cmd.Run(ctx)
@@ -106,6 +107,7 @@ func TestRunRefusesTwoRoutersClaimingOneRoute(t *testing.T) {
 	logger := pry.Noop()
 	cmd := NewHttpCommand(
 		server.New(),
+		nil,
 		[]server.Router{probeRouter{}, echoRouter{}},
 		app.NewCommand("http", "test"),
 		nil,

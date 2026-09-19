@@ -157,6 +157,7 @@ func (c *cmd) plan() (map[string]string, map[string]any, error) {
 		"GrpcInterceptors": found.Grpc.Interceptors,
 		"GrpcStream":       found.Grpc.Stream,
 		"HttpMux":          found.Http.Mux,
+		"HttpGlobal":       found.Http.Global,
 		"HttpRouters":      found.Http.Routers,
 	}
 

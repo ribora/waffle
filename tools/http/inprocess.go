@@ -9,8 +9,8 @@ import (
 
 // Setup is what the daemon calls too, so the routes and the middleware under
 // test are the ones that ship.
-func Serve(mux server.Mux, routers []server.Router) (*InProcess, error) {
-	if err := Setup(mux, routers); err != nil {
+func Serve(mux server.Mux, global Global, routers []server.Router) (*InProcess, error) {
+	if err := Setup(mux, global, routers); err != nil {
 		return nil, err
 	}
 	srv := httptest.NewServer(mux)

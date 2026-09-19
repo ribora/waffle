@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	nethttp "net/http"
+	"slices"
 	"strings"
 	"testing"
 
@@ -35,7 +36,7 @@ func (widgetRouter) Setup(mux server.Mux) {
 
 func serve(t *testing.T, routers ...server.Router) *InProcess {
 	t.Helper()
-	inproc, err := Serve(server.New(), routers)
+	inproc, err := Serve(server.New(), nil, routers)
 	if err != nil {
 		t.Fatalf("serve: %v", err)
 	}
@@ -78,8 +79,76 @@ func TestServeJoinsEveryRouterIntoOneServer(t *testing.T) {
 	}
 }
 
+type tally struct{ through []string }
+
+func (t *tally) layer(name string) server.Layer {
+	return func(next server.Handler) server.Handler {
+		return func(src server.Source) (server.Renderer, error) {
+			t.through = append(t.through, name)
+			return next(src)
+		}
+	}
+}
+
+func (t *tally) All() []server.Layer { return []server.Layer{t.layer("global")} }
+
+type layeredRouter struct {
+	name  string
+	path  string
+	tally *tally
+}
+
+func (r layeredRouter) Setup(mux server.Mux) {
+	mux.Use(r.tally.layer(r.name))
+	mux.Post(r.path, server.Bind(
+		func(context.Context, *probeReq) (*server.Response[probeReq], error) {
+			return server.OK(&probeReq{Name: r.name}), nil
+		},
+	))
+}
+
+func layered(t *testing.T) (*tally, *InProcess) {
+	t.Helper()
+	seen := &tally{}
+	inproc, err := Serve(server.New(), seen, []server.Router{
+		layeredRouter{name: "first", path: "/first", tally: seen},
+		layeredRouter{name: "second", path: "/second", tally: seen},
+	})
+	if err != nil {
+		t.Fatalf("serve: %v", err)
+	}
+	t.Cleanup(inproc.Close)
+	return seen, inproc
+}
+
+func TestServeAppliesTheGlobalChainOnce(t *testing.T) {
+	seen, inproc := layered(t)
+
+	post(t, inproc, "/first")
+
+	var ran int
+	for _, name := range seen.through {
+		if name == "global" {
+			ran++
+		}
+	}
+	if ran != 1 {
+		t.Errorf("the global chain ran %d times: %v", ran, seen.through)
+	}
+}
+
+func TestServeKeepsARoutersLayerOnItsOwnRoutes(t *testing.T) {
+	seen, inproc := layered(t)
+
+	post(t, inproc, "/first")
+
+	if want := []string{"global", "first"}; !slices.Equal(seen.through, want) {
+		t.Errorf("the chain ran as %v, want %v", seen.through, want)
+	}
+}
+
 func TestServeNamesBothRoutersOnACollision(t *testing.T) {
-	_, err := Serve(server.New(), []server.Router{echoRouter{}, probeRouter{}})
+	_, err := Serve(server.New(), nil, []server.Router{echoRouter{}, probeRouter{}})
 
 	if err == nil {
 		t.Fatal("two routers claimed one route and the server came up")
@@ -92,7 +161,7 @@ func TestServeNamesBothRoutersOnACollision(t *testing.T) {
 }
 
 func TestServeRefusesAnEmptyCollection(t *testing.T) {
-	if _, err := Serve(server.New(), nil); !errors.Is(err, ErrNoRouters) {
+	if _, err := Serve(server.New(), nil, nil); !errors.Is(err, ErrNoRouters) {
 		t.Fatalf("serve: %v", err)
 	}
 }
