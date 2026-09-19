@@ -8,7 +8,6 @@ import (
 	_ "gitlab.com/gorib/waffle/config/tools/scribus"
 )
 
-// Routes each key to a dedicated scribus.Handler tagged with scribus.CommandTag.
 func InitSingle() {
 	di.Wire[scribus.ScribusCommand](scribus.NewScribusCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
 		"commands":    di.Tags[scribus.Handler](scribus.CommandTag),
