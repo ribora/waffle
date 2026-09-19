@@ -174,7 +174,9 @@ func TestAgentsTemplateListsEveryCommand(t *testing.T) {
 var (
 	citedInvocation = regexp.MustCompile("`waffle ([a-z][a-z:]*)([^`]*)`")
 	// A whole operand: `domain/<x>/adapter/dto` is a `<path>`, not a slot `<x>`.
-	placeholder = regexp.MustCompile(`^<[a-z][a-z-]*>$`)
+	// Optional ones too: `[routing-key]` outlived the operand by that name because
+	// only the angle brackets were read.
+	placeholder = regexp.MustCompile(`^(<[a-z][a-z-]*>|\[[a-z][a-z-]*\])$`)
 )
 
 func TestDocsNameOperandsTheWayTheCommandsDo(t *testing.T) {
@@ -202,6 +204,47 @@ func TestDocsNameOperandsTheWayTheCommandsDo(t *testing.T) {
 			}
 		}
 	}
+}
+
+// A documented invocation that leaves out a flag the command refuses to run
+// without is worse than a wrong operand name: it is copied, and it fails. Only
+// invocations that carry operands are held to this — `waffle make:outbox` in a
+// sentence is a reference to the command, not a line to run.
+func TestDocsCarryTheFlagsTheCommandsRequire(t *testing.T) {
+	root := repoRoot(t)
+	cmds := newCommands()
+
+	files := append(markdownFiles(t), filepath.Join(root, "cmd/waffle", agentsTemplate))
+	for _, file := range files {
+		seen := map[string]bool{}
+		for _, m := range citedInvocation.FindAllStringSubmatch(read(t, file), -1) {
+			cmd := cmds.Get(m[1])
+			if cmd == nil || seen[m[0]] || strings.TrimSpace(m[2]) == "" {
+				continue
+			}
+			for _, flag := range requiredFlags(cmd) {
+				if strings.Contains(m[2], flag) {
+					continue
+				}
+				seen[m[0]] = true
+				rel, _ := filepath.Rel(root, file)
+				t.Errorf("%s documents `waffle %s%s`, which %s refuses without %s",
+					rel, m[1], m[2], cmd.Code(), flag)
+				break
+			}
+		}
+	}
+}
+
+// A flag the usage does not wrap in brackets.
+func requiredFlags(cmd Command) []string {
+	var flags []string
+	for _, token := range strings.Fields(operands(cmd)) {
+		if strings.HasPrefix(token, "--") {
+			flags = append(flags, token)
+		}
+	}
+	return flags
 }
 
 // Usage() carries examples on the lines after the first.
