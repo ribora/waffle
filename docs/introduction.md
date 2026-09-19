@@ -70,8 +70,8 @@ The app discovers **Commands** at startup. Each runtime concern is a command:
 | `http` | `_ "gitlab.com/gorib/waffle/config/tools/http"`                       |
 | `grpc` | `_ "gitlab.com/gorib/waffle/config/tools/grpc"`                       |
 | `migrate` | `_ "gitlab.com/gorib/waffle/config/tools/migrate"`                    |
-| `scribus` (single mode) | `_ "gitlab.com/gorib/waffle/config/tools/scribus/single"`             |
-| `scribus` (batch mode) | `_ "gitlab.com/gorib/waffle/config/tools/scribus/batch"`              |
+| `scribus` (single mode) | `_ ".../config/tools/scribus/amqp"` and `_ ".../config/tools/scribus/single"` |
+| `scribus` (batch mode) | `_ ".../config/tools/scribus/amqp"` and `_ ".../config/tools/scribus/batch"`  |
 
 You pick which commands your service needs by adding the corresponding blank import to `config/di/modules.go`. Commands are invoked by name:
 
@@ -92,7 +92,7 @@ waffle/
 │   ├── http/     HTTP server command and middleware registry
 │   ├── grpc/     gRPC server command, middleware and error mapping
 │   ├── migrate/  Database migration command (goose)
-│   └── scribus/  RabbitMQ consumer command
+│   └── scribus/  Event consumer command, over a broker driver
 └── cmd/waffle/   Scaffolding CLI (waffle init:service, make:domain, …)
 ```
 

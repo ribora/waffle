@@ -167,7 +167,7 @@ The pattern is supported by waffle commands:
 |---|---|
 | `waffle make:domain:grpc <domain>` | with `mapper: goverter` (default) — `domain/<x>/cmd/grpc/convert/convert.go` + ensures `pkg/goverter/convert.go`; with `mapper: dto` — nothing extra |
 | `waffle make:domain:http <domain>` | with `mapper: goverter` (default) — `domain/<x>/cmd/http/convert/convert.go` + ensures `pkg/goverter/convert.go`; with `mapper: dto` — nothing extra |
-| `waffle make:domain:scribus [--batch] <domain> <event>` | with `mapper: goverter` (default) — `domain/<x>/cmd/scribus/convert/convert.go` + ensures `pkg/goverter/convert.go`; with `mapper: dto` — nothing extra |
+| `waffle make:domain:scribus --driver <id> [--batch] <domain> <event>` | with `mapper: goverter` (default) — `domain/<x>/cmd/scribus/convert/convert.go` + ensures `pkg/goverter/convert.go`; with `mapper: dto` — nothing extra |
 | `waffle make:converter <path>` | `<path>/convert.go` + ensures `pkg/goverter/convert.go` |
 
 `make:converter <path>` covers the places no transport command reaches: it adds

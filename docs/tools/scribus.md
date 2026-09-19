@@ -1,31 +1,38 @@
 # Scribus Tool
 
-The scribus tool wraps `gitlab.com/gorib/amqp` into a waffle `Command` for consuming RabbitMQ messages. It supports two modes: **single mode**, where each routing key is handled by a dedicated `Handler`, and **batch mode**, where a single `BatchHandler` processes all messages together.
+The scribus tool turns a message consumer into a waffle `Command`. It supports two modes: **single mode**, where each subject is handled by a dedicated `Handler`, and **batch mode**, where a single `BatchHandler` processes all messages together.
+
+The tool itself names no broker: a handler receives a `whisk/scan.Source`, and the routing semantics come from a driver. The one that ships is `config/tools/scribus/amqp`, over `gitlab.com/gorib/amqp`.
 
 ## Setup
 
-Scribus ships **two** mode-specific subpackages — pick one. Common registrations (BaseCommand, AMQP Consumer, middlewares) live in `config/tools/scribus` and are pulled in transitively.
+A service includes **one driver** and **one mode**. The driver brings the consumer, its `Subjects` and its middlewares; the mode brings the dispatch shape.
 
-**Single mode** (each routing key dispatched to a dedicated `Handler`):
+`waffle make:domain:scribus` enables both, and takes the driver as a required flag — `--driver amqp` — because picking a broker for you is the one thing this tool avoids. It refuses before writing anything if `config/di/modules.go` has no line for the driver named.
+
+**Single mode** (each subject dispatched to a dedicated `Handler`):
 
 ```go
 // config/di/modules.go
 package di
 
 import (
+    _ "gitlab.com/gorib/waffle/config/tools/scribus/amqp"
     _ "gitlab.com/gorib/waffle/config/tools/scribus/single"
     // ... other modules ...
 )
 ```
 
-This expands to the registrations from [`config/tools/scribus/init.go`](../../config/tools/scribus/init.go) (common) plus [`config/tools/scribus/single/init.go`](../../config/tools/scribus/single/init.go):
+This expands to the registrations from [`config/tools/scribus/init.go`](../../config/tools/scribus/init.go) (common), [`config/tools/scribus/amqp/init.go`](../../config/tools/scribus/amqp/init.go) (driver) and [`config/tools/scribus/single/init.go`](../../config/tools/scribus/single/init.go):
 
 ```go
 // common — from config/tools/scribus
 di.Wire[app.BaseCommand](
-    func() app.BaseCommand { return app.NewCommand("scribus", "Start RabbitMq consumer") },
+    func() app.BaseCommand { return app.NewCommand("scribus", "Start the event consumer") },
     di.For[wscribus.ScribusCommand](),
 )
+
+// driver — from config/tools/scribus/amqp
 di.Wire[wscribus.Consumer](amqp.NewConsumer, di.Args(map[string]any{
     "dsn":      env.NeedValue[string]("RABBIT_DSN"),
     "exchange": env.NeedValue[string]("RABBIT_EXCHANGE"),
@@ -35,6 +42,7 @@ di.Wire[wscribus.Consumer](amqp.NewConsumer, di.Args(map[string]any{
         amqp.WithConsumerFlushInterval(5 * time.Second),
     },
 }))
+di.Wire[wscribus.Subjects](amqp.Subjects)
 di.Define(interceptor.NewTracing, di.Tag(wscribus.MiddlewareTag))
 di.Define(interceptor.NewLog,     di.Tag(wscribus.MiddlewareTag))
 di.Define(interceptor.NewRecover, di.Tag(wscribus.MiddlewareTag))
@@ -51,6 +59,7 @@ di.Wire[wscribus.ScribusCommand](wscribus.NewScribusCommand, di.Tag(app.CommandT
 ```go
 // config/di/modules.go
 import (
+    _ "gitlab.com/gorib/waffle/config/tools/scribus/amqp"
     _ "gitlab.com/gorib/waffle/config/tools/scribus/batch"
 )
 
@@ -67,16 +76,24 @@ Run `make generate` after adding this.
 ## Running the consumer
 
 ```sh
-./app scribus [<dsn> <exchange> <queue>]
+./app scribus
 ```
 
-With no positional arguments, transport config is taken from DI (env-bound `RABBIT_DSN` / `RABBIT_EXCHANGE` / `RABBIT_QUEUE`). All three positional args together override that — useful for ad-hoc local debugging against a different broker:
+The connection operands are the driver's, not the command's: it asks the consumer
+for their names through `Transport.Params()`, prints them in `--help`, and passes
+the values back in that order. The AMQP driver answers `dsn exchange queue`, so
+`./app scribus --help` prints `[dsn exchange queue]` and a full set overrides what
+DI wired — useful for ad-hoc local debugging against a different broker:
 
 ```sh
 ./app scribus amqp://guest:guest@localhost:5672 events local-debug
 ```
 
-Routing keys are **not** an argument of the running command — they come from each registered `Handler.Keys()` / `BatchHandler.Keys()`, and this CLI only overrides the transport (DSN/exchange/queue), never the bindings. The scaffolder does take one, as the value it writes into that `Keys()`: `waffle make:domain:scribus user order_paid order.paid`.
+With no operands the values come from DI, which for that driver means `RABBIT_DSN`,
+`RABBIT_EXCHANGE` and `RABBIT_QUEUE`. A partial set is refused, naming the operands
+the driver takes rather than any fixed three.
+
+Subjects are **not** an argument of the running command — they come from each registered `Handler.Keys()` / `BatchHandler.Keys()`, and this CLI only overrides the connection, never the bindings. The scaffolder does take one, as the value it writes into that `Keys()`: `waffle make:domain:scribus --driver amqp user order_paid order.paid`.
 
 ### Flags
 
@@ -90,28 +107,28 @@ Routing keys are **not** an argument of the running command — they come from e
 
 Environment variables are not read automatically. They are wired explicitly in `InitDi()` via `env.NeedValue` / `env.Value` as shown in the Setup section above. Variable names are chosen by you. The CLI positional arguments take precedence at runtime.
 
-## Routing keys
+## Subjects
 
-Routing keys are **not** configured in env. Each `Handler` (single mode) or `BatchHandler` (batch mode) declares its own keys via `Keys() []string`, and scribus binds the consumer's queue to those keys at startup. Adding a new handler — or a new key on an existing handler — automatically extends the binding set on next deploy.
+Subjects are **not** configured in env. Each `Handler` (single mode) or `BatchHandler` (batch mode) declares its own via `Keys() []string`, and scribus binds the consumer to them at startup. Adding a new handler — or a new subject on an existing handler — automatically extends the binding set on next deploy.
 
-Bindings are additive: `QueueBind` is idempotent at the broker level, so repeated startups don't churn. Removing a key from a `Handler` stops new messages from being delivered for that key only after the stale binding is removed manually via RabbitMQ Management UI (or `rabbitmqadmin delete binding`). Scribus does not unbind for you — the consumer code only knows what it currently *wants*, not what was bound before.
+Bindings are additive: `QueueBind` is idempotent at the broker level, so repeated startups don't churn. Removing a subject from a `Handler` stops new messages from being delivered for it only after the stale binding is removed manually via RabbitMQ Management UI (or `rabbitmqadmin delete binding`). Scribus does not unbind for you — the consumer code only knows what it currently *wants*, not what was bound before.
 
-For ad-hoc fan-out (consume every message regardless of routing), implement `Keys() []string{"#"}` on the handler. Wildcard semantics are RabbitMQ's, not scribus's.
+For ad-hoc fan-out (consume everything), implement `Keys() []string{"#"}` on the handler. Wildcard semantics belong to the driver's `Subjects`, not to scribus — under the AMQP one they are RabbitMQ's.
 
 ## Single mode
 
-In single mode, each routing key dispatches to its own `Handler`.
+In single mode, each subject dispatches to its own `Handler`.
 
 ### Handler interface
 
 ```go
 type Handler interface {
     Keys() []string
-    Run(src amqp.Source) error
+    Run(src scan.Source) error
 }
 ```
 
-`Keys()` returns the routing keys this handler subscribes to. `Run` is called for each incoming message with an `amqp.Source` — body, routing key, headers and context. Parse it with `scan.Into[T](src)`.
+`Keys()` returns the subjects this handler subscribes to. `Run` is called for each incoming message with a `scan.Source` — body, context, and everything else through `Lookup`. Parse it with `scan.Into[T](src)`. Under the AMQP driver the value is an `amqp.Source`, so a handler that needs the exchange can assert for it and say so.
 
 ### Message model
 
@@ -146,7 +163,6 @@ import (
 
     scribusModel "mymodule/domain/order/cmd/scribus/model"
     "mymodule/domain/order/model"
-    "gitlab.com/gorib/amqp"
     "gitlab.com/gorib/pry"
     "gitlab.com/gorib/whisk/scan"
 )
@@ -168,7 +184,7 @@ func (h *orderCreatedHandler) Keys() []string {
     return []string{"order.created"}
 }
 
-func (h *orderCreatedHandler) Run(src amqp.Source) error {
+func (h *orderCreatedHandler) Run(src scan.Source) error {
     msg, err := scan.Into[scribusModel.OrderCreated](src)
     if err != nil {
         h.logger.Error("Cannot parse message", pry.Err(err), pry.Ctx(src.Context()))
@@ -213,11 +229,11 @@ In batch mode, a single `BatchHandler` receives a slice of messages accumulated 
 ```go
 type BatchHandler interface {
     Keys() []string
-    Run(msgs []amqp.Source) error
+    Run(msgs []scan.Source) error
 }
 ```
 
-`Keys()` returns the routing keys this batch handler subscribes to — scribus auto-binds them on the queue at startup. `Run` is called with a slice of `amqp.Source`; each carries its own body, routing key, headers and context.
+`Keys()` returns the subjects this batch handler subscribes to — scribus auto-binds them on the queue at startup. `Run` is called with a slice of `scan.Source`; each carries its own body, context and scopes.
 
 ### Implementing a batch handler
 
@@ -231,20 +247,36 @@ func NewOrderBatchHandler(management OrderManagement, logger pry.Logger) *orderB
     return &orderBatchHandler{management: management, logger: logger}
 }
 
-func (h *orderBatchHandler) Run(msgs []amqp.Source) error {
+func (h *orderBatchHandler) Run(msgs []scan.Source) error {
+    var (
+        skipped int
+        cause   error
+    )
     for _, m := range msgs {
         msg, err := scan.Into[scribusModel.OrderCreated](m)
         if err != nil {
-            h.logger.Error("Cannot parse message", pry.Err(err), pry.Ctx(m.Context()))
+            skipped++
+            if cause == nil {
+                cause = err
+            }
             continue
         }
         if err = h.management.HandleOrderCreated(m.Context(), &model.Order{Id: msg.Id}); err != nil {
-            h.logger.Error("Cannot handle "+m.RoutingKey(), pry.Err(err), pry.Ctx(m.Context()))
+            h.logger.Error("Cannot handle "+m.Lookup("routing-key", ""), pry.Err(err), pry.Ctx(m.Context()))
         }
+    }
+    if skipped > 0 {
+        h.logger.Error("Skipped unparsable events",
+            pry.Err(cause), pry.Field("count", skipped), pry.Ctx(msgs[len(msgs)-1].Context()))
     }
     return nil
 }
 ```
+
+A page is as large as `--page` says, so a per-message line turns one bad publisher
+into five hundred log entries. Count them and log once. Keep the payload out of it
+either way: these are invoices and contracts, and a log line is read by more people
+than the database is.
 
 Register exactly one `BatchHandler` without a tag:
 
@@ -256,11 +288,11 @@ di.Wire[wscribus.BatchHandler](scribus.NewOrderBatchHandler)
 
 On startup the scribus command:
 
-1. Collects every registered handler's `Keys()` and calls `consumer.Bind(key)` for each — the broker is told to deliver only those keys.
+1. Collects every registered handler's `Keys()` and calls `consumer.Bind(subject)` for each — the broker is told to deliver only those subjects.
 2. (Optional) overrides DSN/exchange/queue from CLI positional args.
-3. Opens the consumer; for each incoming message reads its routing key from the AMQP delivery.
+3. Opens the consumer; for each incoming message reads its subject through the driver's `Subjects.Of`.
 4. Accumulates messages until `--page` is reached or `--flush-timeout` expires — both modes go through the same accumulator.
-5. In single mode: for each message in the page, looks up the handler by key and calls `Run`. In batch mode: calls `BatchHandler.Run` once with the whole page.
+5. In single mode: for each message in the page, looks up the handler whose subject `Subjects.Match` accepts and calls `Run`. In batch mode: calls `BatchHandler.Run` once with the whole page.
 
 ## Page size and settlement
 
@@ -285,8 +317,19 @@ The refusal covers the flag. A service that registers its own `scribus.Consumer`
 
 ## Logging
 
-The scribus command logs every consumed message at trace level in single mode:
+In single mode the command logs the subject of every message it dispatches, at
+trace level, under the message's own correlation id and trace:
 
 ```
-TRACE order.created {"id":42,...}
+TRACE order.created
 ```
+
+The body is not in that line: Trace is a per-service switch rather than a
+per-line one, so turning it on to follow dispatch would otherwise put every
+payload in the log sink, and what a message carries is the service's to decide
+about rather than this tool's.
+
+The AMQP driver's own log middleware is a separate decision and currently does
+include the body, one line per message, so a service that enables Trace does see
+payloads today. Drop `interceptor.NewLog` from the middleware registrations if
+that is not acceptable for what your queues carry.

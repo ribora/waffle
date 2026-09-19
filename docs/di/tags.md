@@ -119,7 +119,7 @@ There is no untagged form: `di.Wire[server.Router](...)` fills a slot nothing as
 
 **Package:** `gitlab.com/gorib/waffle/tools/scribus`
 
-Collects `scribus.Middleware` interceptors — each wraps `func([]amqp.Source) error` — applied around the consumer's dispatch handler in `Order()` sequence.
+Collects `scribus.Middleware` interceptors — each wraps `func([]scan.Source) error` — applied around the consumer's dispatch handler in `Order()` sequence.
 
 ```go
 di.Define(interceptor.NewTracing, di.Tag(scribus.MiddlewareTag))
@@ -169,14 +169,14 @@ All collected sources are applied in sequence when the `migrate` command runs.
 
 **Package:** `gitlab.com/gorib/waffle/tools/scribus`
 
-Collects `Handler` implementations for the single-mode consumer. Each handler declares its routing keys via `Keys()`.
+Collects `Handler` implementations for the single-mode consumer. Each handler declares its subjects via `Keys()`.
 
 ```go
 di.Wire[scribus.Handler](NewOrderCreatedHandler, di.Tag(scribus.CommandTag))
 di.Wire[scribus.Handler](NewOrderCancelledHandler, di.Tag(scribus.CommandTag))
 ```
 
-On startup the scribus command builds a routing table from all registered handlers and dispatches by routing key.
+On startup the scribus command builds a routing table from all registered handlers and dispatches by subject.
 
 For batch mode, register a `BatchHandler` without a tag:
 
