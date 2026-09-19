@@ -3,23 +3,24 @@ package scribus
 import (
 	"context"
 	"errors"
+	"fmt"
+	"slices"
 	"sync"
 	"time"
 
-	"gitlab.com/gorib/amqp"
+	"gitlab.com/gorib/whisk/scan"
 )
 
-// A silent consumer swallows Bind, so a typo in a routing key stays green while
-// production receives nothing. No Reset: clearing the wiring would drop the
-// installed handler. Take a new one per scenario.
-func Recorder() *ConsumerRecorder { return &ConsumerRecorder{} }
+// No Reset: clearing the wiring would drop the handler the container installed.
+func Recorder(params ...string) *ConsumerRecorder {
+	return &ConsumerRecorder{params: params}
+}
 
 type ConsumerRecorder struct {
 	mu        sync.Mutex
-	handler   func(msgs []amqp.Source) error
-	dsn       string
-	exchange  string
-	queue     string
+	handler   func(msgs []scan.Source) error
+	params    []string
+	applied   []string
 	bindings  []string
 	pageSize  uint16
 	flush     time.Duration
@@ -27,38 +28,33 @@ type ConsumerRecorder struct {
 	consumed  bool
 }
 
-func (r *ConsumerRecorder) SetHandler(handler func(msgs []amqp.Source) error) error {
+func (r *ConsumerRecorder) SetHandler(handler func(msgs []scan.Source) error) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.handler = handler
 	return nil
 }
 
-func (r *ConsumerRecorder) SetDsn(dsn string) error {
+func (r *ConsumerRecorder) Params() []string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.dsn = dsn
+	return slices.Clone(r.params)
+}
+
+func (r *ConsumerRecorder) Apply(args []string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if len(args) != len(r.params) {
+		return fmt.Errorf("scribus: the recorder takes %v, got %d values", r.params, len(args))
+	}
+	r.applied = slices.Clone(args)
 	return nil
 }
 
-func (r *ConsumerRecorder) SetExchange(exchange string) error {
+func (r *ConsumerRecorder) Bind(subject string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.exchange = exchange
-	return nil
-}
-
-func (r *ConsumerRecorder) SetQueue(queue string) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.queue = queue
-	return nil
-}
-
-func (r *ConsumerRecorder) Bind(routingKey string) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.bindings = append(r.bindings, routingKey)
+	r.bindings = append(r.bindings, subject)
 	return nil
 }
 
@@ -91,19 +87,13 @@ func (r *ConsumerRecorder) Consume(context.Context) error {
 	return nil
 }
 
-// One page, the way the broker would. Returns what the handler returned: nil
-// settled, error requeued.
-func (r *ConsumerRecorder) Deliver(ctx context.Context, deliveries ...amqp.Delivery) error {
+func (r *ConsumerRecorder) Deliver(msgs ...scan.Source) error {
 	r.mu.Lock()
 	handler := r.handler
 	r.mu.Unlock()
 
 	if handler == nil {
 		return errors.New("scribus: no handler installed, boot the container first")
-	}
-	msgs := make([]amqp.Source, 0, len(deliveries))
-	for _, delivery := range deliveries {
-		msgs = append(msgs, delivery.Source(ctx))
 	}
 	return handler(msgs)
 }
@@ -114,24 +104,22 @@ func (r *ConsumerRecorder) Bindings() []string {
 	return append([]string(nil), r.bindings...)
 }
 
-func (r *ConsumerRecorder) Exchange() string {
+// One at a time, and no slice: a failing assertion prints its argument, and one
+// of these operands is a connection string with a password in it.
+func (r *ConsumerRecorder) Param(name string) string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return r.exchange
+	i := slices.Index(r.params, name)
+	if i < 0 || i >= len(r.applied) {
+		return ""
+	}
+	return r.applied[i]
 }
 
-func (r *ConsumerRecorder) Queue() string {
+func (r *ConsumerRecorder) Applied() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return r.queue
-}
-
-// Whether a DSN reached the consumer, not which one: a broker DSN carries a
-// password, and a failing assertion prints its argument into the CI log.
-func (r *ConsumerRecorder) DsnSet() bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.dsn != ""
+	return len(r.applied) > 0
 }
 
 func (r *ConsumerRecorder) PageSize() uint16 {

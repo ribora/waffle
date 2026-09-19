@@ -5,9 +5,10 @@ import (
 	"strings"
 	"testing"
 
-	"gitlab.com/gorib/amqp"
 	"gitlab.com/gorib/hilton"
+	"gitlab.com/gorib/pry"
 	"gitlab.com/gorib/waffle/app"
+	"gitlab.com/gorib/whisk/scan"
 )
 
 var _ Consumer = Recorder()
@@ -20,7 +21,7 @@ type capturing struct {
 
 func (h *capturing) Keys() []string { return []string{h.key} }
 
-func (h *capturing) Run(src amqp.Source) error {
+func (h *capturing) Run(src scan.Source) error {
 	h.seen = append(h.seen, string(src.Body()))
 	return h.fail
 }
@@ -33,8 +34,8 @@ type tagging struct {
 func (m tagging) Name() string { return "tagging" }
 func (m tagging) Order() int   { return m.order }
 
-func (m tagging) Wrap(next func(msgs []amqp.Source) error) func(msgs []amqp.Source) error {
-	return func(msgs []amqp.Source) error {
+func (m tagging) Wrap(next func(msgs []scan.Source) error) func(msgs []scan.Source) error {
+	return func(msgs []scan.Source) error {
 		*m.log = append(*m.log, m.Name())
 		return next(msgs)
 	}
@@ -43,7 +44,7 @@ func (m tagging) Wrap(next func(msgs []amqp.Source) error) func(msgs []amqp.Sour
 func command(t *testing.T, consumer Consumer, handler Handler, middlewares ...Middleware) *scribusCommand {
 	t.Helper()
 	cmd, err := NewScribusCommand(
-		[]Handler{handler}, middlewares,
+		[]Handler{handler}, middlewares, starSubjects{},
 		app.NewCommand("scribus", "test"), consumer, logger(t),
 	)
 	if err != nil {
@@ -66,10 +67,7 @@ func TestDeliverReachesTheHandler(t *testing.T) {
 	handler := &capturing{key: "contracts.updated"}
 	command(t, consumer, handler)
 
-	err := consumer.Deliver(t.Context(), amqp.Delivery{
-		RoutingKey: "contracts.updated",
-		Body:       []byte(`{"id":1}`),
-	})
+	err := consumer.Deliver(message{key: "contracts.updated", body: []byte(`{"id":1}`)})
 
 	if err != nil {
 		t.Fatalf("deliver: %v", err)
@@ -79,13 +77,28 @@ func TestDeliverReachesTheHandler(t *testing.T) {
 	}
 }
 
+// A subject the handler never spelled out, so only Match can route it.
+func TestDeliverAsksTheDriverToMatch(t *testing.T) {
+	consumer := Recorder()
+	handler := &capturing{key: "orders.*"}
+	command(t, consumer, handler)
+
+	if err := consumer.Deliver(message{key: "orders.created", body: []byte("first")}); err != nil {
+		t.Fatalf("deliver: %v", err)
+	}
+
+	if len(handler.seen) != 1 || handler.seen[0] != "first" {
+		t.Fatalf("a message matching the bound pattern did not reach the handler: %v", handler.seen)
+	}
+}
+
 func TestDeliverGoesThroughTheMiddlewares(t *testing.T) {
 	var passed []string
 	consumer := Recorder()
 	handler := &capturing{key: "contracts.updated"}
 	command(t, consumer, handler, tagging{order: 1, log: &passed})
 
-	if err := consumer.Deliver(t.Context(), amqp.Delivery{RoutingKey: "contracts.updated"}); err != nil {
+	if err := consumer.Deliver(message{key: "contracts.updated"}); err != nil {
 		t.Fatalf("deliver: %v", err)
 	}
 
@@ -102,19 +115,19 @@ func TestDeliverReturnsWhatTheHandlerReturned(t *testing.T) {
 	consumer := Recorder()
 	command(t, consumer, &capturing{key: "contracts.updated", fail: broken})
 
-	err := consumer.Deliver(t.Context(), amqp.Delivery{RoutingKey: "contracts.updated"})
+	err := consumer.Deliver(message{key: "contracts.updated"})
 
 	if !errors.Is(err, broken) {
 		t.Fatalf("deliver: %v", err)
 	}
 }
 
-func TestDeliverSkipsAnUnboundRoutingKey(t *testing.T) {
+func TestDeliverSkipsAnUnboundSubject(t *testing.T) {
 	consumer := Recorder()
 	handler := &capturing{key: "contracts.updated"}
 	command(t, consumer, handler)
 
-	if err := consumer.Deliver(t.Context(), amqp.Delivery{RoutingKey: "orders.created"}); err != nil {
+	if err := consumer.Deliver(message{key: "orders.created"}); err != nil {
 		t.Fatalf("deliver: %v", err)
 	}
 
@@ -123,8 +136,38 @@ func TestDeliverSkipsAnUnboundRoutingKey(t *testing.T) {
 	}
 }
 
+// Trace is a per-service toggle, not a per-line one, so turning it on to chase a
+// dispatch problem must not put every payload in the sink.
+func TestTraceNamesTheSubjectAndNotTheBody(t *testing.T) {
+	log := pry.Recorder()
+	consumer := Recorder()
+	if _, err := NewScribusCommand(
+		[]Handler{&capturing{key: "contracts.updated"}}, nil, starSubjects{},
+		app.NewCommand("scribus", "test"), consumer, log,
+	); err != nil {
+		t.Fatalf("NewScribusCommand: %v", err)
+	}
+
+	if err := consumer.Deliver(message{key: "contracts.updated", body: []byte(`{"iban":"DE89"}`)}); err != nil {
+		t.Fatalf("deliver: %v", err)
+	}
+
+	traced := log.At(pry.LevelTrace)
+	if len(traced) != 1 {
+		t.Fatalf("trace records: %v", traced)
+	}
+	if traced[0].Message != "contracts.updated" {
+		t.Errorf("trace message = %q, want the subject alone", traced[0].Message)
+	}
+	for _, record := range log.Entries() {
+		if strings.Contains(record.Message, "iban") {
+			t.Errorf("a log record carries the payload: %q", record.Message)
+		}
+	}
+}
+
 func TestDeliverBeforeBootSaysSo(t *testing.T) {
-	err := Recorder().Deliver(t.Context(), amqp.Delivery{RoutingKey: "contracts.updated"})
+	err := Recorder().Deliver(message{key: "contracts.updated"})
 
 	if err == nil || !strings.Contains(err.Error(), "no handler installed") {
 		t.Fatalf("deliver: %v", err)
@@ -136,9 +179,9 @@ func TestDeliverPassesEveryMessageAsOnePage(t *testing.T) {
 	handler := &capturing{key: "contracts.updated"}
 	command(t, consumer, handler)
 
-	err := consumer.Deliver(t.Context(),
-		amqp.Delivery{RoutingKey: "contracts.updated", Body: []byte("first")},
-		amqp.Delivery{RoutingKey: "contracts.updated", Body: []byte("second")},
+	err := consumer.Deliver(
+		message{key: "contracts.updated", body: []byte("first")},
+		message{key: "contracts.updated", body: []byte("second")},
 	)
 
 	if err != nil {
@@ -150,7 +193,7 @@ func TestDeliverPassesEveryMessageAsOnePage(t *testing.T) {
 }
 
 func TestRunRecordsTheConfigurationAndTheStart(t *testing.T) {
-	consumer := Recorder()
+	consumer := Recorder("dsn", "exchange", "queue")
 	cmd := command(t, consumer, &capturing{key: "contracts.updated"})
 	ctx := app.NewContextWithCommand("scribus",
 		[]string{"scribus", "amqp://broker", "sherpa", "bastion.guards"}, hilton.Noop(), logger(t))
@@ -159,14 +202,14 @@ func TestRunRecordsTheConfigurationAndTheStart(t *testing.T) {
 		t.Fatalf("run: %v", err)
 	}
 
-	if !consumer.DsnSet() {
-		t.Error("the dsn did not reach the consumer")
+	if !consumer.Applied() {
+		t.Error("the connection operands did not reach the consumer")
 	}
-	if consumer.Exchange() != "sherpa" {
-		t.Errorf("exchange: %q", consumer.Exchange())
+	if consumer.Param("exchange") != "sherpa" {
+		t.Errorf("exchange: %q", consumer.Param("exchange"))
 	}
-	if consumer.Queue() != "bastion.guards" {
-		t.Errorf("queue: %q", consumer.Queue())
+	if consumer.Param("queue") != "bastion.guards" {
+		t.Errorf("queue: %q", consumer.Param("queue"))
 	}
 	if !consumer.Consuming() {
 		t.Error("the command did not get as far as consuming")
@@ -174,7 +217,7 @@ func TestRunRecordsTheConfigurationAndTheStart(t *testing.T) {
 }
 
 func TestAPartialConnectionIsRefused(t *testing.T) {
-	consumer := Recorder()
+	consumer := Recorder("dsn", "exchange", "queue")
 	cmd := command(t, consumer, &capturing{key: "contracts.updated"})
 
 	err := usage(t, cmd, "amqp://broker", "sherpa")
@@ -182,8 +225,11 @@ func TestAPartialConnectionIsRefused(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "got 2") {
 		t.Fatalf("usage: %v", err)
 	}
-	if consumer.DsnSet() {
-		t.Error("the dsn was applied anyway")
+	if !strings.Contains(err.Error(), "dsn exchange queue") {
+		t.Errorf("the error does not name the operands the driver takes: %v", err)
+	}
+	if consumer.Applied() {
+		t.Error("the operands were applied anyway")
 	}
 }
 
