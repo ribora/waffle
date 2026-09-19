@@ -103,6 +103,7 @@ type fakeStore struct {
 	addErr   error
 
 	sentDeadline bool
+	sentLeft     time.Duration
 }
 
 func (f *fakeStore) Add(_ context.Context, entry Entry) error {
@@ -129,7 +130,9 @@ func (f *fakeStore) Claim(_ context.Context, by string, _ time.Duration) (*Entry
 // the call returns, so a test holding one would inspect it after the fact.
 func (f *fakeStore) Sent(ctx context.Context, id string) error {
 	f.sentErr = ctx.Err()
-	_, f.sentDeadline = ctx.Deadline()
+	if deadline, ok := ctx.Deadline(); ok {
+		f.sentDeadline, f.sentLeft = true, time.Until(deadline)
+	}
 	f.sent = append(f.sent, id)
 	return nil
 }

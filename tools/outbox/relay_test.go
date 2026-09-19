@@ -56,6 +56,22 @@ func TestRelay(t *testing.T) {
 		}
 	})
 
+	// A slow broker must not spend the budget meant for recording what it did: the
+	// entry is delivered by then, and a bookkeeping write that times out sends it twice.
+	t.Run("TheBookkeepingDeadlineStartsAfterTheSend", func(t *testing.T) {
+		store := &fakeStore{claim: &Entry{Id: "e1", Subject: "invoices.paid"}}
+		relay := NewRelay(store, slowSender{take: 200 * time.Millisecond}, pry.Recorder())
+
+		relay.deliver(context.Background())
+
+		if len(store.sent) != 1 {
+			t.Fatalf("marked sent: %v", store.sent)
+		}
+		if spent := bookkeepingTimeout - store.sentLeft; spent > 100*time.Millisecond {
+			t.Errorf("the send spent %v of the bookkeeping budget", spent.Round(time.Millisecond))
+		}
+	})
+
 	// OUTBOX_STALE_AFTER=0 reaches this the same way any other value does, and a
 	// claim stale on arrival lets every relay pass the staleness test on every row.
 	t.Run("RefusesAClaimThatIsStaleOnArrival", func(t *testing.T) {
@@ -186,6 +202,15 @@ func TestRelay(t *testing.T) {
 			t.Fatal("the relay did not stop")
 		}
 	})
+}
+
+type slowSender struct{ take time.Duration }
+
+func (slowSender) Encode(any) ([]byte, error) { return nil, nil }
+
+func (s slowSender) Send(context.Context, string, []byte) error {
+	time.Sleep(s.take)
+	return nil
 }
 
 type panicSender struct{}

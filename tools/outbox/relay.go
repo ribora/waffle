@@ -158,6 +158,9 @@ func (r *relay) deliver(ctx context.Context) bool {
 		return false
 	}
 
+	send := r.restore(ctx, entry)
+	sendErr := r.sender.Send(send, entry.Subject, entry.Payload)
+
 	// The bookkeeping does not take the caller's cancellation: an entry the broker
 	// has already accepted has to be marked whatever happened to ctx, or the next
 	// pass sends it a second time. Its own deadline, because dropping the caller's
@@ -165,12 +168,11 @@ func (r *relay) deliver(ctx context.Context) bool {
 	book, cancel := context.WithTimeout(context.WithoutCancel(ctx), bookkeepingTimeout)
 	defer cancel()
 
-	send := r.restore(ctx, entry)
-	if err := r.sender.Send(send, entry.Subject, entry.Payload); err != nil {
-		r.logger.Error("outbox: cannot send an entry", pry.Err(err), pry.Ctx(send), pry.Field("entry", entry.Id))
+	if sendErr != nil {
+		r.logger.Error("outbox: cannot send an entry", pry.Err(sendErr), pry.Ctx(send), pry.Field("entry", entry.Id))
 		// Failed keeps the claim, so this row is retried only after staleAfter — a
 		// message the broker keeps refusing cannot spin this loop.
-		if err := r.store.Failed(book, entry.Id, err); err != nil {
+		if err := r.store.Failed(book, entry.Id, sendErr); err != nil {
 			r.logger.Error("outbox: cannot record a failed entry", pry.Err(err), pry.Ctx(ctx), pry.Field("entry", entry.Id))
 		}
 		return false
