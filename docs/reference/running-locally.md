@@ -1,5 +1,7 @@
 # What a service needs to run
 
+[Docs](../README.md) · Reference
+
 Adding a blank import to `config/di/modules.go` wires a module in. Most modules
 also expect something to be running and something to be in `.env` — and neither
 is visible from the import line. This page is that list.

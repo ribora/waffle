@@ -1,5 +1,7 @@
 # Input Parsing and Validation
 
+[Docs](../README.md) · Conventions
+
 Every entry point reads structured input from somewhere — an HTTP request, an AMQP delivery, a file on disk. `gitlab.com/gorib/whisk` generates the parsing and validation code for all of them from struct tags: `Parse(scan.Source) error` to populate the struct, `Validate() error` to check it. No runtime reflection, and no transport baked into the DTO.
 
 ## The Source contract

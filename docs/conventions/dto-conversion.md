@@ -1,5 +1,7 @@
 # DTO Conversion
 
+[Docs](../README.md) · Conventions
+
 Each transport (gRPC, AMQP/scribus, HTTP) converts between external and
 domain types. Two strategies exist, selected by the `mapper` key in
 `waffle.yaml`:
@@ -187,16 +189,16 @@ file is a no-op.
 `make:domain:entity` (postgres) does *not* scaffold a goverter convert
 — the sql adapter uses a hand-written `stored<X>` struct with `Unwrap()`
 and `Inserts()` methods instead. See
-[make:domain](../cli/make-domain.md#domainuseradapterpostgresstored_usergo) for
-that convention if you need to mix the two.
+[make:domain](../cli/make-domain.md#postgres-adapter) for that convention if you
+need to mix the two.
 
 ## Why not interface embedding?
 
-Goverter's parser rejects unnamed interface members
-([`comments/parse_docs.go:177`](https://github.com/jmattheis/goverter)). A
-common interface holding extends, embedded into domain interfaces, fails
-with `method must have one name`. The whitelist-via-vars pattern is the
-intended way to share extends.
+[Goverter](https://github.com/jmattheis/goverter)'s parser rejects unnamed
+interface members — an embedded interface is one, so it has no method name to
+report against. A common interface holding the extends, embedded into each
+domain's `Convert`, fails with `method must have one name`. The
+whitelist-via-vars pattern above is the intended way to share extends.
 
 ## Why not `-g extend …` CLI flag?
 

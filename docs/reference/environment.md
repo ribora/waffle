@@ -1,5 +1,7 @@
 # Environment Variables
 
+[Docs](../README.md) · Reference
+
 All environment variables are read using `gitlab.com/gorib/env`, which loads a `.env` file from the working directory at startup and falls back to the process environment.
 
 A variable is only read if the module that reads it is enabled — every one below comes from a blank import in `config/di/modules.go`. `NeedValue` panics at startup when the variable is missing, so a misconfigured service fails immediately rather than at the first request; `Value` takes a fallback.
@@ -12,8 +14,15 @@ A variable is only read if the module that reads it is enabled — every one bel
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `DB_DRIVER` | yes | — | `postgres`, `mysql` or `sqlite` |
+| `DB_DRIVER` | yes | — | `pgx` is what `init:service` writes. See below |
 | `DB_DSN` | yes | — | Connection string, e.g. `postgres://user:pass@host:port/dbname?sslmode=disable` |
+
+`postgres`, `pgx` and `pgsql` all select the native pgx pool — the scaffolded
+`.env` says `pgx`. Any other value is passed to `database/sql` as a driver name,
+so it has to be one your binary registers by import: `mysql`, `sqlite`,
+`sqlite3`. The same string is the goose dialect when `config/tools/migrate` is
+enabled, which is the reason the two modules share one variable rather than each
+reading its own.
 
 ### `config/service/redis`
 
@@ -23,6 +32,16 @@ A variable is only read if the module that reads it is enabled — every one bel
 | `REDIS_PORT` | no | `6379` | Port |
 | `REDIS_PASSWORD` | no | empty | Password |
 | `REDIS_DB` | no | `0` | Database index |
+
+### `config/service/amqp`
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `RABBIT_DSN` | yes | — | `amqp://user:pass@host:port/` |
+| `RABBIT_EXCHANGE` | yes | — | Exchange the publisher writes to |
+
+The one place a publisher is built, so a service that also enables the outbox gets
+one instance on one connection rather than two.
 
 ### `config/service/elastic`
 
@@ -64,7 +83,7 @@ A variable is only read if the module that reads it is enabled — every one bel
 
 Both servers read the same pair, so a service running HTTP and gRPC in one process runs them as two commands, not two listeners in one.
 
-### `config/tools/scribus`
+### `config/tools/scribus/amqp`
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
@@ -72,17 +91,7 @@ Both servers read the same pair, so a service running HTTP and gRPC in one proce
 | `RABBIT_EXCHANGE` | yes | — | Exchange to bind the queue to |
 | `RABBIT_QUEUE` | yes | — | Queue name |
 
-Page size and flush interval are wired as constants in the module, not read from the environment; both can be overridden per run with `--page` and `--flush-timeout`. See [tools/scribus.md](../tools/scribus.md).
-
-### `config/service/amqp`
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `RABBIT_DSN` | yes | — | `amqp://user:pass@host:port/` |
-| `RABBIT_EXCHANGE` | yes | — | Exchange the publisher writes to |
-
-The one place a publisher is built, so a service that also enables the outbox gets
-one instance on one connection rather than two.
+The **driver** module, not `config/tools/scribus` itself: the command names no broker, so a driver of your own reads whatever it likes and none of these three exist. Page size and flush interval are wired as constants there rather than read from the environment; both can be overridden per run with `--page` and `--flush-timeout`. See [tools/scribus.md](../tools/scribus.md).
 
 ### `config/tools/outbox`
 
@@ -127,7 +136,7 @@ The flag's scheme selects the driver, so it replaces both variables at once.
 DAEMON_HOST=0.0.0.0
 DAEMON_PORT=8080
 
-DB_DRIVER=postgres
+DB_DRIVER=pgx
 DB_DSN=postgres://user:pass@localhost:5432/mydb?sslmode=disable
 
 REDIS_HOST=localhost
@@ -145,29 +154,37 @@ ENVIRONMENT=local
 
 ## Adding your own variables
 
-Use `gitlab.com/gorib/env` in `config/config.go`:
+**There is no `Config` struct**, and `config/config.go` is not where this goes —
+that file is the three-line wrapper around `diogen.InitDi()` and stays that way.
+A variable is read where the thing that needs it is registered, in
+`config/di/di.go`, the same way every module above does it:
 
 ```go
-package config
-
-import (
-    "time"
-    "gitlab.com/gorib/env"
-)
-
-type Config struct {
-    JWTSecret      string
-    CacheAddr      string
-    RequestTimeout time.Duration
-}
-
-func NewConfig() *Config {
-    return &Config{
-        JWTSecret:      env.NeedValue[string]("JWT_SECRET"),
-        CacheAddr:      env.Value("CACHE_ADDR", "localhost:6379"),
-        RequestTimeout: env.Value("REQUEST_TIMEOUT", 30*time.Second),
-    }
+// config/di/di.go
+func InitDi() {
+    di.Wire[auth.Signer](auth.NewSigner, di.Args(map[string]any{
+        "secret": env.NeedValue[string]("JWT_SECRET"),
+        "ttl":    env.Value("JWT_TTL", 15*time.Minute),
+    }))
 }
 ```
+
+`di.Args` values are evaluated at container build time, so a missing
+`NeedValue` stops the process at startup with the variable's name — the same
+failure the framework's own modules give, rather than a nil field discovered on
+the first request.
+
+That the reads sit next to the registration is also what `waffle agents` walks
+to fill in the env list in `AGENTS.md`: it greps `env.Value` / `env.NeedValue`
+across `config/`, `domain/` and `cmd/`. A struct built somewhere else is
+invisible to it.
+
+Two rules follow, and they are the reason there is no central config object:
+
+- **Nothing reads the environment below the composition root.** A service or an
+  adapter takes the value as a constructor argument. That is what makes it
+  replaceable in a component test, which sets no environment at all.
+- **A variable arrives with the thing that reads it**, so it goes into `.env`
+  in the same change — the convention every scaffolding command follows.
 
 See the [env package documentation](https://gitlab.com/gorib/env) for the full API reference.

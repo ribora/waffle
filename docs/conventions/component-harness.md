@@ -1,5 +1,7 @@
 # Component harness
 
+[Docs](../README.md) · Conventions
+
 A component test boots the **real container** over **real infrastructure** and replaces only the leaves. It is the executable form of the specification Rule #11 asks for: a caller drives the service the way production does — a proto request over a real connection, an event through the real consumer, a cron command as the app runs it — down through the real management and the real repositories.
 
 `waffle tests:harness init` writes the files, and each one carries the reason for its own lines. So this page is what those comments cannot hold: the decisions nobody can make for you, the mechanisms behind the generated code, and what goes wrong at run time.
@@ -143,7 +145,7 @@ Two things follow. The runtime picks the port (`-p 127.0.0.1::6379`, read back w
 
 ```go
 var search = elastictest.New(
-	elastictest.Env("MERCATOR_TEST_ES"),
+	elastictest.Env("CATALOG_TEST_ES"),
 	elastictest.Prefix("test_"),
 	elastictest.Index("product", productMappings),
 )
@@ -193,7 +195,7 @@ The decision is written down, in `waffle.yaml`, as a permission list:
 ```yaml
 replacements:
   allow:
-    gitlab.com/sherpa-erp/sherpa/api/contract: [ContractServiceClient]
+    example.com/platform/api/contract: [ContractServiceClient]
 ```
 
 What it does not name may not be replaced, in any form.
@@ -208,12 +210,25 @@ follows from the assertion and belongs to whoever writes the test, and anything
 in `tests/internal/`, which is the same person's harness as the list itself.
 
 A grant is keyed by interface, not by field, so an interface serving two
-container fields is granted for both.
+container fields is granted for both. `google.golang.org/grpc:
+[ClientConnInterface]` therefore grants every connection in the container at
+once, which is a reason not to grant it.
+
+A **composite** field — `interface{ A; B }`, produced when registrations share
+one container field — is granted only when every constituent is, because
+replacing the field replaces every contract it merges. Those are the most
+informative lines in the report rather than noise: a composite names the
+contracts one management object owes, and each constituent is a caller, which is
+a place a scenario binds.
 
 `waffle tests:replacements` prints the menu; a person picks from
 it, and what they pick goes into `replacements.allow`. The `# leaf` marker means
 one thing only — *this constructor takes nothing else out of the container* — and
-that is a heuristic, not the answer.
+that is a heuristic, not the answer. It separates the two kinds of test, though:
+a **component test** replaces leaves and lets everything else run for real,
+while replacing an interior seam deletes the subtree below it — the code the test
+was meant to exercise. A **unit test** builds its subject by hand, so
+`Replacements` plays no part and the list has nothing to say about it.
 
 **Cut above anything that speaks a language the code itself generates.** A
 stand-in for such a level would have to speak it too, and then the test checks
@@ -263,7 +278,7 @@ One consequence of `di.For` worth expecting: it groups the consumers that share 
 
 ### `Noop()` is a recorder nobody queries
 
-That is the rule that decides which to use. A silent stand-in is fine where the scenario asserts nothing about that leaf — and dangerous where it does. A silent consumer swallows `SetExchange`, `SetQueue` and `Bind`, so a typo in a handler's routing key stays green forever while production receives nothing.
+That is the rule that decides which to use. A silent stand-in is fine where the scenario asserts nothing about that leaf — and dangerous where it does. A silent consumer swallows `Apply` and `Bind`, so a typo in a handler's subject stays green forever while production receives nothing.
 
 The scaffold therefore writes the recording one and leaves the choice on one line: whether anything is ever asserted about the logger is not knowable at `init` time, and a recorder nobody queries costs a slice, while a `Noop()` somebody needed costs a debugging session.
 
@@ -272,6 +287,7 @@ The scaffold therefore writes the recording one and leaves the choice on one lin
 | `pry.Logger` | `pry.Noop()` | `pry.Recorder()` — levels, messages, fields, errors |
 | `scribus.Consumer` | a recorder you do not query | `scribus.Recorder()` — wiring, plus `Deliver` |
 | an amqp publisher | — | `amqp.NewPublisherRecorder()` — keys and payloads, `FailWith` |
+| `outbox.Sender` | — | `outbox.Recorder()` — subjects and payloads, `FailWith`. Replace this and not the `Store`, so `Enqueue` still writes a row ([details](../tools/outbox.md#testing)) |
 | `grpc.ClientConnInterface` | `grpcClient.Dead(name)` | — |
 
 **`pry.Recorder()` is a driver, not a second logger.** It sits underneath the real logger, so a scenario asserts on records the production code built rather than on a parallel implementation of the same options.
@@ -289,9 +305,21 @@ Two things this does not excuse:
 - A recorder must still assert the count. `.Times(1)` comes free with a mock; a spy that finds *a* matching call and stops will pass an implementation that calls twice.
 - The lifecycle is not the obstacle it looks like. godog runs each scenario as a subtest when `Options.TestingT` is set, and `godog.T(ctx)` satisfies gomock's reporter, so a per-scenario controller with correct attribution is available. The grammar is the reason, not the plumbing.
 
+**Waffle generates no mocks**, and no command will. The test that needs one
+carries its own directive, which keeps the mock beside its only user and inside
+`go generate ./...`:
+
+```go
+//go:generate go tool mockgen -typed -package security -self_package <this package> -destination client_mock_test.go <this package> Client
+```
+
+A `_test.go` destination inside the package under test is what makes a private
+field reachable, and it keeps a single-use mock out of the production build and
+out of everyone else's import graph.
+
 ### Delivering an event
 
-`scribus.Recorder()` keeps the wiring the command asked for and delivers through **the handler the container installed** — so a scenario exercises the routing-key dispatch and the middlewares, not a bare `Run`:
+`scribus.Recorder()` keeps the wiring the command asked for and delivers through **the handler the container installed** — so a scenario exercises the subject dispatch and the middlewares, not a bare `Run`:
 
 ```go
 delivery, err := harness.Delivery("contracts.updated", payload)
@@ -305,13 +333,13 @@ err = w.app.Consumer.Deliver(ctx, delivery)   // nil settled, error requeued
 
 ## The in-process server
 
-`Serve` is a method on `App`, and it answers with one `Clients` however many transports the service serves — two of the nine in sherpa serve both, and a file per transport could not coexist: each would declare `Clients` and `Serve` in the same package. What `init` leaves for you is the typed clients: `proto.NewFacilityServiceClient(grpc.Conn())` per handler, because which client belongs to which handler is not in the container.
+`Serve` is a method on `App`, and it answers with one `Clients` however many transports the service serves — a service can serve both, and a file per transport could not coexist: each would declare `Clients` and `Serve` in the same package. What `init` leaves for you is the typed clients: `proto.NewFacilityServiceClient(grpc.Conn())` per handler, because which client belongs to which handler is not in the container.
 
 `waffleGrpc.Serve` runs the handlers over `bufconn` and chains the interceptors with **`UnaryChain`, the exact function the daemon uses**. That is the point of it being exported: interceptor order has caused a real production bug (see [tools/grpc](../tools/grpc.md)), and a harness that sorted its own copy would be checking its copy of the order rather than the service's.
 
 The **lists** come from the container for the same reason — `a.ServerInterceptorAsMiddlewareTag()` and its two siblings, and the router collection beside them, not the members written out one by one. A tagged registration added later reaches the daemon and the suite together; written out, it would reach only the daemon, and the scenarios would go on passing against a chain that no longer ships.
 
-`waffleHttp.Serve` is the same idea over `httptest`. It returns a `URL` and a `Client` — an ordinary `*http.Client`, so a scenario writes an ordinary request. The routers are the container's own collection, and `Setup` is the same function the daemon runs, so the routes, the collision check and the middleware under test are the ones that ship — including its two errors, which is why `Serve` returns one. Both `InProcess` types close in `Clients.Close`.
+`waffleHttp.Serve` is the same idea over `httptest`. It returns a `URL` and a `Client` — an ordinary `*http.Client`, so a scenario writes an ordinary request. The routers and the global chain are the container's own, and `Setup` is the same function the daemon runs, so the routes, the collision check and the middleware under test are the ones that ship — including its two errors, which is why `Serve` returns one. Both `InProcess` types close in `Clients.Close`.
 
 ## Rules that came from being wrong
 

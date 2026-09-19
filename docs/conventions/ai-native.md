@@ -1,5 +1,7 @@
 # AI-native development
 
+[Docs](../README.md) · Conventions
+
 How a change gets made when a coding agent writes most of the code.
 
 The premise is a shift in what is scarce. Writing code is no longer the
@@ -7,9 +9,13 @@ bottleneck; deciding what *correct* means is. So the human artifact of a change
 stops being reviewed code and becomes an approved specification, and the agent's
 job is to satisfy it without being able to move the goalposts.
 
-`AGENTS.md` carries the enforceable form of this as **Rule #11**. This page is
-the reasoning behind it, what the framework gives you, and — honestly — what is
-not built yet.
+**The protocol itself is Rule #11 in `AGENTS.md`** — the generated file in the
+root of your own service, written for the agent that works to it: the roles,
+the four steps and the stop after each, what may not appear in the diff. This
+page is the other half — why the cycle is shaped that way, what the framework
+gives you, and, honestly, what is not built yet. Read this to decide; read Rule
+#11 to follow. [cli/agents](../cli/agents.md#what-is-in-the-file) describes the
+file and how to keep it current.
 
 ## The cycle
 
@@ -78,9 +84,17 @@ stop and report a gap, which the rule does say.
 **Prose was tried first, and one line of it made things worse.** After the first
 failure the fix was a paragraph of argument, and in it "run the check before you
 hand anything over" turns a red check into a list of the exact lines that would
-make it green. The file-list surface replaced that paragraph. The second failure
-is what extended it to production files and to `CONTRIBUTING.md`, and what added
+make it green. The file-list surface is what actually holds — it does not depend
+on the agent reading the paragraph the right way round. The second failure is
+what extended it to production files and to `CONTRIBUTING.md`, and what added
 the red-count check's mirror.
+
+The line itself stayed, because running the check *is* right; what it needed was
+the sentence after it. Rule #11 now says "its failure names the seams you need,
+it is not a list of edits to make", and names the forbidden one of the two ways
+to turn the output green. Worth noting as a pattern: the fix for prose that
+points the wrong way is usually the next sentence, not deleting it — but neither
+is what makes the rule hold.
 
 The generalisation, now with two data points: **prose describing a state does not
 stop an agent with momentum. A prohibition needs either a mechanism or a surface
@@ -109,10 +123,10 @@ missing question. Absence has to be stated to be reviewable.
 The instructions in `AGENTS.md` are terse where these numbers are the reason for
 them.
 
-- **One specification per declared contract, not per service.** On dungeon, a
-  domain's management served four callers — gRPC, a consumer and two cron
-  commands — with no overlap at all, so a specification written against the gRPC
-  operations alone would have covered one contract in four. The
+- **One specification per declared contract, not per service.** A domain's
+  management can serve four callers — gRPC, a consumer and two cron commands —
+  with no overlap at all, so a specification written against the gRPC operations
+  alone would cover one contract in four. The
   `interface{ A; B; C }` entry that `waffle tests:replacements` prints
   for a shared container field *is* that list of contracts.
 - **Adjudication of defects is the human's.** Deriving candidate defects from
@@ -127,12 +141,12 @@ them.
   one facility with one provider, so an implementation holding a single
   configuration for the whole process passed all three. The second facility is
   what turned them into cases.
-- **Hand-computed numbers fail at about one in a hundred.** On kostej, one row
-  of a hundred and four had the wrong date — month-end clamping done in the
-  head — and the code was right. Which is why the gate is told that the
-  arithmetic was read rather than run.
+- **Hand-computed numbers fail at about one in a hundred.** One row of a hundred
+  and four had the wrong date — month-end clamping done in the head — and the
+  code was right. Which is why the gate is told that the arithmetic was read
+  rather than run.
 - **An unexpected failure is as likely to be the step as the service.** One of
-  sixteen on kostej: a column added to a fixture table that the step never read.
+  sixteen: a column added to a fixture table that the step never read.
 
 ## Why this needs the container cut
 
@@ -158,69 +172,39 @@ tooling.
 
 ### Cut at the leaves
 
-`waffle tests:replacements` marks a seam `# leaf` when its default
-constructor takes nothing else out of the container. Those are the boundaries of
-the process; everything else is a node inside it.
+Where to cut is a question with its own page —
+[conventions/component-harness](component-harness.md#choosing-where-to-cut) has
+the `# leaf` marker, the two directions in which it misses the real process
+boundary, and which stand-in each interface gets. What matters *here* is why the
+specification depends on the answer.
 
-That distinction is the difference between the two kinds of test:
+A specification is stated at the boundary of the service: given this state, when
+this call arrives, then this happens. It is satisfied only if the code between
+the call and the outcome actually runs. So:
 
-- a **component test** replaces leaves and lets the rest run for real. It is what
-  a specification at the service boundary needs.
-- replacing an interior seam instead deletes the subtree below it — which is the
-  code the specification was meant to exercise. That is a unit test wearing a
-  component test's clothes.
+- a **component test** replaces leaves and lets the rest run for real. That is
+  the only arrangement in which the specification is checking what it claims to.
+- replacing an **interior** seam deletes the subtree below it — which is the code
+  the specification was written about. The suite stays green, the specification
+  stops being evidence, and nothing about the diff says so. It is a unit test
+  wearing a component test's clothes.
+- a **unit test** builds its subject directly and never touches `Replacements`,
+  so the permission list has nothing to say about it.
 
-A **unit test** does not use `Replacements` at all: it builds the object under
-test directly, so the permission list has nothing to say about it — its mock is
-generated by a `//go:generate` line next to the test that needs one.
+Two consequences are the specification's own, not the harness's.
 
-### Where the marker does not reach
+**The negative assertion is written, never implied.** `.Times(0)`, rather than
+leaving the call undeclared and letting the controller fail on it. The suite is
+a document somebody approves, and an assertion that exists only as a missing
+line cannot be approved — the reviewer would have to notice an absence.
 
-The boundary of the container and the boundary of the process are not the same
-thing, and they miss in both directions:
+**What is deliberately not replaced is stated too.** A port whose production
+implementation already has a null variant selected by data needs no stand-in; if
+that is not written down, the next reader cannot tell a decision from an
+oversight, which is the same failure in a different place.
 
-- reaching another service over gRPC, the leaf is `grpc.ClientConnInterface`,
-  while the seam worth replacing is the generated `*ServiceClient` one hop above
-  it. Mocking a connection means answering with encoded protobuf. Replace
-  **both**: supplying the typed client does not stop the connection under it
-  from being built, because `InitAppWith` is a flat eager sequence and prunes
-  nothing — so the boot still reads that service's host and port. The
-  connection is then unreachable, which makes a panicking stub the honest
-  filling.
-- behind a factory that builds its clients from runtime data, the real boundary
-  is *below* the leaf and outside the container entirely. A mock of it cannot
-  reach the app through `Replacements` at all — it serves a unit test of the
-  factory, while the component test still cuts at the factory's own port.
-
-A leaf is also not always worth a mock. `sql.Db` is one, but a component test
-hands it a real connection to a test database. The rule behind that: a
-dependency carrying a language the code itself generates cannot be stood in for,
-because a stand-in has to understand the language, and then the test checks the
-language instead of the behaviour. Same for a port whose production
-implementation already has a null variant selected by data: nothing needs
-replacing, so it is classified and left alone.
-
-Within the cut, what gets a generated mock and what gets a no-op is structural,
-not a matter of taste:
-
-- a seam the test **programs** — an outbound client, an adapter — gets a mock.
-- a seam that only has to be **non-nil for the boot** — a message consumer, an
-  unreachable connection, the logger — gets a stand-in owned by the harness, not
-  a mock (`grpcClient.Dead()` for a connection, a recorder for the rest).
-  Declaring expectations for the calls a container makes while constructing
-  itself turns "this does not matter" into work in every case.
-- a seam a later assertion **reads back** gets a recorder — `pry.Recorder()`,
-  `scribus.Recorder()`. The line between the last two is the specification: a
-  no-op is a recorder nobody queries, so silence is right exactly where nothing
-  is asserted, and hides the subject everywhere else.
-
-And the negative assertion is written, never implied: `.Times(0)` rather than
-leaving the call undeclared and letting the controller fail. The suite is a
-document that someone approves, and an assertion that exists only as a missing
-line cannot be reviewed.
-
-None of this is derivable, which is why the marker is a fact about the graph and
-not a recommendation, and why `replacements.allow` is curated by a person.
+None of it is derivable, which is why `replacements.allow` is curated by a
+person and the marker is a fact about the graph rather than a recommendation.
 
 ## What it costs
 
@@ -293,15 +277,14 @@ this once" is a property of one task and belongs in the task. Putting it in the
 repository turns a standing decision into a switch for whatever mood the day is
 in.
 
-**What declining gives up.** On kostej — the first service taken through the
-cycle end to end, 233 scenarios over 18 operations — writing the cases surfaced
-defects in code that was already in production: a grid keeping the wrong version,
-freeze boundaries off by a day at both ends, a missing facility requirement, a
-currency anchored to the wrong moment, a promo window short by its last day, and
-a product kind that could be changed after the fact. None of them needed a test
-run to find. They came out of having
-to state, per case, what the answer should be — which is the part traditional
-mode removes, and it is not the same as the part that runs in CI.
+**What declining gives up.** On the first service taken through the cycle end to
+end, writing the cases surfaced defects in code that was already in production: a
+grid keeping the wrong version, freeze boundaries off by a day at both ends, a
+missing facility requirement, a currency anchored to the wrong moment, a promo
+window short by its last day, and a product kind that could be changed after the
+fact. None of them needed a test run to find. They came out of having to state,
+per case, what the answer should be — which is the part traditional mode removes,
+and it is not the same as the part that runs in CI.
 
 ## What this does not cover
 

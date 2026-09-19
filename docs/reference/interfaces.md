@@ -1,5 +1,7 @@
 # Interface Reference
 
+[Docs](../README.md) · Reference
+
 Every exported interface a service implements or is handed — waffle's own, plus
 the ones from gorib packages it meets through waffle. The import path is in a
 comment wherever it is not waffle's.
@@ -13,12 +15,12 @@ comment wherever it is not waffle's.
 ```go
 type App interface {
     RunUntilStop()
-    Run()
+    Run() error
     Stop() error
 }
 ```
 
-The top-level application object. Resolved from the DI container in `main.go`.
+The top-level application object. Resolved from the DI container in `main.go`. `Run` returns the error that decides the exit code; `RunUntilStop` wraps it with signal handling and calls `os.Exit` itself.
 
 ### HasCloser
 
@@ -48,11 +50,36 @@ The unit of work. Implement this to add a custom CLI command.
 type BaseCommand interface {
     Name() string
     Description() string
-    Usage() error
+    Usage(ctx context.Context) error
 }
 ```
 
-Identity and help text for a command. Tool constructors accept `BaseCommand` so name/description are provided by the framework.
+Identity and help text for a command. Tool constructors accept `BaseCommand` so name/description are provided by the framework. `Usage` takes the context because argv arrives on it — see [core/commands](../core/commands.md#flag-parsing-inside-a-command).
+
+### Daemon
+
+```go
+type Daemon interface {
+    Command
+    Daemon()
+}
+```
+
+A marker, implemented with a no-op method. It says `Run(ctx)` blocks until the context is cancelled, which is how cron knows to refuse the command rather than jam itself on the first tick.
+
+### Commands and CommandsAware
+
+```go
+type Commands interface {
+    Get(name string) Command
+}
+
+type CommandsAware interface {
+    SetCommands(Commands)
+}
+```
+
+The peer registry, and the way an orchestrator asks for it. `app.Init` calls `SetCommands` once on every command that implements the second, after the registry is built. `Commands` is read-only on purpose: a peer is looked up, never added. Cron is the only built-in consumer — see [tools/cron](../tools/cron.md#architecture).
 
 ---
 
@@ -77,7 +104,18 @@ type Router interface {
 }
 ```
 
-The one interface a service implements for every domain that serves HTTP, scaffolded by `waffle make:domain:http`. Register it under the collection — `di.Define(http.NewRouter, di.Tag(httpCommand.RouterTag))` — and every domain's routes land on one mux. `Setup` applies the middleware chain and registers routes; the same method is what the component harness calls, so a scenario exercises the routes that ship. See [tools/http](../tools/http.md#registering-routes).
+The one interface a service implements for every domain that serves HTTP, scaffolded by `waffle make:domain:http`. Register it under the collection — `di.Define(http.NewRouter, di.Tag(httpCommand.RouterTag))` — and every domain's routes land on one mux. `Setup` registers routes; the same method is what the component harness calls, so a scenario exercises the routes that ship. The `Mux` it is handed is the router's own group, so a `Use` there covers its routes and no neighbour's. See [tools/http](../tools/http.md#registering-routes).
+
+### Global
+
+```go
+// gitlab.com/gorib/waffle/tools/http
+type Global interface {
+    All() []server.Layer
+}
+```
+
+The chain that runs around every request, put on the mux once before any router registers a route. `config/tools/http` answers it with `*middleware.Standard`, whose individual layers are replaceable one at a time; the set and the order are what a struct cannot express, so replacing those means registering a `Global` of your own. See [tools/http](../tools/http.md#middleware).
 
 ### Mux
 
@@ -112,7 +150,7 @@ type Layer   = func(next Handler) Handler
 
 Not interfaces, but the two shapes everything else composes around. A handler returning a nil renderer and a nil error renders 204.
 
-`Layer` is a type **alias**, so a named function type — `middleware.Compress`, your own auth layer — is assignable without conversion. Middleware is therefore a `Layer` and not a tool-specific interface; the standard chain ships as `*middleware.Standard` and goes on with `mux.Use(standard.All()...)`. Its order is load-bearing at three points — see [tools/http](../tools/http.md#middleware).
+`Layer` is a type **alias**, so a named function type — `middleware.Compress`, your own auth layer — is assignable without conversion. Middleware is therefore a `Layer` and not a tool-specific interface; the chain that runs around every request is `httpCommand.Global`, answered by `*middleware.Standard` and put on the mux once by the http command. Its order is load-bearing in two places — `log` outside `error` so it sees the rendered status, `recover` innermost so a panic becomes an error something can render. The whole chain, in order, is [tools/http](../tools/http.md#middleware).
 
 `server.Handle` adapts a handler into a layer; `server.Bind` does the same for a typed `func(ctx, *Req) (*Response[Res], error)` and records the two types on the route.
 
@@ -180,6 +218,17 @@ type ServiceHandler interface {
 
 Implemented by each gRPC domain handler. `Start` registers the proto-generated server with the gRPC registrar.
 
+### Server
+
+```go
+type Server interface {
+    Serve(ctx context.Context) error
+    Close() error
+}
+```
+
+The listening half of the command, as the command sees it. `grpcCommand.Run` builds one with `grpc.NewServer` and hands it the chained interceptors and the address; the interface is what keeps `tools/grpc` from naming the concrete server type. Nothing registers it in DI, so this is a type you read, not one you implement — an in-process server for a test comes from [`Serve`](../conventions/component-harness.md#the-in-process-server) instead.
+
 ### Interceptor
 
 ```go
@@ -191,7 +240,7 @@ type Interceptor interface {
 }
 ```
 
-A unary gRPC interceptor. Tag with `grpc.MiddlewareTag`. Chained by `Order()` ascending (smaller = outer). Reserved framework orders: 100 tracing, 200 status, 300 session, 400 log, 500 recover.
+A unary gRPC interceptor. Tag with `grpc.MiddlewareTag`. Chained by `Order()` ascending — **smaller is further out**. The five that ship take 100 `session`, 200 `tracing`, 300 `log`, 400 `status`, 500 `recover`; `status` is inside tracing and log on purpose, and moving it out reports every failure as `Unknown`. Take ≥ 1000, and see [tools/grpc](../tools/grpc.md#unary-interceptor) before picking anything below it.
 
 ### StreamInterceptor
 
@@ -233,6 +282,20 @@ Marker interface for the migration runner command.
 
 ---
 
+## tools/cron package
+
+### CronCommand
+
+```go
+type CronCommand interface {
+    app.Command
+}
+```
+
+Marker interface for the scheduler command. It is also the only built-in `app.CommandsAware` — it takes the peer registry and dispatches through it on each tick — and its implementation has a `Close()`, so the generated `Shutdown()` stops the scheduler with everything else. It does not implement `app.Daemon`, which is what `validate()` checks its schedule entries *against*. See [tools/cron](../tools/cron.md).
+
+---
+
 ## tools/scribus package
 
 ### ScribusCommand
@@ -255,6 +318,18 @@ type Handler interface {
 ```
 
 A single-mode message handler. `Keys()` declares which subjects this handler subscribes to. Tag with `scribus.CommandTag`. Parse the body with `scan.Into[T](src)`.
+
+### Middleware
+
+```go
+type Middleware interface {
+    Name() string
+    Order() int
+    Wrap(next func(msgs []scan.Source) error) func(msgs []scan.Source) error
+}
+```
+
+Wraps the dispatch handler, in `Order()` ascending with the smallest outermost — the same shape as a gRPC `Interceptor`, over a page rather than over a call. Tag with `scribus.MiddlewareTag`. Tracing, log and recover come from the driver; yours goes beside them. Note that it wraps the whole page, so a middleware counting messages counts pages unless it walks the slice.
 
 ### BatchHandler
 
