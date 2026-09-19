@@ -1,5 +1,7 @@
 # Outbox Tool
 
+[Docs](../README.md) · Tools
+
 The outbox delivers an event exactly when the transaction that produced it
 commits. It exists for the gap in this shape, which every service has somewhere:
 
@@ -244,3 +246,14 @@ cut.OutboxSender = outbox.Recorder()
 
 A recorder for the publisher instead would make "the event went out" and "the
 event was lost" look the same, which is the thing being fixed.
+
+## Next
+
+| | |
+|---|---|
+| The claim protocol and the at-least-once caveat, in full | [the package README](../../tools/outbox/README.md) |
+| `Sender`, `Store`, `Publisher`, `Relay` signatures | [reference/interfaces](../reference/interfaces.md#toolsoutbox-package) |
+| Where the outbox sits in a modular monolith | [Recommended architectures](../architectures.md#events-leaving-the-binary) |
+| Publishing without the outbox, straight to the broker | [tools/scribus](scribus.md) and `config/service/amqp` |
+| What has to be running and in `.env` | [reference/running-locally](../reference/running-locally.md#by-module) |
+| Why the recorder rather than a silent stand-in | [conventions/component-harness](../conventions/component-harness.md#noop-is-a-recorder-nobody-queries) |

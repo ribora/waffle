@@ -1,5 +1,7 @@
 # Hilton (tracing & metrics)
 
+[Docs](../README.md) · Tools
+
 `gitlab.com/gorib/hilton` is a thin tracing/metrics abstraction. Base packages depend on hilton interfaces, not on any specific backend; the OTel SDK is the default implementation, hidden behind the `hilton.Provider` interface.
 
 ## Setup
@@ -28,6 +30,10 @@ Once `service/hilton/otel` is in `modules.go`, `hilton.Provider` is wired automa
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP/gRPC collector endpoint (e.g. `otel-collector:4317`). Empty → spans/metrics are created and propagated but not exported. |
 | `SERVICE` | `service.name` resource attribute |
 | `ENVIRONMENT` | `deployment.environment` resource attribute |
+| `HOSTNAME` | `service.instance.id` resource attribute; set by the container runtime in practice |
+
+All four are `env.Value`, so none of them stops a boot — a service with no
+observability configured runs and reports nothing.
 
 ## Provider lifecycle
 
@@ -107,3 +113,13 @@ func (s *service) DoWork(ctx context.Context) error {
     // ...
 }
 ```
+
+## Next
+
+| | |
+|---|---|
+| How the provider reaches a CLI command's context | [core/context](../core/context.md) |
+| The `cli.command.duration` histogram and the span around every command | [core/application](../core/application.md#run) |
+| Why `hilton` is one of the four packages you cannot really remove | [What is optional](../opting-out.md#the-core-you-cannot-really-remove) |
+| Every variable the otel module reads | [reference/environment](../reference/environment.md#configservicehiltonotel) |
+| Running without a collector | [reference/running-locally](../reference/running-locally.md#when-it-does-not-start) |

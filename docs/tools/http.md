@@ -1,5 +1,7 @@
 # HTTP Tool
 
+[Docs](../README.md) · Tools
+
 The HTTP tool wraps `gitlab.com/gorib/http/server` into a waffle `Command`. Blank-import its config package to register the `http` command.
 
 ## Setup
@@ -35,28 +37,26 @@ The address is wired automatically from `DAEMON_HOST` / `DAEMON_PORT` (see `conf
 
 ## Registering routes
 
-Implement `server.Router` — a single `Setup(mux server.Mux)` method. The scaffolded router under `domain/<x>/cmd/http` is the conventional place: it injects the standard middleware chain, applies it, then registers routes.
+Implement `server.Router` — a single `Setup(mux server.Mux)` method. The scaffolded router under `domain/<x>/cmd/http` is the conventional place: it registers routes and nothing else. The global middleware chain is the server's and goes on once, before any router runs.
 
 ```go
 package http
 
 import (
     "gitlab.com/gorib/http/server"
-    "gitlab.com/gorib/http/server/middleware"
 )
 
 type router struct {
-    handler  *userHandler
-    standard *middleware.Standard
+    handler *userHandler
 }
 
 func (r *router) Setup(mux server.Mux) {
-    mux.Use(r.standard.All()...) // global middleware chain
-
     mux.Get("/v1/users/{id}", server.Handle(r.handler.Get))
     mux.Post("/v1/users", server.Handle(r.handler.Create))
 }
 ```
+
+The `mux` a router is handed is its own: a `mux.Use` here covers the routes below it and no neighbour's.
 
 Route patterns use chi syntax — `{id}`, `{id:[0-9]+}`, trailing `/*` wildcard. Register the router under `RouterTag`:
 
@@ -87,8 +87,6 @@ Only routes registered with `server.Bind` reach the spec: `Bind` captures the re
 
 ```go
 func (r *router) Setup(mux server.Mux) {
-    mux.Use(r.standard.All()...)
-
     mux.Get("/v1/users/{id}", server.Bind(r.handler.Get))
     mux.Post("/v1/users", server.Bind(r.handler.Create))
 }
@@ -186,7 +184,31 @@ How many documents to keep follows where the **prose** differs, not where the co
 
 ## Middleware
 
-Middleware is a `server.Layer`: `func(next server.Handler) server.Handler`. The framework ships a standard chain via `*middleware.Standard` — compress, health, session, tracing, log, error, recover — applied with `mux.Use(r.standard.All()...)`. Each layer in it is a replaceable default (`di.Fallback`): register your own, e.g. `di.Wire[middleware.Session](NewMySession)`, and it wins over the default.
+Middleware is a `server.Layer`: `func(next server.Handler) server.Handler`.
+
+The chain that runs around **every** request is `httpCommand.Global` — one method, `All() []server.Layer` — and the command puts it on the mux once, before any router registers a route. It sits outside routing, so it also covers what no route matched.
+
+`config/tools/http` answers it with `*middleware.Standard`, in this order,
+outer to inner:
+
+| | Layer | Why there |
+|---|---|---|
+| 1 | `compress` | outermost, so it wraps the writer everything below it writes to |
+| 2 | `health` | answers and returns, so a liveness probe builds no session and opens no span |
+| 3 | `session` | the correlation id everything below it logs and traces under |
+| 4 | `tracing` | the `SERVER` span, and `http.server.request.duration` |
+| 5 | `log` | **outside `error`, so it sees the rendered status** rather than the raw error |
+| 6 | `error` | turns an error into a response body and a status |
+| 7 | `recover` | **innermost, so a handler panic becomes an error `error` can render** |
+
+The two bold rows are the load-bearing ones — the same shape as the gRPC chain,
+where `status` sits inside tracing and log for the same reason ([tools/grpc](grpc.md#unary-interceptor)).
+A layer a route or a router adds composes **inside** `recover`.
+
+There are two levels of replacement, and they answer different questions:
+
+- **One layer**, keeping the set and the order: each layer of `Standard` is a `di.Fallback` default, so `di.Wire[middleware.Session](NewMySession)` wins over the shipped one.
+- **The set or the order itself**: `Standard` is a struct, so its fields are all it can express. Register your own `di.Wire[httpCommand.Global](NewMyChain)` — without `di.Fallback()`, so it drops the default — and `All()` returns whatever you want, in whatever order.
 
 ### Custom middleware
 
@@ -203,13 +225,22 @@ func NewAuthLayer(publicKey *ecdsa.PublicKey) server.Layer {
 }
 ```
 
-Apply it globally in `Setup` (place cross-cutting concerns like auth/cors outermost — layers run outer→inner in registration order):
+Apply it to everything the router serves — layers run outer→inner in registration order, and these sit inside the global chain:
 
 ```go
 func (r *router) Setup(mux server.Mux) {
-    mux.Use(r.auth)              // outermost
-    mux.Use(r.standard.All()...)
+    mux.Use(r.auth)
     // routes ...
+}
+```
+
+To place it outside the global chain instead — the usual want for auth or cors — put it in your own `Global`:
+
+```go
+func NewChain(standard *middleware.Standard, auth server.Layer) *chain { ... }
+
+func (c *chain) All() []server.Layer {
+    return append([]server.Layer{c.auth}, c.standard.All()...)
 }
 ```
 
@@ -225,3 +256,15 @@ admin.Get("/{id}", server.Handle(r.handler.GetAdmin))
 ## Graceful shutdown
 
 The HTTP server registers itself with the app closer. On `SIGINT` / `SIGTERM` the server's graceful shutdown is triggered and in-flight requests are allowed to complete, bounded by the configured shutdown timeout.
+
+## Next
+
+| | |
+|---|---|
+| Writing the handlers this server routes to | [tools/http-handler](http-handler.md) |
+| Declaring the request as a struct instead of parsing by hand | [conventions/input-parsing](../conventions/input-parsing.md) |
+| Scaffolding a domain's router and DI | [cli/make:domain:http](../cli/make-domain-http.md) |
+| `RouterTag` and every other collection | [di/tags](../di/tags.md#httproutertag) |
+| `Router`, `Mux`, `Source`, `Renderer` in full | [reference/interfaces](../reference/interfaces.md#toolshttp-package) |
+| What has to be in `.env` for the command to start | [reference/running-locally](../reference/running-locally.md) |
+| Serving the real routes in a component test | [conventions/component-harness](../conventions/component-harness.md#the-in-process-server) |

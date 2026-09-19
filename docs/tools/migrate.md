@@ -1,5 +1,7 @@
 # Migrate Tool
 
+[Docs](../README.md) · Tools
+
 The migrate tool wraps [goose v3](https://github.com/pressly/goose) into a waffle `Command`. It supports multiple `fs.FS` migration sources, so each domain can ship its own SQL files and they are all applied in a single run.
 
 ## Setup
@@ -53,15 +55,22 @@ Run `make generate`, then run migrations:
 
 ## Migration sources
 
-Each domain's migrate package exports `NewMigrations()` returning the embedded SQL files:
+Each domain's migrate package exports `NewMigrations()` returning the embedded SQL files, and a one-line `Migration` interface to register it under:
 
 ```go
 // domain/user/cmd/migrate/main.go
 package migrate
 
-import "embed"
+import (
+    "embed"
+    "io/fs"
+)
 
-//go:embed migrations/*.sql
+type Migration interface {
+    fs.FS
+}
+
+//go:embed migrations/*
 var migrations embed.FS
 
 func NewMigrations() embed.FS {
@@ -69,25 +78,26 @@ func NewMigrations() embed.FS {
 }
 ```
 
-Register each domain's migrations in `InitDi()` using `di.Define`. Because no interface is specified, `diogen` uses the constructor's return type (`embed.FS`) as the field type and automatically prefixes the field name with the constructor's package alias to avoid collisions between domains (e.g. `userMigrateEmbedFS`, `templateMigrateEmbedFS`):
+`waffle make:domain:migrate` and `make:domain` both write the registration —
+one file per domain, under that domain's own interface:
 
 ```go
-import (
-    userMigrate    "mymodule/domain/user/cmd/migrate"
-    productMigrate "mymodule/domain/product/cmd/migrate"
-    "gitlab.com/gorib/waffle/tools/migrate"
-)
-
-// Inside InitDi():
-di.Define(userMigrate.NewMigrations, di.Tag(migrate.MigrationsTag))
-di.Define(productMigrate.NewMigrations, di.Tag(migrate.MigrationsTag))
+// config/di/di_user_migrate.go
+di.Wire[userMigration.Migration](userMigration.NewMigrations, di.Tag(migrate.MigrationsTag))
 ```
 
-The migrate command collects all registered sources and runs them all in order. Adding a new domain with migrations requires only the `di.Define` call above — no changes to the migrate command itself.
+The interface is why each domain gets its own `Migration` rather than sharing
+`fs.FS` or registering `embed.FS` concretely: a container field is named after
+the type it is exposed as, so twenty domains registered as `embed.FS` would be
+twenty registrations competing for one name.
+
+The migrate command collects every source under the tag as `[]fs.FS` and runs
+them in order. Adding a domain with migrations is the one registration above —
+no change to the migrate command itself.
 
 ## Database connection
 
-By default the migrate command uses the `sql.Db` from the DI container (configured by your `Config`). Override it at runtime with the `--connection` / `-c` flag:
+By default the migrate command uses the `sql.Db` from the DI container — `DB_DRIVER` and `DB_DSN`, read by `config/service/sql`. Override it at runtime with the `--connection` / `-c` flag:
 
 ```sh
 ./app migrate --connection "postgres://user:pass@localhost:5432/mydb?sslmode=disable" up
@@ -165,3 +175,13 @@ domain/user/cmd/migrate/
 | Tag | Collects |
 |-----|---------|
 | `migrate.MigrationsTag` | All domain `Migration` (i.e. `fs.FS`) sources |
+
+## Next
+
+| | |
+|---|---|
+| Setting a domain up with migrations | [cli/make:domain:migrate](../cli/make-domain-migrate.md) |
+| Adding one more `.sql` to a domain that has them | `waffle make:domain:migration <domain> <description>` — [cli/overview](../cli/overview.md#commands) |
+| The table a scaffolded entity gets, and the `stored<X>` struct it pairs with | [cli/make:domain](../cli/make-domain.md#migrations) |
+| `DB_DRIVER` as both connection and goose dialect | [reference/environment](../reference/environment.md#configservicesql) |
+| Applying the same migrations in a component test | [conventions/component-harness](../conventions/component-harness.md#postgres) |

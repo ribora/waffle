@@ -1,5 +1,7 @@
 # gRPC Tool
 
+[Docs](../README.md) · Tools
+
 The gRPC tool wraps `gitlab.com/gorib/grpc/server` into a waffle `Command`. Blank-import its config package to register the `grpc` command.
 
 ## Setup
@@ -20,13 +22,38 @@ This pulls in the registrations from [`config/tools/grpc/init.go`](../../config/
 
 ```go
 import (
+    "net"
+    "strconv"
+
     "gitlab.com/gorib/di"
+    "gitlab.com/gorib/env"
     "gitlab.com/gorib/grpc/server"
+    "gitlab.com/gorib/grpc/server/interceptor"
     "gitlab.com/gorib/waffle/app"
     wgrpc "gitlab.com/gorib/waffle/tools/grpc"
 )
 
 func InitDi() {
+    di.Wire[server.ErrorMapper](wgrpc.NewErrorMap, di.Args(map[string]any{
+        "mappers": di.Tags[server.ErrorMapper](wgrpc.ErrorMapperTag),
+    }))
+
+    di.Define(interceptor.NewTracingMW, di.Tag(wgrpc.MiddlewareTag))
+    di.Define(interceptor.NewStatusMW, di.Tag(wgrpc.MiddlewareTag))
+    di.Define(interceptor.NewSessionMW, di.Tag(wgrpc.MiddlewareTag))
+    di.Define(interceptor.NewLogMW, di.Tag(wgrpc.MiddlewareTag))
+    di.Define(interceptor.NewRecoverMW, di.Tag(wgrpc.MiddlewareTag))
+
+    // ... and the five NewStream…MW siblings under StreamMiddlewareTag ...
+
+    di.Wire[net.Addr](net.ResolveTCPAddr, di.For[wgrpc.GrpcCommand](), di.Args(map[string]any{
+        "network": "tcp",
+        "address": net.JoinHostPort(
+            env.NeedValue[string]("DAEMON_HOST"),
+            strconv.FormatUint(uint64(env.NeedValue[uint16]("DAEMON_PORT")), 10),
+        ),
+    }))
+
     di.Wire[app.BaseCommand](
         func() app.BaseCommand { return app.NewCommand("grpc", "Start grpc server") },
         di.For[wgrpc.GrpcCommand](),
@@ -50,16 +77,9 @@ Run `make generate`, then start the server:
 
 ## Listen address
 
-`NewGrpcCommand` requires a `net.Addr` argument. You must wire it explicitly in `InitDi()`:
+`NewGrpcCommand` takes a `net.Addr`, and the module wires it from `DAEMON_HOST` and `DAEMON_PORT` — both `env.NeedValue`, so a missing one stops the process at startup rather than at the first call. You wire it yourself only to take the address from somewhere else; `di.For[wgrpc.GrpcCommand]()` is what keeps that registration off every other `net.Addr` in the container.
 
-```go
-import "net"
-
-// Inside InitDi():
-di.Wire[net.Addr](func() (net.Addr, error) {
-    return net.ResolveTCPAddr("tcp", env.Value[string]("...", ":50051"))
-}, di.For[wgrpc.GrpcCommand]())
-```
+The HTTP module reads the same pair, so the two servers are two commands of one binary rather than two listeners in one process — see [reference/running-locally](../reference/running-locally.md#two-servers-at-once).
 
 Override the address at runtime with the `--listen` / `-l` flag (takes precedence over the wired value):
 
@@ -112,7 +132,30 @@ type Interceptor interface {
 }
 ```
 
-Reserved conventional orders: 100 tracing, 200 status, 300 session, 400 log, 500 recover. Pick `Order()` ≥ 1000 for user interceptors.
+The five that ship occupy fixed positions. Pick `Order()` ≥ 1000 for your own.
+
+| Order | Interceptor | Why there |
+|---|---|---|
+| 100 | `session` | builds the `session.Session` everything below it logs and traces under |
+| 200 | `tracing` | starts the `SERVER` span and records `rpc.server.duration` |
+| 300 | `log` | traces request and response, and picks trace vs error level by status code |
+| 400 | `status` | maps a domain error to a gRPC code and attaches the `failure` detail |
+| 500 | `recover` | turns a panic into `failure.Panic` |
+
+**The order is load-bearing in both directions, and getting it wrong is silent.**
+`status` sits **inside** tracing and log so that both observe the mapped code
+rather than the raw error — outside them, every failure is recorded as
+`Unknown`, which this repository has already shipped once. `recover` sits inside
+`status` so a panic becomes an error `status` can then map, instead of killing
+the process.
+
+That is also why `UnaryChain` is exported: a component test chains the
+container's own interceptor list with the same function the daemon uses, rather
+than sorting a copy. See [conventions/component-harness](../conventions/component-harness.md#the-in-process-server).
+
+The full table, with what each one puts on the context and which methods skip
+tracing, is [Interceptor order](https://gitlab.com/gorib/grpc#interceptor-order)
+in the `grpc` README. The stream set has the same five orders.
 
 ```go
 type LoggingInterceptor struct {
@@ -200,3 +243,15 @@ The same `ErrorMapper` instance feeds both unary and stream `status` interceptor
 ## Graceful shutdown
 
 On `SIGINT` / `SIGTERM`, the gRPC server calls `GracefulStop()`, which waits for active RPCs to complete before closing.
+
+## Next
+
+| | |
+|---|---|
+| Writing the handler this server registers | [tools/grpc-handler](grpc-handler.md) |
+| Scaffolding the proto, the handler and its DI | [cli/make:domain:grpc](../cli/make-domain-grpc.md) |
+| Converting between proto and domain types | [conventions/dto-conversion](../conventions/dto-conversion.md) |
+| `ServiceTag` and the three other collections | [di/tags](../di/tags.md#grpcservicetag) |
+| `ServiceHandler`, `Interceptor`, `ErrorMapper` in full | [reference/interfaces](../reference/interfaces.md#toolsgrpc-package) |
+| What has to be in `.env`, and running http and grpc at once | [reference/running-locally](../reference/running-locally.md#two-servers-at-once) |
+| Calling the real server from a component test | [conventions/component-harness](../conventions/component-harness.md#the-in-process-server) |

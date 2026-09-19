@@ -1,5 +1,7 @@
 # HTTP Handler Pattern
 
+[Docs](../README.md) · Tools
+
 This page describes how to implement HTTP handlers in a waffle service using `gitlab.com/gorib/http/server`.
 
 ## Handler signature
@@ -87,7 +89,7 @@ func (h *userHandler) Create(ctx context.Context, req *createRequest) (*server.R
     if err != nil {
         return nil, err
     }
-    return server.NewJsonResponse(http.StatusCreated, &userResponse{Id: user.Id}), nil
+    return server.Created(&userResponse{Id: user.Id}), nil
 }
 ```
 
@@ -106,21 +108,32 @@ through it where an invalid request reaches the service.
 
 ## Response helpers
 
+Every one of these returns a `*server.Response[Res]` and takes a **pointer** to
+the payload. The status-named ones are JSON, which is what a handler wants
+almost every time:
+
 ```go
-import (
-    "net/http"
-
-    "gitlab.com/gorib/http/server"
-)
-
-// JSON response (most common)
-return server.NewJsonResponse(http.StatusOK, &userResponse{Id: user.Id}), nil
-
-// Plain text
-return server.NewResponse(http.StatusOK, lo.ToPtr("ok")), nil
+return server.OK(&userResponse{Id: user.Id}), nil        // 200
+return server.Created(&userResponse{Id: user.Id}), nil   // 201
+return server.Accepted(&jobResponse{Id: job.Id}), nil    // 202
+return server.NoContent(), nil                           // 204, no payload
 ```
 
-Both take a pointer to the payload (status from `net/http`). For JSON the payload is marshalled automatically.
+The rest take the status, because it is the part that varies:
+
+| Helper | Content-Type |
+|---|---|
+| `server.JSON(status, body)` | `application/json` |
+| `server.XML(status, body)` | `application/xml` — see [OpenAPI / media types](http.md#media-types) |
+| `server.Text(status, body)` | `text/plain; charset=utf-8` |
+| `server.HTML(status, body)` | `text/html; charset=utf-8` |
+| `server.StreamWith(status, contentType, fn)` | yours; the body is written incrementally by `fn` |
+
+`server.NewJsonResponse` and `server.NewResponse` are the older spelling of
+`JSON` and `Text` and still work. New code takes the shorter ones.
+
+Returning a nil renderer with a nil error also renders 204, so `NoContent()` is
+for saying it on purpose rather than by omission.
 
 ## Local DTOs
 
@@ -159,12 +172,19 @@ package http
 
 import (
     "context"
-    "net/http"
     "strconv"
 
     "gitlab.com/gorib/http/server"
+    "gitlab.com/gorib/whisk/scan"
+
     "mymodule/domain/user/model"
 )
+
+// What the router asks for, and the seam a component test stands in on.
+type Routes interface {
+    Get(src server.Source) (server.Renderer, error)
+    Create(src server.Source) (server.Renderer, error)
+}
 
 type UserManagement interface {
     GetUser(ctx context.Context, id int) (*model.User, error)
@@ -190,7 +210,7 @@ func (h *userHandler) Get(src server.Source) (server.Renderer, error) {
         return nil, err
     }
 
-    return server.NewJsonResponse(http.StatusOK, &userResponse{
+    return server.OK(&userResponse{
         Id:    user.Id,
         Email: user.Email,
         Name:  user.Name,
@@ -208,7 +228,7 @@ func (h *userHandler) Create(src server.Source) (server.Renderer, error) {
         return nil, err
     }
 
-    return server.NewJsonResponse(http.StatusCreated, &userResponse{
+    return server.Created(&userResponse{
         Id:    user.Id,
         Email: user.Email,
         Name:  user.Name,
@@ -218,12 +238,23 @@ func (h *userHandler) Create(src server.Source) (server.Renderer, error) {
 
 ## Wiring in DI
 
-The handler and router are both concrete types — use `di.Define`, and tag the router so the `http` command collects it:
+The handler goes in under an interface, the router under the collection:
 
 ```go
-di.Define(http.NewUserHandler)
-di.Define(api.NewRouter, di.Tag(httpCommand.RouterTag))
+di.Wire[userHttp.Routes](userHttp.NewUserHandler)
+di.Define(userHttp.NewRouter, di.Tag(httpCommand.RouterTag))
 ```
+
+Two different reasons, and neither is a style preference.
+
+**The handler is `di.Wire[Routes]`** — the interface declared beside it above —
+because `di.Define` alone would expose `*userHandler`, a name the generated
+container cannot use and no component test can stand in for. The router asks
+for a `Routes`, so the interface is also what makes the two meet.
+
+**The router is `di.Define` plus the tag** because it reaches the server only
+through the collection; a plain `di.Wire[server.Router]` fills a slot nothing
+asks for any more. See [di/tags](../di/tags.md#httproutertag).
 
 The service dependency (`UserManagement`) is resolved automatically from the registered aliases. If the service struct satisfies multiple interfaces, declare them with `di.Alias` when registering the service:
 
@@ -240,3 +271,13 @@ di.Define(service.NewUserService,
 - **No logging in handlers** — errors propagate to the framework, which logs and renders them. Log only when you need extra context specific to this handler.
 - **No `json` tags in `model/`** — DTOs with json tags belong in `cmd/http`.
 - **Context**: pass `src.Context()` to all service calls — it carries the session populated by the session middleware.
+
+## Next
+
+| | |
+|---|---|
+| The server these handlers are mounted on | [tools/http](http.md) |
+| Every `scan` and `validate` tag, the hooks, custom validators | [conventions/input-parsing](../conventions/input-parsing.md) |
+| Scaffolding the router, the handler and the convert package | [cli/make:domain:http](../cli/make-domain-http.md) |
+| `Handler`, `Source`, `Renderer` and the response helpers | [reference/interfaces](../reference/interfaces.md#handler-and-layer) |
+| Getting an OpenAPI document out of these routes | [tools/http](http.md#openapi) |

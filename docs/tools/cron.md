@@ -1,5 +1,7 @@
 # Cron Tool
 
+[Docs](../README.md) · Tools
+
 The cron tool runs other waffle commands on a schedule. It is itself a `Command` — invoking `./app cron` starts a long-running scheduler that fires registered commands according to a crontab-style configuration. Each tick re-enters the target command's `Run(ctx)` with the argv specified in the schedule.
 
 ## Setup
@@ -134,3 +136,12 @@ No special-casing in `app.Init` for cron — `CommandsAware` is a generic mechan
 - **No retry semantics.** A failed tick is logged and skipped; the next scheduled tick fires normally. Use the target command's own error handling for retry policies.
 - **No `@reboot` or `@daily`-style aliases.** Standard 5-field crontab only. `@reboot` is a system-cron concept that does not map to container lifecycle anyway.
 - **No second-precision schedules.** 5-field minute-precision only.
+
+## Next
+
+| | |
+|---|---|
+| Writing a command worth scheduling | [core/commands](../core/commands.md#writing-a-custom-command) |
+| Scaffolding one scoped to a domain | `waffle make:domain:command <domain> <command>` — [cli/overview](../cli/overview.md#command-names) |
+| Marking your own long-running command a daemon | [core/commands](../core/commands.md#daemons) |
+| What the tick's context carries, and why not `os.Args` | [core/context](../core/context.md#args) |

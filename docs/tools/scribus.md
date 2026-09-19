@@ -1,5 +1,7 @@
 # Scribus Tool
 
+[Docs](../README.md) · Tools
+
 The scribus tool turns a message consumer into a waffle `Command`. It supports two modes: **single mode**, where each subject is handled by a dedicated `Handler`, and **batch mode**, where a single `BatchHandler` processes all messages together.
 
 The tool itself names no broker: a handler receives a `whisk/scan.Source`, and the routing semantics come from a driver. The one that ships is `config/tools/scribus/amqp`, over `gitlab.com/gorib/amqp`.
@@ -105,7 +107,15 @@ Subjects are **not** an argument of the running command — they come from each 
 
 ## Environment variables
 
-Environment variables are not read automatically. They are wired explicitly in `InitDi()` via `env.NeedValue` / `env.Value` as shown in the Setup section above. Variable names are chosen by you. The CLI positional arguments take precedence at runtime.
+The command itself reads none. The **driver** does, in the registration shown in
+Setup above — `config/tools/scribus/amqp` reads `RABBIT_DSN`,
+`RABBIT_EXCHANGE` and `RABBIT_QUEUE`, all three `env.NeedValue`, so a missing one
+stops the process at startup. A driver of your own names whatever it likes;
+`scribus` never sees a variable. Full list in
+[reference/environment](../reference/environment.md#configtoolsscribusamqp).
+
+The CLI operands take precedence over all of it at runtime — see [Running the
+consumer](#running-the-consumer).
 
 ## Subjects
 
@@ -312,8 +322,10 @@ The refusal covers the flag. A service that registers its own `scribus.Consumer`
 | Tag | Collects |
 |-----|---------|
 | `scribus.CommandTag` | All `Handler` implementations (single mode) |
+| `scribus.MiddlewareTag` | All `Middleware` implementations, driver's and yours alike |
 
-`BatchHandler` is provided without a tag — only one may be registered.
+`BatchHandler` is provided without a tag — only one may be registered. Both tags
+in full, with the other seven, are [di/tags](../di/tags.md#quick-reference).
 
 ## Logging
 
@@ -333,3 +345,14 @@ The AMQP driver's own log middleware is a separate decision and currently does
 include the body, one line per message, so a service that enables Trace does see
 payloads today. Drop `interceptor.NewLog` from the middleware registrations if
 that is not acceptable for what your queues carry.
+
+## Next
+
+| | |
+|---|---|
+| Parsing the message body — the same tags an HTTP DTO uses | [conventions/input-parsing](../conventions/input-parsing.md) |
+| `Handler`, `BatchHandler`, `Consumer`, `Subjects`, `Transport` | [reference/interfaces](../reference/interfaces.md#toolsscribus-package) |
+| `CommandTag` and `MiddlewareTag` | [di/tags](../di/tags.md#scribuscommandtag) |
+| Publishing an event that must not be lost | [tools/outbox](outbox.md) |
+| What has to be running and in `.env` | [reference/running-locally](../reference/running-locally.md#by-module) |
+| Delivering an event through the real consumer in a test | [conventions/component-harness](../conventions/component-harness.md#delivering-an-event) |

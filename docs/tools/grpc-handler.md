@@ -1,5 +1,7 @@
 # gRPC Handler Pattern
 
+[Docs](../README.md) · Tools
+
 This page describes how to implement gRPC domain handlers in a waffle service.
 
 ## Handler struct
