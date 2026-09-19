@@ -1,5 +1,7 @@
 # make:domain:migrate
 
+[Docs](../README.md) · CLI scaffolding
+
 Sets up migrations for a domain that has none: the migration package, the
 bootstrap SQL and the DI registration.
 
@@ -24,14 +26,21 @@ entity.
 
 **`domain/user/cmd/migrate/main.go`**
 
-The migration package exports a `NewMigrations()` constructor that returns the embedded SQL files:
+The migration package exports a `NewMigrations()` constructor that returns the embedded SQL files, and the `Migration` interface it is registered under:
 
 ```go
 package migrate
 
-import "embed"
+import (
+    "embed"
+    "io/fs"
+)
 
-//go:embed migrations/*.sql
+type Migration interface {
+    fs.FS
+}
+
+//go:embed migrations/*
 var migrations embed.FS
 
 func NewMigrations() embed.FS {
@@ -39,7 +48,10 @@ func NewMigrations() embed.FS {
 }
 ```
 
-`diogen` automatically disambiguates the generated field name by prefixing it with the constructor's package alias (e.g. `userMigrateEmbedFS`) when `di.Define` is used without an explicit interface type.
+The interface is one line and it exists for the container: registered as
+`di.Wire[Migration]`, the source gets a named `Replacements` field and a field
+name derived from the domain, so twenty domains produce twenty distinct entries.
+`di.Define` on `embed.FS` would name them all after the same concrete type.
 
 ### SQL migrations
 
@@ -105,17 +117,27 @@ Add your domain columns to the Up section before running for the first time.
 
 ### DI configuration
 
-Add the following inside `InitDi()` in `config/di/di.go`:
+**`config/di/di_user_migrate.go`** — written by the command, like every other
+registration, so nothing has to be merged into a file you are also editing:
 
 ```go
+package di
+
 import (
+    userMigration "mymodule/domain/user/cmd/migrate"
+
+    "gitlab.com/gorib/di"
     "gitlab.com/gorib/waffle/tools/migrate"
-    userMigrate "mymodule/domain/user/cmd/migrate"
 )
 
-// Inside InitDi():
-di.Define(userMigrate.NewMigrations, di.Tag(migrate.MigrationsTag))
+func InitUserMigrate() {
+    di.Wire[userMigration.Migration](userMigration.NewMigrations, di.Tag(migrate.MigrationsTag))
+}
 ```
+
+Nothing calls `InitUserMigrate` — diogen reads the bodies of every `InitXxx` in
+`config/di` and never invokes one. See
+[di/overview](../di/overview.md#the-initxxx-functions).
 
 ## Post-generation steps
 
@@ -129,7 +151,7 @@ make .tidy generate
 go run ./cmd/app migrate up
 ```
 
-Or run all migration-related subcommands through the same binary:
+Or any other goose subcommand through the same binary:
 
 ```sh
 ./app migrate status
@@ -137,28 +159,22 @@ Or run all migration-related subcommands through the same binary:
 ./app migrate up-to 20240315143022
 ```
 
-### Available subcommands
-
-| Subcommand | Description |
-|------------|-------------|
-| `up` | Apply all pending migrations (default) |
-| `up-by-one` | Apply the next pending migration |
-| `up-to <version>` | Apply migrations up to a specific version |
-| `down` | Roll back the last applied migration |
-| `down-to <version>` | Roll back to a specific version |
-| `redo` | Roll back then re-apply the last migration |
-| `reset` | Roll back all migrations |
-| `status` | Print the status of all migrations |
-| `version` | Print the current migration version |
-
-See [tools/migrate.md](../tools/migrate.md) for the full reference.
+The nine of them, the `--connection` override and the fixed `migrations`
+tracking table are [tools/migrate](../tools/migrate.md#subcommands).
 
 ## Adding new migrations
 
-Create SQL files in `domain/user/cmd/migrate/migrations/` following the goose naming convention:
-
-```
-<timestamp>_<description>.sql
+```sh
+waffle make:domain:migration user add_status
 ```
 
-Use `goose create` or create them manually. The timestamp must be monotonically increasing.
+That writes `domain/user/cmd/migrate/migrations/<timestamp>_add_status.sql`, an
+empty `Up`/`Down` pair already wrapped in `StatementBegin`/`StatementEnd` — the
+markers a function body or a `$$`-quoted block needs, and the ones people
+remember only after goose has split a statement on a semicolon inside one. The
+description is a single file-name segment, so it may hold dashes and dots but
+not a separator.
+
+By hand is the same file: the convention is `<timestamp>_<description>.sql`, and
+the timestamp has to be monotonically increasing — which is the reason to let the
+command name it.

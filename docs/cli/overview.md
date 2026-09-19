@@ -1,5 +1,7 @@
 # CLI Overview
 
+[Docs](../README.md) · CLI scaffolding
+
 The `waffle` CLI is a standalone scaffolding tool. It generates the boilerplate for new services and domains so you can focus on business logic from the first commit.
 
 ## Install
@@ -16,12 +18,13 @@ go install gitlab.com/gorib/waffle/cmd/waffle@latest
 | `waffle make:domain <domain>` | Add a domain (model, service, postgres adapter) |
 | `waffle make:domain:grpc <domain>` | Add a gRPC handler for an existing domain |
 | `waffle make:domain:http <domain>` | Add an HTTP handler for an existing domain |
-| `waffle make:domain:scribus [--batch] <domain> <event> [routing-key]` | Add an AMQP consumer for an existing domain; `--batch` scaffolds a `BatchHandler` instead of a per-message `Handler` |
+| `waffle make:domain:scribus --driver <id> [--batch] <domain> <event> [subject]` | Add an event consumer for an existing domain; `--driver` names the broker module under `config/tools/scribus` (`amqp` today), `--batch` scaffolds a `BatchHandler` instead of a per-message `Handler` |
 | `waffle make:domain:migrate <domain>` | Add database migrations for an existing domain |
 | `waffle make:domain:entity <domain> <entity>` | Add an entity to an existing domain — model, repository interface, adapter, table and DI, the same set the domain's own entity gets. `--storage` picks the adapter and defaults to `sql`, the only one there is; an entity always gets a repository |
 | `waffle make:domain:migration <domain> <description>` | Add a new SQL migration |
 | `waffle make:domain:command <domain> <command>` | Add a CLI subcommand scoped to a domain, registered as `<domain>:<command>` |
 | `waffle make:converter <path>` | Scaffold a goverter convert.go at the given path |
+| `waffle make:outbox --driver <id>` | Enable the transactional outbox: the table, its migration runner, the module and the named broker driver under `config/tools/outbox`. See [tools/outbox](../tools/outbox.md) |
 | `waffle tests:harness [init]` | Report the component harness, and write what is missing with `init` ([details](../conventions/component-harness.md)) |
 | `waffle tests:replacements [check] [--container=<path>]` | List everything the containers expose and what `replacements.allow` grants; `check` fails if a test replaces a field the list does not name |
 | `waffle agents` | Regenerate `AGENTS.md` after a waffle upgrade ([details](agents.md)) |
@@ -72,23 +75,23 @@ So it takes lowercase words joined by `-` or `_`: `recalc`, `sweep-otp` and
 not. The package carries no separator because Go package names do not.
 
 The token is prefixed with its domain, which is not decoration. The framework's
-own commands are bare words — `grpc`, `http`, `migrate`, `cron`, `scribus` — in
-the same registry, and a second command answering to one of them fails
-`app.Init`: the binary refuses to start, taking every other command with it.
+own commands are bare words — `grpc`, `http`, `migrate`, `cron`, `scribus`,
+`outbox` — in the same registry, and a second command answering to one of them
+fails `app.Init`: the binary refuses to start, taking every other command with it.
 
-### Routing keys
+### Subjects
 
-`make:domain:scribus` takes the routing key after the event, because the event
-names the generated Go type and keys are usually dotted:
+`make:domain:scribus` takes the subject after the event, because the event names
+the generated Go type and a subject is usually dotted:
 
 ```sh
-waffle make:domain:scribus user order_paid order.paid
+waffle make:domain:scribus --driver amqp user order_paid order.paid
 ```
 
-The key defaults to the event, so `waffle make:domain:scribus user ping` binds
-`ping` — which is why the event alone is enough when it happens to fit both jobs.
-Give a dotted event with no key and the command says so rather than emitting a
-type called `order.paidCommand`.
+The subject defaults to the event, so `waffle make:domain:scribus --driver amqp user ping`
+binds `ping` — which is why the event alone is enough when it happens to fit both
+jobs. Give a dotted event with no subject and the command says so rather than
+emitting a type called `order.paidCommand`.
 
 ## How it works
 
@@ -106,12 +109,20 @@ Each command ships embedded Go templates. When you run a command, waffle renders
 
 Some commands run additional steps after writing files:
 
-- `init:service` — runs `go get -tool gitlab.com/gorib/di/cmd/diogen@latest` then `make .tidy generate`
-- `make:domain` — runs `go get -tool gitlab.com/gorib/sql/cmd/store@latest` then `make .tidy generate`
-- `make:domain:grpc` — runs `go generate ./api/...` (skipped if `proto_dir` is outside the module) then `make .tidy generate`
-- `make:domain:migrate` — runs `make .tidy generate`
+- `init:service` — installs the `diogen` and `waffle` tools, then runs `make .tidy generate`
+- `make:domain` — installs the `store` tool and enables `config/service/sql` and `config/tools/migrate` (unless `--no-repository`), then runs `make .tidy generate`
+- `make:domain:entity` — the same tail as `make:domain`, for one more entity
+- `make:domain:grpc` — enables `config/tools/grpc`, runs `go generate ./api/...`, then `make .tidy generate`; when `proto_dir` is outside the module both runs are skipped and the command prints the steps to do by hand
+- `make:domain:http` — enables `config/tools/http`, installs `whisk` (and `goverter`, under the default mapper) and writes `whisk.yaml`, then runs `make .tidy generate`
+- `make:domain:scribus` — enables `config/tools/scribus/<driver>` and the mode module, installs `whisk`, then runs `make .tidy generate`
+- `make:domain:command` — runs `make .tidy generate`
+- `make:outbox` — enables `config/service/sql`, `config/tools/migrate`, `config/tools/outbox` and the driver named by `--driver`, then runs `make .tidy generate`
 
-The `make generate` step re-runs code generators (DI container, stored struct mappers) so the project compiles immediately after scaffolding.
+`make:domain:migrate`, `make:domain:migration`, `make:converter`,
+`tests:harness` and `agents` write files and stop; run `make generate` yourself
+afterwards.
+
+The `make generate` step re-runs code generators (DI container, stored struct mappers) so the project compiles immediately after scaffolding. It is idempotent — a run with nothing to do prints `diogen: skipped, no changes detected` — so running it again after any command costs nothing and settles the question.
 
 ### Template functions
 
@@ -142,21 +153,25 @@ The whisk generator keeps its own `whisk.yaml` beside it, on the same missing-is
 
 - [init:service](init-service.md)
 - [make:domain](make-domain.md)
+- [make:domain:http](make-domain-http.md)
 - [make:domain:grpc](make-domain-grpc.md)
 - [make:domain:migrate](make-domain-migrate.md)
 - [agents](agents.md)
 
-The remaining commands — `make:domain:http`, `make:domain:scribus`,
-`make:domain:entity`, `make:domain:migration`, `make:domain:command`,
-`make:converter`, `tests:harness` and `tests:replacements` — have no
-page of their own. They
-follow the same rules as the ones above (project root detection, idempotent
-writes, `make generate` afterwards); what they produce is described where the
-produced thing is documented: [tools/http-handler](../tools/http-handler.md),
-[tools/scribus](../tools/scribus.md), [tools/migrate](../tools/migrate.md),
-[core/commands](../core/commands.md),
-[conventions/dto-conversion](../conventions/dto-conversion.md) and
-[di/overview](../di/overview.md#testing-with-the-container).
+The remaining commands have no page of their own. They follow the same rules as
+the ones above — project root detection, idempotent writes, `make generate`
+afterwards — and what each produces is described where the produced thing is:
+
+| Command | Read |
+|---|---|
+| `make:domain:entity` | [make:domain](make-domain.md#a-second-entity) — the same second list, once more |
+| `make:domain:scribus` | [tools/scribus](../tools/scribus.md) |
+| `make:domain:migration` | [tools/migrate](../tools/migrate.md#sql-file-format) |
+| `make:domain:command` | [core/commands](../core/commands.md#writing-a-custom-command), and [Command names](#command-names) above |
+| `make:converter` | [conventions/dto-conversion](../conventions/dto-conversion.md#cli-scaffolding) |
+| `make:outbox` | [tools/outbox](../tools/outbox.md#setup) |
+| `tests:harness` | [conventions/component-harness](../conventions/component-harness.md#scaffolding-it) |
+| `tests:replacements` | [below](#testsreplacements), and [di/overview](../di/overview.md#testing-with-the-container) for the mechanics |
 
 `tests:harness` takes one optional operand: a bare run reports which of the
 harness files are there, and `init` writes the rest, leaving an existing file
@@ -172,9 +187,11 @@ close a set the container already knows:
   gateway, a proxy — the set is `resource.New()`, whose `Up`, `Reset` and `Down`
   do nothing. Adding a resource later is editing that literal.
 - **the transports.** `NewGrpcCommand` in the container gives an in-process gRPC
-  server, `NewHttpCommand` gives `waffleHttp.Serve` over the container's own mux
-  and router, and a service that has both gets both behind one `Clients` — two
-  of the nine in sherpa do.
+  server, `NewHttpCommand` gives `waffleHttp.Serve` over the container's own mux,
+  global chain and router collection, and a service that has both gets both
+  behind one `Clients`. A container still passing a single `server.Router`, or
+  none of the `http.Global` the chain now arrives as, is refused with the fix
+  rather than read as a service that serves no HTTP.
 - **the handlers and the interceptor order**, copied out of the daemon's own
   construction call, so the server a scenario talks to is chained like the
   daemon's.
@@ -218,8 +235,11 @@ report layer, and the comparison is what you ask for by name.
 
 `replacements.allow` is a **permission list**, not a list of exceptions: an empty
 one allows nothing, and what it does not name may not be replaced in any form —
-mock, spy, hand-written fake or no-op. Which form to use is the test author's
-choice, because it follows from the assertion; where the boundary lies is not.
+mock, spy, hand-written fake or no-op. **Where to draw that list is not a CLI
+question**, and the whole of the reasoning — what `# leaf` means and where the
+marker misses, which leaves are worth granting, which stand-in each interface
+gets — is [conventions/component-harness](../conventions/component-harness.md#choosing-where-to-cut).
+The rest of this section is what the command itself does.
 
 The check reads every `.go` file in the module and reports the position of each
 field it finds filled in, in either form:
@@ -237,31 +257,10 @@ is the platform owner's own decision, so measuring it against the platform
 owner's own list would deny the thing the list exists to allow.
 
 A grant is keyed by import path and interface, never by field name — the field
-name is diogen's, and it changes when registrations do. One consequence worth
-knowing: an interface serving two fields is granted for both. `google.golang.org/
-grpc: [ClientConnInterface]` grants every connection in the container at once,
-which is a reason not to grant it.
+name is diogen's, and it changes when registrations do.
 
-A **composite** field — `interface{ A; B }`, produced when registrations share a
-container field — is granted only when every constituent is, because replacing
-the field replaces every contract it merges. Composites are the most informative
-lines in the report rather than noise: a composite names the contracts one
-management object owes, and each constituent is a caller, which is a place a
-scenario binds.
-
-An entry marked `# leaf` has a default constructor that takes nothing else out of
-the container, which makes it a boundary of the process rather than a node inside
-it. It is read off the body of `InitAppWith`, so it is a fact about the graph and
-not a recommendation — but it is the fact that separates the two kinds of test:
-
-- a **component test** replaces leaves and lets everything else run for real.
-  Replacing an interior seam instead deletes the subtree below it, which is the
-  code the test was meant to exercise.
-- a **unit test** builds the object under test itself, so `Replacements` plays no
-  part, and this list has nothing to say about it.
-
-A package holding more than one interface is written one per line, so the marker
-sits on the interface it describes — which is the common case, because a domain
+The report writes a package holding more than one interface one per line, so a
+marker sits on the interface it describes — the common case, because a domain
 declares the port of an external adapter next to its own repositories. A single
 interface stays inline, where there is nothing to tell apart:
 
@@ -270,45 +269,33 @@ replacements:
   allow:
     gitlab.com/gorib/sql: [Db]  # leaf
 
-    gitlab.com/sherpa-erp/sherpa/warehouse/domain/warehouse/service:
+    example.com/platform/warehouse/domain/warehouse/service:
       - FacilityRepository
       - SecurityAdapter  # leaf, allowed
       - UnitRepository
 ```
 
-The marker is structural, and the boundary of the container is not always the
-boundary of the process — it misses in both directions:
+`# leaf` on a line means the seam's default constructor takes nothing else out of
+the container. It is read off the body of `InitAppWith`, so it is a fact about
+the graph and not a recommendation — the marker misses the real process boundary
+in both directions, and not every leaf is worth granting. Both cases, with what
+to do instead, are in
+[component-harness](../conventions/component-harness.md#what-the-marker-cannot-know).
 
-- reaching another service over gRPC, the leaf is `grpc.ClientConnInterface`,
-  while the seam worth granting is the generated `*ServiceClient` one hop above
-  it. Faking the connection would mean answering with encoded protobuf.
-- behind a factory that builds its clients from runtime data, the real boundary
-  is below the leaf and outside the container entirely. It cannot be reached
-  through `Replacements` at all — that one is for a unit test of the factory, and
-  the component test still cuts at the factory's own port.
+**Mocks are not generated by waffle**, by this command or any other. A test that
+needs one carries its own `//go:generate go tool mockgen` line — see
+[component-harness](../conventions/component-harness.md#a-mock-is-a-declaration-a-spy-is-an-observation).
 
-A leaf is also not always worth granting. `sql.Db` is one, but a component test
-wants a real connection to a test database, and a stand-in for a dependency
-carrying a language the code itself generates makes the test check the language
-rather than the behaviour. Same for a leaf that only has to be non-nil for the
-boot — the logger, a consumer, the connection under a replaced client: the
-harness supplies it, so no grant is needed.
-[conventions/component-harness](../conventions/component-harness.md) has the
-reasoning and the stand-ins that ship with each interface.
+`make replacements` runs the check and prints its report. It is deliberately
+not part of `make generate`: it reads the container, so it wants a tree that
+already compiles. It is the fast way to ask — the same comparison rides in
+`make test`, which boots the whole component suite to get there.
 
-None of this is derivable, which is why the list is written by hand.
+## Next
 
-**Mocks are not generated by waffle.** A test that needs one carries its own
-`//go:generate go tool mockgen` line, which keeps the mock beside its only user
-and inside `go generate ./...`:
-
-```go
-//go:generate go tool mockgen -typed -package security -self_package <this package> -destination client_mock_test.go <this package> Client
-```
-
-Generating into a `_test.go` destination in the package under test is what makes
-a private field reachable, and it keeps a single-use mock out of the production
-build and out of everyone else's import graph.
-
-`make replacements` runs the check. It is deliberately not part of `make
-generate`: it reads the container, so it wants a tree that already compiles.
+| | |
+|---|---|
+| The whole path a scaffolded service takes | [Getting Started](../getting-started.md) |
+| Where the generated tree comes from and why it is shaped that way | [Recommended architectures](../architectures.md) |
+| What each generated registration means | [di/overview](../di/overview.md) |
+| What a component test may replace, and where to cut | [conventions/component-harness](../conventions/component-harness.md) |

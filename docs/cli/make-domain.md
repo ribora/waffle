@@ -1,5 +1,7 @@
 # make:domain
 
+[Docs](../README.md) · CLI scaffolding
+
 Creates a domain and its first entity: errors and a management for the domain,
 then model, repository interface, postgres adapter, stored struct, DI and a table
 for the entity. Every entity added later gets that second list and nothing else —
@@ -47,13 +49,27 @@ Typed sentinel errors for the domain, defined with `gitlab.com/gorib/failure`:
 ```go
 package model
 
-import "gitlab.com/gorib/failure"
+import (
+    "gitlab.com/gorib/failure"
+)
 
 var (
-    ErrUserNotFound = failure.New("user not found")
-    ErrUserConflict = failure.New("user conflict")
+    ErrUserNotFound = failure.New("user is not found")
 )
 ```
+
+`failure.New` rather than `errors.New`: it registers a slug for the message, and
+the slug is what the HTTP error renderer puts in the body.
+
+```
+{"code":500,"message":"user is not found","payload":{},"type":"user_is_not_found"}
+```
+
+A bare `errors.New` reaches the client as `"type":"internal_error"` — one label
+for every failure a service can have. The status is a separate decision: 500
+until the error is wrapped in something that carries one, or mapped by the gRPC
+error handler. Add the rest of the domain's sentinels to this file as they
+appear.
 
 ### Service
 
@@ -114,39 +130,71 @@ by type as soon as it is there.
 
 **`domain/user/adapter/postgres/user.go`**
 
-The repository implementation using `gitlab.com/gorib/sql`. Wraps the `sql.Repository` generic and exposes domain-typed methods:
+The implementation of the `UserRepository` interface the service declared, over
+`gitlab.com/gorib/sql`. It holds a `sql.Repository[storedUser]` and exposes
+domain-typed methods — `Get`, `Save`, `List`, `Count`, the four the interface
+names:
 
 ```go
 package postgres
 
 import (
-    sql "gitlab.com/gorib/sql"
+    "context"
+    "errors"
+
+    "gitlab.com/gorib/criteria"
+    "gitlab.com/gorib/pry"
+    "gitlab.com/gorib/sql"
+
     "mymodule/domain/user/model"
 )
 
-type UserRepository struct {
-    sql.Repository[storedUser]
-}
+var (
+    userTable = sql.Table("users")
+)
 
-func NewUserRepository(db sql.Db) (*UserRepository, error) {
-    repo, err := sql.NewRepository[storedUser, *storedUser](db)
+func NewUserRepository(
+    db sql.Db,
+    logger pry.Logger,
+) (*userRepository, error) {
+    repo, err := sql.NewRepository[storedUser](db)
     if err != nil {
         return nil, err
     }
-    return &UserRepository{Repository: repo}, nil
+    return &userRepository{repo: repo, logger: logger}, nil
 }
 
-func (r *UserRepository) Get(ctx context.Context, id int) (*model.User, error) {
-    stored, err := r.Repository.Get(ctx,
-        sql.Select().From(sql.Table("users")).
-            Where(criteria.And().Add("id", "eq", id)),
-    )
+type userRepository struct {
+    repo   sql.Repository[storedUser]
+    logger pry.Logger
+}
+
+func (r *userRepository) Get(ctx context.Context, userId int) (*model.User, error) {
+    stored, err := r.repo.Get(ctx, sql.Select().From(userTable).Where(criteria.And("id", "eq", userId)))
     if err != nil {
-        return nil, err
+        if errors.Is(err, sql.ErrNoRows) {
+            return nil, model.ErrUserNotFound
+        }
+        r.logger.Error(err, pry.Ctx(ctx))
+        return nil, sql.ErrQueryFailed
     }
     return stored.Unwrap(), nil
 }
 ```
+
+Three things in that shape are the convention rather than this entity's taste.
+
+**The constructor returns the unexported `*userRepository`.** Nothing asks for
+the concrete type — `di.Wire[service.UserRepository]` is what puts it in the
+container — so exporting it would only offer a second way to reach it.
+
+**The table is a package-level `sql.Table`,** built once instead of per query.
+
+**`sql.ErrNoRows` becomes the domain's own `ErrUserNotFound`; everything else
+is logged and becomes `sql.ErrQueryFailed`.** A driver error carries the query
+and sometimes its parameters, and the service above has no use for either — so
+the detail goes to the log and the caller gets an error it can act on. This is
+the one place a repository logs; see [No logging in handlers](../tools/http-handler.md#guidelines).
 
 **`domain/user/adapter/postgres/stored_user.go`**
 
@@ -251,6 +299,25 @@ di.Define(service.NewUserManagement,
 )
 ```
 
+Those aliases decide something else as well. A component test can replace a
+registration only when every type it is exposed as is an interface, and the two
+above are exposed differently: `di.Wire[service.UserRepository]` names an
+interface, so the repository gets a `Replacements` field, while `di.Define` on
+its own exposes whatever the constructor returns — `*userManagement`, which no
+fake can be — so the management gets none.
+
+What both constructors return is beside the point: `postgres.NewUserRepository`
+returns an unexported `*userRepository` and is replaceable anyway. Aliases do not
+add to the concrete exposure, they take its place, so the registration above —
+`di.Define` plus two `di.Alias` — is replaceable through a field typed as both
+interfaces at once.
+
+Leaving the management without a seam is usually right: a component test drives
+the service through a transport and wants the real one. Declare an interface for
+it when something below it has to be cut and the repository is not where the cut
+belongs. [Component harness](../conventions/component-harness.md) covers what may
+be replaced; `gitlab.com/gorib/di` covers how a seam is derived.
+
 ## Post-generation steps
 
 The command does these itself: it installs `gitlab.com/gorib/sql/cmd/store`,
@@ -262,5 +329,8 @@ that had no database before is ready to run when the command returns.
 
 - Add fields to the model and the stored struct, then `make generate`
 - Add another entity: `waffle make:domain:entity user address`
-- Add gRPC support: `waffle make:domain:grpc user`
+- Serve it over HTTP: `waffle make:domain:http user` — [make:domain:http](make-domain-http.md)
+- Serve it over gRPC: `waffle make:domain:grpc user` — [make:domain:grpc](make-domain-grpc.md)
+- Consume events into it: `waffle make:domain:scribus --driver amqp user order_paid` — [tools/scribus](../tools/scribus.md)
 - Add a migration of your own: `waffle make:domain:migration user add_status`
+- Give it a CLI subcommand: `waffle make:domain:command user recalc` — [core/commands](../core/commands.md)

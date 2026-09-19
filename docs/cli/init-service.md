@@ -1,5 +1,7 @@
 # init:service
 
+[Docs](../README.md) · CLI scaffolding
+
 Bootstraps a complete microservice project from scratch.
 
 ## Usage
@@ -111,7 +113,7 @@ Each tool page shows the exact block to copy inside `InitDi()` when you need man
 di.Wire[server.Mux](server.New)
 di.Wire[middleware.Session](middleware.NewSession, di.Fallback())
 // ... the rest of the standard middlewares ...
-di.Wire[*middleware.Standard](middleware.NewStandard)
+di.Wire[whttp.Global](middleware.NewStandard, di.Fallback())
 di.Wire[app.BaseCommand](
     func() app.BaseCommand { return app.NewCommand("http", "Start web server") },
     di.For[whttp.HttpCommand](),
@@ -161,13 +163,33 @@ Ensures the `proto/` directory is tracked by git even when empty.
 
 ### Project files
 
+**`waffle.yaml`**
+
+Project-level conventions the generators read instead of hardcoding paths.
+`init:service` writes three of them — `api_import`, `proto_dir` and `mapper` —
+each with its default and a comment saying what it decides. The fourth,
+`replacements.allow`, you add when the first component test asks for a seam; an
+absent key and an empty one both allow nothing. A missing file behaves exactly
+like one holding only the defaults, so the file is documentation as much as
+configuration. Keys in [CLI overview](overview.md#waffleyaml).
+
 **`.env`**
 
 Local environment variable overrides for development. Loaded automatically by `gitlab.com/gorib/env` on startup. Not committed to git.
 
+It starts nearly empty on purpose: a variable arrives with the module that reads
+it, and a module arrives with the scaffolding command that needs it. `init:service`
+writes no `DAEMON_HOST` because nothing listens yet.
+
 **`.gitignore`**
 
 Standard Go gitignore plus `.env`.
+
+**`waffle`**
+
+A one-line script running `go tool waffle`, so `make replacements` and anything
+else in the repository calls the version pinned in `go.mod` rather than whatever
+is on the developer's `PATH`.
 
 **`Makefile`**
 
@@ -177,15 +199,26 @@ Standard targets:
 |--------|-------------|
 | `make generate` | Run all code generators (DI, store) |
 | `make .tidy` | `go mod tidy` |
+| `make test` | `go test ./...` — before a commit, and in CI |
 | `make build` | Build the binary into `bin/` |
 | `make run ARGS=<command>` | `.tidy generate`, then `go run ./cmd/app <command>` |
 | `make audit` | `golangci-lint run` |
 | `make replacements` | Refuse any seam a test replaces that `waffle.yaml` does not allow |
-| `make all` | `.tidy generate build` |
+| `make all` (the default) | `.tidy generate build` |
 
 `run` tidies and regenerates first — the same pair every scaffolding command
 runs — so a new import or a new registration is in the binary that starts. The
 subcommand goes in `ARGS` because make reads a bare word as a target of its own.
+
+**`test` is deliberately out of `all`.** A bare `make` is what runs after every
+edit, and the component suite boots the real container over real infrastructure
+— too slow for that loop. `make test` belongs before a commit and in CI.
+
+The consequence is worth knowing, because two checks ride in that suite:
+`replacements.Check()` and `boundaries.Check()` sit in `config/diogen`, so a
+green `make` says the service builds, not that the seams and the domain
+boundaries are clean. `make replacements` answers the first of those on demand
+without the rest of the suite.
 
 ## Post-generation steps
 
@@ -211,7 +244,14 @@ This rewrites `AGENTS.md` with the conventions of the new waffle version. Commit
 
 ## What to do next
 
-1. Add your environment variables to `.env`
-2. Call tool initializers in `config/di/di.go`
-3. Run `waffle make:domain <domain>` to create your first domain
-4. Run `make generate` after each DI change
+A fresh service registers no commands at all, so `go run ./cmd/app --help` lists
+none — every command arrives with a module, and a module arrives with the
+scaffolding command that needs it.
+
+1. `waffle make:domain <domain>` — the first domain, and with it the database modules
+2. `waffle make:domain:http <domain>` or `make:domain:grpc` — a transport, which is what puts a command in the list
+3. Both of those enable their modules in `modules.go` and append the variables they read to `.env`; the per-module list is [Running locally](../reference/running-locally.md)
+4. `make generate` after every DI change — `make run ARGS=<command>` does it for you
+
+[Getting Started](../getting-started.md) walks that path end to end, from here to
+a route answering `curl`.

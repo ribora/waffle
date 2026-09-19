@@ -1,5 +1,7 @@
 # make:domain:grpc
 
+[Docs](../README.md) · CLI scaffolding
+
 Adds a gRPC transport layer to an existing domain. Generates the proto definition, the gRPC service handler, an error mapper stub, and DI configuration.
 
 ## Usage
@@ -18,7 +20,7 @@ Run this after `waffle make:domain user`.
 
 ## waffle.yaml
 
-Behavior is driven by the project's `waffle.yaml` (see [overview](overview.md#waffle.yaml)):
+Behavior is driven by the project's `waffle.yaml` (see [overview](overview.md#waffleyaml)):
 
 | Key | Used for |
 |-----|----------|
@@ -144,9 +146,12 @@ func InitUserGrpc() {
 }
 ```
 
-Both the service handler and the error mapper are concrete types collected by tag — use `di.Define`, not `di.Wire[ServiceHandler]`. Replace `userManagementInstance` with whatever provides `UserManagement` (typically the domain service, wired via `di.Alias[userGrpc.UserManagement]()`).
+Both the service handler and the error mapper are concrete types collected by tag — use `di.Define`, not `di.Wire[ServiceHandler]`. `userManagementInstance` is the handle `config/di/di_user_domain.go` published when `make:domain` ran; see [di/overview](../di/overview.md#didefine--registering-a-concrete-constructor) for what a handle is.
 
-Call `InitUserGrpc()` from `InitDi()` in `config/di/di.go`.
+Nothing calls `InitUserGrpc`, and nothing should: diogen reads the bodies of
+every `InitXxx` in `config/di` and never invokes one. That is what lets each
+registration have a file of its own instead of a line in a file you are also
+editing — see [di/overview](../di/overview.md#the-initxxx-functions).
 
 ## Post-generation steps
 
