@@ -195,6 +195,21 @@ func (c *Command) UncommentModule(modulePath string) error {
 //go:embed env
 var envFragments embed.FS
 
+func ModuleEnv(name string) []string {
+	fragment, err := envFragments.ReadFile("env/config/" + name + ".env")
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for line := range strings.Lines(string(fragment)) {
+		key, _, found := strings.Cut(strings.TrimSpace(line), "=")
+		if found && key != "" && !strings.HasPrefix(key, "#") {
+			out = append(out, key)
+		}
+	}
+	return out
+}
+
 // A module that has just been enabled needs its variables in .env, or the service
 // stops at startup naming one of them. Only missing keys are added — an existing
 // value is never touched, so this is safe to run again.

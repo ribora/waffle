@@ -53,11 +53,12 @@ type serviceContext struct {
 }
 
 func scanContext(projectName string) serviceContext {
+	modules := scanModules()
 	return serviceContext{
 		ModulePath: projectName,
 		Domains:    scanDomains(),
-		Modules:    scanModules(),
-		EnvVars:    scanEnvVars(),
+		Modules:    modules,
+		EnvVars:    scanEnvVars(modules),
 	}
 }
 
@@ -109,8 +110,7 @@ func scanModules() []string {
 
 const envPackage = "gitlab.com/gorib/env"
 
-// Every reader takes the key first, so the list is the package's, not a
-// selection: the regexp this replaces knew four of the nine.
+// Every reader takes the key first, so the list is the package's, not a selection.
 var envReaders = map[string]bool{
 	"Value": true, "Array": true, "Json": true,
 	"NeedValue": true, "NeedArray": true, "NeedJson": true,
@@ -118,8 +118,13 @@ var envReaders = map[string]bool{
 }
 
 // Parsed, not matched, for the same reason as scanModules.
-func scanEnvVars() []string {
+func scanEnvVars(modules []string) []string {
 	seen := map[string]bool{}
+	for _, module := range modules {
+		for _, name := range command.ModuleEnv(module) {
+			seen[name] = true
+		}
+	}
 	for _, root := range []string{"config", "domain", "cmd"} {
 		_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 			switch {

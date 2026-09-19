@@ -7,8 +7,6 @@ import (
 	"testing"
 )
 
-// The scaffolded modules.go is mostly commented-out lines, so a service with
-// five modules listed twelve and an agent read http and scribus as available.
 func TestScanModulesSkipsCommentedImports(t *testing.T) {
 	inModule(t, `package di
 
@@ -36,8 +34,6 @@ import (
 	}
 }
 
-// A named import is not a module registration, and the file holds nothing else
-// of waffle's — so neither may be reported.
 func TestScanModulesTakesOnlyBlankWaffleImports(t *testing.T) {
 	inModule(t, `package di
 
@@ -65,8 +61,6 @@ func TestScanModulesWithoutTheFile(t *testing.T) {
 	}
 }
 
-// The readers differ in how they are written, not in where the key sits, and
-// the regexp this replaced saw four of the nine.
 func TestScanEnvVarsReadsEveryCallShape(t *testing.T) {
 	inConfig(t, `package config
 
@@ -84,13 +78,11 @@ func Init() {
 `)
 
 	want := []string{"ARRAY", "INSTANTIATED", "JSON", "MUST", "NEED_JSON", "PLAIN"}
-	if got := scanEnvVars(); !slices.Equal(got, want) {
+	if got := scanEnvVars(nil); !slices.Equal(got, want) {
 		t.Errorf("vars = %v, want %v", got, want)
 	}
 }
 
-// The qualifier is whatever the file called the import, and a selector that
-// only looks like one belongs to something else.
 func TestScanEnvVarsFollowsTheImport(t *testing.T) {
 	inConfig(t, `package config
 
@@ -109,7 +101,21 @@ func Init() {
 `)
 
 	want := []string{"REAL"}
-	if got := scanEnvVars(); !slices.Equal(got, want) {
+	if got := scanEnvVars(nil); !slices.Equal(got, want) {
+		t.Errorf("vars = %v, want %v", got, want)
+	}
+}
+
+func TestScanEnvVarsTakesWhatTheModulesRead(t *testing.T) {
+	inConfig(t, `package config
+
+import "gitlab.com/gorib/env"
+
+func Init() { _ = env.Value("OWN", "") }
+`)
+
+	want := []string{"DB_DRIVER", "DB_DSN", "OWN", "RABBIT_DSN", "RABBIT_EXCHANGE"}
+	if got := scanEnvVars([]string{"service/amqp", "service/sql", "app"}); !slices.Equal(got, want) {
 		t.Errorf("vars = %v, want %v", got, want)
 	}
 }
@@ -119,7 +125,7 @@ func Init() {
 func TestScanEnvVarsSkipsWhatDoesNotParse(t *testing.T) {
 	inConfig(t, "package config\n\nfunc Init() { this is not go")
 
-	if got := scanEnvVars(); got != nil {
+	if got := scanEnvVars(nil); got != nil {
 		t.Errorf("vars = %v, want nil", got)
 	}
 }
@@ -136,7 +142,6 @@ func inConfig(t *testing.T, body string) {
 	t.Chdir(dir)
 }
 
-// body empty writes no file, for the case where the project has no modules.go.
 func inModule(t *testing.T, body string) {
 	t.Helper()
 	dir := t.TempDir()
