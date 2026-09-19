@@ -21,11 +21,12 @@ type MigrateCommand interface {
 	app.Command
 }
 
-func NewMigrateCommand(migrations []fs.FS, command app.BaseCommand, connection sql.Db) *migrateCommand {
+func NewMigrateCommand(migrations []fs.FS, command app.BaseCommand, connection sql.Db, driver string) *migrateCommand {
 	return &migrateCommand{
 		BaseCommand: command,
 		connection:  connection,
 		migrations:  migrations,
+		driver:      driver,
 	}
 }
 
@@ -33,6 +34,7 @@ type migrateCommand struct {
 	app.BaseCommand
 	connection sql.Db
 	migrations []fs.FS
+	driver     string
 }
 
 func (c *migrateCommand) Run(ctx context.Context) (err error) {
@@ -73,6 +75,9 @@ func (c *migrateCommand) Run(ctx context.Context) (err error) {
 		if err != nil {
 			return err
 		}
+		// The scheme names the database this run targets, so it names the dialect
+		// too — DB_DRIVER describes the connection that was just replaced.
+		c.driver = dsn[0]
 	}
 
 	db, err := c.connection.DbSql()
@@ -82,5 +87,5 @@ func (c *migrateCommand) Run(ctx context.Context) (err error) {
 	if err = db.Ping(); err != nil {
 		return fmt.Errorf("cannot connect to db: %w", err)
 	}
-	return run(ctx, db, c.migrations, args[0], args[1:])
+	return run(ctx, db, c.migrations, c.driver, args[0], args[1:])
 }

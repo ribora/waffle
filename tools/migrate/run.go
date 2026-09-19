@@ -11,7 +11,10 @@ import (
 // goose keeps its configuration in package globals, so the source is set per
 // iteration. Allow-missing is what lets a second source carry a version below
 // the first one's highest.
-func run(ctx context.Context, db *dbSql.DB, sources []fs.FS, command string, args []string) error {
+func run(ctx context.Context, db *dbSql.DB, sources []fs.FS, dialect, command string, args []string) error {
+	if err := goose.SetDialect(dialect); err != nil {
+		return err
+	}
 	for _, source := range sources {
 		goose.SetBaseFS(source)
 		goose.SetTableName("migrations")
@@ -22,13 +25,12 @@ func run(ctx context.Context, db *dbSql.DB, sources []fs.FS, command string, arg
 	return nil
 }
 
-// Up is the loop the migrate command runs, shaped for sqltest.Migrations, so a
-// component test gets the schema the daemon builds. Order is the caller's:
-// goose takes one source at a time, and a table hanging on another domain's
-// trigger has to come after it. Silences goose, which logs a line per migration.
+// Order is the caller's: goose takes one source at a time, and a table hanging on
+// another domain's trigger has to come after it. Postgres and not the service's
+// DB_DRIVER, because sqltest speaks nothing else.
 func Up(sources ...fs.FS) func(ctx context.Context, handle *dbSql.DB) error {
 	return func(ctx context.Context, handle *dbSql.DB) error {
 		goose.SetLogger(goose.NopLogger())
-		return run(ctx, handle, sources, "up", nil)
+		return run(ctx, handle, sources, "postgres", "up", nil)
 	}
 }

@@ -22,6 +22,7 @@ This pulls in the registrations from [`config/tools/migrate/init.go`](../../conf
 import (
     "io/fs"
     "gitlab.com/gorib/di"
+    "gitlab.com/gorib/env"
     "gitlab.com/gorib/waffle/app"
     "gitlab.com/gorib/waffle/tools/migrate"
 )
@@ -33,8 +34,14 @@ di.Wire[app.BaseCommand](
 )
 di.Wire[migrate.MigrateCommand](migrate.NewMigrateCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
     "migrations": di.Tags[fs.FS](migrate.MigrationsTag),
+    "driver":     env.NeedValue[string]("DB_DRIVER"),
 }))
 ```
+
+`driver` is the goose dialect, and it is not optional: goose defaults to postgres
+in its own package init, so without it a service on MySQL or SQLite migrates with
+postgres syntax. It is the same `DB_DRIVER` that `config/service/sql` reads, which
+is why this module pulls that one in.
 
 Run `make generate`, then run migrations:
 
@@ -87,6 +94,8 @@ By default the migrate command uses the `sql.Db` from the DI container (configur
 ```
 
 The flag value is parsed as a standard DSN: `driver://user:pass@host:port/dbname`.
+Its scheme also becomes the goose dialect for that run, overriding `DB_DRIVER` —
+it describes the connection the flag just replaced.
 
 ## Subcommands
 
