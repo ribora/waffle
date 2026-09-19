@@ -150,12 +150,12 @@ func ValidatePath(kind, p string) error {
 
 // Deliberately thin: the broker owns the grammar, this only rejects literals
 // that would not survive being written into Keys().
-func ValidateRoutingKey(key string) error {
+func ValidateSubject(subject string) error {
 	switch {
-	case key == "":
-		return fmt.Errorf("routing key is empty")
-	case strings.ContainsAny(key, " \t\n\""):
-		return fmt.Errorf("routing key %q contains whitespace or a quote", key)
+	case subject == "":
+		return fmt.Errorf("subject is empty")
+	case strings.ContainsAny(subject, " \t\n\"\\"):
+		return fmt.Errorf("subject %q contains whitespace, a quote or a backslash", subject)
 	}
 	return nil
 }

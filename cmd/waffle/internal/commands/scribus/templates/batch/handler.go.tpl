@@ -3,7 +3,6 @@ package scribus
 import (
 	scribusModel "{{ .Project }}/domain/{{ .Domain }}/cmd/scribus/model"
 
-	"gitlab.com/gorib/amqp"
 	"gitlab.com/gorib/pry"
 	"gitlab.com/gorib/whisk/scan"
 )
@@ -28,18 +27,29 @@ type {{ camel .Event }}Command struct {
 }
 
 func (c *{{ camel .Event }}Command) Keys() []string {
-	return []string{"{{ .Key }}"}
+	return []string{"{{ .Subject }}"}
 }
 
-func (c *{{ camel .Event }}Command) Run(msgs []amqp.Source) error {
+func (c *{{ camel .Event }}Command) Run(msgs []scan.Source) error {
+	var (
+		skipped int
+		cause   error
+	)
 	for _, m := range msgs {
 		event, err := scan.Into[scribusModel.{{ title .Event }}](m)
 		if err != nil {
-			c.logger.Error("Failed to parse event", pry.Err(err), pry.Ctx(m.Context()), pry.Field("key", m.RoutingKey()))
+			skipped++
+			if cause == nil {
+				cause = err
+			}
 			continue
 		}
 		_ = event
 		// TODO: implement
+	}
+	if skipped > 0 {
+		c.logger.Error("Skipped unparsable events",
+			pry.Err(cause), pry.Field("count", skipped), pry.Ctx(msgs[len(msgs)-1].Context()))
 	}
 	return nil
 }

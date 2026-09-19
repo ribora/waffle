@@ -18,7 +18,7 @@ import (
 // Nothing compiles these templates, so a handler that stops satisfying its
 // interface stays invisible until a scaffolded service fails to build.
 
-func render(t *testing.T, mode, key string) string {
+func render(t *testing.T, mode, subject string) string {
 	t.Helper()
 
 	body, err := templates.ReadFile(filepath.Join("templates", mode, "handler.go.tpl"))
@@ -35,7 +35,7 @@ func render(t *testing.T, mode, key string) string {
 	err = tpl.Execute(&out, map[string]string{
 		"Domain":  "user",
 		"Event":   "order_paid",
-		"Key":     key,
+		"Subject": subject,
 		"Project": "example.com/svc",
 	})
 	if err != nil {
@@ -81,15 +81,15 @@ func TestHandlerTemplatesSatisfyTheirInterfaces(t *testing.T) {
 	}
 }
 
-// Both templates must bind the key, not the event that named the type.
-func TestKeysReturnTheRoutingKey(t *testing.T) {
+// Both templates must bind the subject, not the event that named the type.
+func TestKeysReturnTheSubject(t *testing.T) {
 	for _, mode := range []string{"single", "batch"} {
 		src := render(t, mode, "order.paid")
 		if !strings.Contains(src, `[]string{"order.paid"}`) {
-			t.Errorf("%s template does not bind the routing key:\n%s", mode, src)
+			t.Errorf("%s template does not bind the subject:\n%s", mode, src)
 		}
 		if strings.Contains(src, `[]string{"order_paid"}`) {
-			t.Errorf("%s template still binds the event name as the key", mode)
+			t.Errorf("%s template still binds the event name as the subject", mode)
 		}
 	}
 }

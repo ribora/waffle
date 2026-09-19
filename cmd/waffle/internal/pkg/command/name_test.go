@@ -150,15 +150,15 @@ func TestValidatePath(t *testing.T) {
 }
 
 // The broker owns the grammar, so only the unusable literals are refused.
-func TestValidateRoutingKey(t *testing.T) {
-	for _, key := range []string{"order.paid", "order.*", "order.#", "order_paid"} {
-		if err := ValidateRoutingKey(key); err != nil {
-			t.Errorf("%q was refused: %v", key, err)
+func TestValidateSubject(t *testing.T) {
+	for _, subject := range []string{"order.paid", "order.*", "order.#", "order_paid"} {
+		if err := ValidateSubject(subject); err != nil {
+			t.Errorf("%q was refused: %v", subject, err)
 		}
 	}
-	for _, key := range []string{"", "order paid", `order"paid`} {
-		if err := ValidateRoutingKey(key); err == nil {
-			t.Errorf("%q was accepted", key)
+	for _, subject := range []string{"", "order paid", `order"paid`, `order\npaid`} {
+		if err := ValidateSubject(subject); err == nil {
+			t.Errorf("%q was accepted", subject)
 		}
 	}
 }
