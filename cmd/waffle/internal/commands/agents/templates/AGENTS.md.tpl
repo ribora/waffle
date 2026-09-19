@@ -3,9 +3,11 @@
 Instructions for AI coding agents working in this repository. This file is
 **managed by `waffle agents`** — hand edits are lost on regeneration.
 
-**Run `waffle agents` after every waffle upgrade** (`go get
-gitlab.com/gorib/waffle@latest`) — framework conventions change between
-versions and a stale AGENTS.md will steer you toward deprecated patterns.
+**`make generate` rewrites it**, so the service context below — domains, active
+modules, env vars — is as current as the container. After a waffle upgrade
+(`go get gitlab.com/gorib/waffle@latest`) run it again for the conventions too:
+they change between versions, and a stale copy steers you toward patterns that
+are gone.
 
 **Read `CONTRIBUTING.md` first, if it exists.** It holds service-specific
 instructions — business rules, custom commands, known quirks — and it overrides
