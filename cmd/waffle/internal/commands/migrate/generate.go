@@ -15,20 +15,10 @@ import (
 // adds its table and keeps the rest.
 func Generate(domain, entity, projectName string) error {
 	c := command.New("migrate-internal", "", templates, nil)
-	service := filepath.Base(projectName)
-	params := map[string]string{
-		"Domain":  domain,
-		"Entity":  entity,
-		"Project": projectName,
-		"Service": service,
-	}
-	path := filepath.Join("domain", domain)
-	sources := map[string]string{
-		filepath.Join("templates", "entity", "main.go.tpl"): filepath.Join(path, "cmd", "migrate", "main.go"),
-		filepath.Join("templates", "di.go.tpl"):             filepath.Join("config", "di", "di_"+domain+"_migrate.go"),
-	}
+	params := Params(domain, entity, projectName)
+	sources := RunnerSources(domain)
 
-	dir := filepath.Join(path, "cmd", "migrate", "migrations")
+	dir := Dir(domain)
 	now := time.Now()
 	migrations := []migration{
 		{
@@ -48,6 +38,35 @@ func Generate(domain, entity, projectName string) error {
 		}
 	}
 	return c.Write(sources, params)
+}
+
+// For a caller that brings its own table and wants neither the entity template
+// nor the updated_at trigger — the outbox is one.
+func Runner(domain, projectName string) error {
+	c := command.New("migrate-internal", "", templates, nil)
+	return c.Write(RunnerSources(domain), Params(domain, domain, projectName))
+}
+
+// RunnerSources and Params are exported for the same caller, so the runner it
+// gets is the one every other domain has rather than a copy that drifts.
+func RunnerSources(domain string) map[string]string {
+	return map[string]string{
+		filepath.Join("templates", "entity", "main.go.tpl"): filepath.Join("domain", domain, "cmd", "migrate", "main.go"),
+		filepath.Join("templates", "di.go.tpl"):             filepath.Join("config", "di", "di_"+domain+"_migrate.go"),
+	}
+}
+
+func Params(domain, entity, projectName string) map[string]string {
+	return map[string]string{
+		"Domain":  domain,
+		"Entity":  entity,
+		"Project": projectName,
+		"Service": filepath.Base(projectName),
+	}
+}
+
+func Dir(domain string) string {
+	return filepath.Join("domain", domain, "cmd", "migrate", "migrations")
 }
 
 // The name carries a timestamp, so on the next run it is a different name and the

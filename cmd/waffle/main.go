@@ -19,6 +19,7 @@ import (
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/http"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/migrate"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/migration"
+	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/outbox"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/replacements"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/repository"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/scribus"
@@ -76,6 +77,7 @@ func newCommands() commands {
 	cmds.Add(migrate.New())
 	cmds.Add(migration.New())
 	cmds.Add(repository.New())
+	cmds.Add(outbox.New())
 	cmds.Add(cmdcommand.New())
 	cmds.Add(converter.New())
 	cmds.Add(harness.New())

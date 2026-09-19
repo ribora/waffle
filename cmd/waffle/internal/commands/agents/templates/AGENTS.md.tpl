@@ -479,11 +479,12 @@ something to fill in by hand without saying so:
 | New domain (model + service + repository + migrations) | `waffle make:domain <domain>` |
 | Add inbound gRPC | `waffle make:domain:grpc <domain>` |
 | Add inbound HTTP | `waffle make:domain:http <domain>` |
-| Add AMQP consumer | `waffle make:domain:scribus [--batch] <domain> <event> [routing-key]` — the key defaults to `<event>`; pass it when it is dotted (`order_paid order.paid`), and `--batch` for a `BatchHandler` |
+| Add event consumer | `waffle make:domain:scribus --driver <id> [--batch] <domain> <event> [subject]` — `--driver` names the broker module under `config/tools/scribus` (`amqp`); the subject defaults to `<event>`, pass it when it is dotted (`order_paid order.paid`), and `--batch` for a `BatchHandler` |
 | Add an entity to a domain | `waffle make:domain:entity <domain> <entity>` — the same set the domain's own entity gets, table included; an entity always gets a repository, and `--storage` only picks which adapter (`sql` by default) |
 | Set up migrations for a domain that has none | `waffle make:domain:migrate <domain>` |
 | Add one migration to a domain that already has them | `waffle make:domain:migration <domain> <description>` |
 | Add CLI subcommand | `waffle make:domain:command <domain> <command>` — the name may be hyphenated (`sweep-otp`), and the command registers as `<domain>:<name>` so it cannot collide with `grpc`, `http`, `migrate`, `cron` or `scribus` |
+| Make published events survive a crash after the commit | `waffle make:outbox --driver amqp` — the driver is required, as it is for scribus; writes `domain/outbox/cmd/migrate` and enables the module; then add `Enqueue` to the publisher interface, change the call sites that need the guarantee, and run `./app outbox` as its own deployment |
 | Add DTO converter (any path) | `waffle make:converter <path>` — also creates `pkg/goverter/convert.go` if it is missing |
 | Put the component harness in place | `waffle tests:harness` reports what is there, `waffle tests:harness init` writes the rest (Rule #11 step 3) |
 | See what a test may replace | `waffle tests:replacements` — every seam, marked `# leaf` and `# allowed` |
@@ -725,7 +726,8 @@ Edit `config/di/modules.go` only:
 import (
     _ "gitlab.com/gorib/waffle/config/app"
     _ "gitlab.com/gorib/waffle/config/tools/grpc"
-    _ "gitlab.com/gorib/waffle/config/tools/scribus/single"   // ← add line here
+    _ "gitlab.com/gorib/waffle/config/tools/scribus/amqp"     // ← driver, and
+    _ "gitlab.com/gorib/waffle/config/tools/scribus/single"   // ← mode
 )
 ```
 

@@ -36,8 +36,16 @@ import (
 	// the commands as usual and let k8s schedule them — no import needed.
 	// _ "gitlab.com/gorib/waffle/config/tools/cron"
 
-	// uncomment if your service uses scribus
+	// uncomment if your service uses scribus — one driver and one mode
+	// _ "gitlab.com/gorib/waffle/config/tools/scribus/amqp"
 	// CHOOSE ONLY ONE VARIANT either batch processing or single processing
 	// _ "gitlab.com/gorib/waffle/config/tools/scribus/batch"
 	// _ "gitlab.com/gorib/waffle/config/tools/scribus/single"
+
+	// uncomment if your service publishes to rabbitmq
+	// _ "gitlab.com/gorib/waffle/config/service/amqp"
+
+	// uncomment if your published events must survive a crash after the commit —
+	// the driver pulls the module in (waffle make:outbox does this and writes the table)
+	// _ "gitlab.com/gorib/waffle/config/tools/outbox/amqp"
 )
