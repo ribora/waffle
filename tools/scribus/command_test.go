@@ -6,25 +6,66 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.com/gorib/amqp"
 	"gitlab.com/gorib/hilton"
 	"gitlab.com/gorib/pry"
 	"gitlab.com/gorib/waffle/app"
+	"gitlab.com/gorib/whisk/scan"
 )
+
+type message struct {
+	key  string
+	body []byte
+}
+
+func (m message) Body() []byte             { return m.body }
+func (m message) Context() context.Context { return context.Background() }
+
+func (m message) Lookup(scope, _ string) string {
+	if scope == "key" {
+		return m.key
+	}
+	return ""
+}
+
+func (m message) LookupAll(scope, key string) []string {
+	if v := m.Lookup(scope, key); v != "" {
+		return []string{v}
+	}
+	return nil
+}
+
+// A trailing '*' and nothing else: the real semantics are tested in the driver.
+type starSubjects struct{}
+
+func (starSubjects) Of(src scan.Source) string { return src.Lookup("key", "") }
+
+func (starSubjects) Match(pattern, subject string) bool {
+	if prefix, found := strings.CutSuffix(pattern, "*"); found {
+		return strings.HasPrefix(subject, prefix)
+	}
+	return pattern == subject
+}
+
+func (s starSubjects) Overlap(a, b string) bool { return s.Match(a, b) || s.Match(b, a) }
 
 type fakeConsumer struct {
 	pageSize uint16
 	bound    []string
-	handler  func(msgs []amqp.Source) error
+	applied  []string
+	handler  func(msgs []scan.Source) error
 }
 
-func (c *fakeConsumer) SetHandler(h func(msgs []amqp.Source) error) error {
+func (c *fakeConsumer) SetHandler(h func(msgs []scan.Source) error) error {
 	c.handler = h
 	return nil
 }
-func (c *fakeConsumer) SetDsn(string) error      { return nil }
-func (c *fakeConsumer) SetExchange(string) error { return nil }
-func (c *fakeConsumer) SetQueue(string) error    { return nil }
+func (c *fakeConsumer) Params() []string { return []string{"dsn", "exchange", "queue"} }
+
+func (c *fakeConsumer) Apply(args []string) error {
+	c.applied = args
+	return nil
+}
+
 func (c *fakeConsumer) Bind(key string) error {
 	c.bound = append(c.bound, key)
 	return nil
@@ -40,12 +81,12 @@ func (c *fakeConsumer) Consume(context.Context) error            { return nil }
 type oneKeyHandler struct{ key string }
 
 func (h oneKeyHandler) Keys() []string        { return []string{h.key} }
-func (h oneKeyHandler) Run(amqp.Source) error { return nil }
+func (h oneKeyHandler) Run(scan.Source) error { return nil }
 
 type oneKeyBatch struct{ key string }
 
 func (h oneKeyBatch) Keys() []string          { return []string{h.key} }
-func (h oneKeyBatch) Run([]amqp.Source) error { return nil }
+func (h oneKeyBatch) Run([]scan.Source) error { return nil }
 
 func logger(*testing.T) pry.Logger {
 	return pry.Noop()
@@ -54,7 +95,7 @@ func logger(*testing.T) pry.Logger {
 func single(t *testing.T, consumer Consumer) *scribusCommand {
 	t.Helper()
 	cmd, err := NewScribusCommand(
-		[]Handler{oneKeyHandler{key: "order.created"}}, nil,
+		[]Handler{oneKeyHandler{key: "order.created"}}, nil, starSubjects{},
 		app.NewCommand("scribus", "test"), consumer, logger(t),
 	)
 	if err != nil {
@@ -133,7 +174,7 @@ func TestAbsentPageLeavesTheConfiguredSize(t *testing.T) {
 // Refused while the container is built, so it must not drift into flag parsing.
 func TestOverlappingKeysFailAtConstruction(t *testing.T) {
 	_, err := NewScribusCommand(
-		[]Handler{oneKeyHandler{key: "order.*"}, oneKeyHandler{key: "order.created"}}, nil,
+		[]Handler{oneKeyHandler{key: "order.*"}, oneKeyHandler{key: "order.created"}}, nil, starSubjects{},
 		app.NewCommand("scribus", "test"), &fakeConsumer{}, logger(t),
 	)
 	if err == nil {

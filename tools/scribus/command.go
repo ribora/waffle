@@ -5,15 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/pborman/getopt/v2"
 
-	"gitlab.com/gorib/amqp"
 	"gitlab.com/gorib/pry"
 	"gitlab.com/gorib/waffle/app"
+	"gitlab.com/gorib/whisk/scan"
 )
 
 type (
@@ -30,12 +31,22 @@ type ScribusCommand interface {
 	app.Command
 }
 
+type Subjects interface {
+	Of(src scan.Source) string
+	Match(pattern, subject string) bool
+	Overlap(a, b string) bool
+}
+
+type Transport interface {
+	Params() []string
+	Apply(args []string) error
+}
+
 type Consumer interface {
-	SetHandler(handler func(msgs []amqp.Source) error) error
-	SetDsn(dsn string) error
-	SetExchange(exchange string) error
-	SetQueue(queue string) error
-	Bind(routingKey string) error
+	Transport
+
+	SetHandler(handler func(msgs []scan.Source) error) error
+	Bind(subject string) error
 	SetPageSize(pageSize uint16) error
 	SetFlushInterval(flushInterval time.Duration) error
 	SetReconnectInterval(interval time.Duration) error
@@ -45,31 +56,32 @@ type Consumer interface {
 type Middleware interface {
 	Name() string
 	Order() int
-	Wrap(next func(msgs []amqp.Source) error) func(msgs []amqp.Source) error
+	Wrap(next func(msgs []scan.Source) error) func(msgs []scan.Source) error
 }
 
-func applyMiddlewares(handler func(msgs []amqp.Source) error, middlewares []Middleware) func(msgs []amqp.Source) error {
+func applyMiddlewares(handler func(msgs []scan.Source) error, middlewares []Middleware) func(msgs []scan.Source) error {
 	sorted := append([]Middleware(nil), middlewares...)
 	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Order() < sorted[j].Order() })
-	for i := len(sorted) - 1; i >= 0; i-- {
-		handler = sorted[i].Wrap(handler)
+	for _, s := range slices.Backward(sorted) {
+		handler = s.Wrap(handler)
 	}
 	return handler
 }
 
 type Handler interface {
-	Run(src amqp.Source) error
+	Run(src scan.Source) error
 	Keys() []string
 }
 
 type BatchHandler interface {
-	Run(msgs []amqp.Source) error
+	Run(msgs []scan.Source) error
 	Keys() []string
 }
 
 func NewScribusCommand(
 	commands []Handler,
 	middlewares []Middleware,
+	subjects Subjects,
 	command app.BaseCommand,
 	consumer Consumer,
 	logger pry.Logger,
@@ -77,49 +89,42 @@ func NewScribusCommand(
 	if len(commands) == 0 {
 		return nil, errors.New("handlers list is empty")
 	}
-	type wildcard struct {
-		pat string
+	type bound struct {
+		key string
 		h   Handler
 	}
-	var (
-		exact = make(map[string]Handler)
-		wild  []wildcard
-		keys  []string
-	)
+	var bounds []bound
 	for _, c := range commands {
 		for _, key := range c.Keys() {
-			for _, prev := range keys {
-				if overlap(prev, key) {
-					return nil, fmt.Errorf("routing keys overlap: %q and %q — give them separate consumers", prev, key)
+			for _, prev := range bounds {
+				if subjects.Overlap(prev.key, key) {
+					return nil, fmt.Errorf("subjects overlap: %q and %q — give them separate consumers", prev.key, key)
 				}
 			}
-			keys = append(keys, key)
-			if strings.ContainsAny(key, "*#") {
-				wild = append(wild, wildcard{pat: key, h: c})
-			} else {
-				exact[key] = c
-			}
+			bounds = append(bounds, bound{key: key, h: c})
 			if err := consumer.Bind(key); err != nil {
 				return nil, err
 			}
 		}
 	}
-	handler := func(msgs []amqp.Source) error {
+	// No map in front of Match, not even for a subject with no wildcard: what counts
+	// as equal is the driver's answer, and a map would pass every test here anyway.
+	handler := func(msgs []scan.Source) error {
 		for _, m := range msgs {
-			rk := m.RoutingKey()
-			h, found := exact[rk]
-			if !found {
-				for _, w := range wild {
-					if matchTopic(w.pat, rk) {
-						h, found = w.h, true
-						break
-					}
+			subject := subjects.Of(m)
+			var h Handler
+			for _, b := range bounds {
+				if subjects.Match(b.key, subject) {
+					h = b.h
+					break
 				}
 			}
-			if !found {
+			if h == nil {
 				continue
 			}
-			logger.Trace(fmt.Sprintf("%s %s", rk, string(m.Body())))
+			// The subject, not the body: what a message carries is the service's to
+			// decide about, and Trace is a per-service toggle, not a per-line one.
+			logger.Trace(subject, pry.Ctx(m.Context()))
 			if err := h.Run(m); err != nil {
 				return err
 			}
@@ -146,7 +151,7 @@ func NewBatchScribusCommand(
 ) (*scribusCommand, error) {
 	keys := handler.Keys()
 	if len(keys) == 0 {
-		return nil, errors.New("batch handler exposes no routing keys")
+		return nil, errors.New("batch handler exposes no subjects")
 	}
 	for _, key := range keys {
 		if err := consumer.Bind(key); err != nil {
@@ -192,8 +197,9 @@ func (c *scribusCommand) Usage(ctx context.Context) error {
 	if err := opts.Getopt(app.Args(ctx), nil); err != nil {
 		return err
 	}
+	params := c.consumer.Params()
 	if help {
-		opts.SetParameters("[amqp://user:pass@host:port exchange queue]")
+		opts.SetParameters("[" + strings.Join(params, " ") + "]")
 		_, _ = fmt.Fprintf(os.Stderr, "%s\n", c.Description())
 		opts.PrintUsage(os.Stderr)
 		return app.ErrUsage
@@ -223,16 +229,14 @@ func (c *scribusCommand) Usage(ctx context.Context) error {
 	if *page != 0 {
 		_ = c.consumer.SetPageSize(*page)
 	}
-	// Getopt has already taken the command name off the front, so the three
-	// parameters of SetParameters start at zero. Counting from one made the
-	// documented form — dsn, exchange, queue — fail as the wrong count.
 	if args := opts.Args(); len(args) > 0 {
-		if len(args) != 3 {
-			return fmt.Errorf("expected 3 connection parameters (dsn exchange queue), got %d", len(args))
+		if len(args) != len(params) {
+			return fmt.Errorf("expected %d connection parameters (%s), got %d",
+				len(params), strings.Join(params, " "), len(args))
 		}
-		_ = c.consumer.SetDsn(args[0])
-		_ = c.consumer.SetExchange(args[1])
-		_ = c.consumer.SetQueue(args[2])
+		if err := c.consumer.Apply(args); err != nil {
+			return err
+		}
 	}
 	return nil
 }
