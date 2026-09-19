@@ -475,7 +475,7 @@ something to fill in by hand without saying so:
 
 | Want to do | Command |
 |---|---|
-| New service | `waffle init:service` (prompts for the name) |
+| New service | `waffle init:service` — no operands; the service name is the last segment of the module path in `go.mod`, which has to exist first |
 | New domain (model + service + repository + migrations) | `waffle make:domain <domain>` |
 | Add inbound gRPC | `waffle make:domain:grpc <domain>` |
 | Add inbound HTTP | `waffle make:domain:http <domain>` |
@@ -500,7 +500,7 @@ re-run any command safely.
 
 Project conventions (API import path, proto directory, DTO mapper) live in
 `waffle.yaml` at the project root — generators follow it instead of
-hardcoded paths. See `waffle/docs/cli/overview.md#waffle.yaml`.
+hardcoded paths. See `waffle/docs/cli/overview.md#waffleyaml`.
 
 ## Rule #2 — always run validation after edits
 
@@ -509,10 +509,17 @@ After any change (yours or human's), run **in this order**:
 ```sh
 make generate    # diogen, goverter, whisk, etc. — recompiles all codegen
 make audit       # golangci-lint
-make             # tests + build
+make             # .tidy, generate, build
 ```
 
 Never commit between steps. If any of the three fails, fix before proceeding.
+
+**And `make test` before you hand anything over** — once, not after every edit.
+It is out of `make` on purpose: the component suite boots the real container
+over real infrastructure, which is too slow for a loop that runs after every
+change. It is also where `replacements.Check()` and `boundaries.Check()` live,
+so the three commands above passing does **not** mean the seams and the
+boundaries are clean. Run it, and paste what it said.
 
 `make generate` is mandatory — diogen reads the entire DI graph and may emit
 errors that surface only at generation time (missing dependency, circular,
@@ -629,16 +636,24 @@ Behaviour crosses through the interface; types cross directly and stop at
 `toDomain`. Past that line the neighbour's model does not appear.
 
 `boundaries.Check()` runs as an ordinary test from
-`config/diogen/boundaries_test.go`, so `make` fails on anything else. There is no
-exceptions file: a crossing that would need one is a design question for the
-platform engineer, not a line of configuration.
+`config/diogen/boundaries_test.go` — so a crossing shows up in `make test` and
+in CI, not in the three commands of Rule #2. Check it before you hand over.
+There is no exceptions file: a crossing that would need one is a design
+question for the platform engineer, not a line of configuration.
 
 ## Rule #3 — naming conventions (strict)
 
 These deviate from Go style guide but are project-wide. Don't "fix" them.
 
 - `Db` not `DB`, `Dsn` not `DSN`, `Id` not `ID` (across all gorib + waffle + services)
-- Constructor returns: prefer interface return (`func NewFoo() Foo`); if returning concrete struct, **export** it
+- **Constructors return the unexported struct, and the interface is on the
+  registration.** `func NewUserHandler(...) *userHandler`, wired as
+  `di.Wire[Routes](NewUserHandler)` — that is what every scaffold writes, and
+  it is what gives the seam a `Replacements` entry. Exporting the struct only
+  adds a second way to reach the same thing. Two exceptions: a constructor
+  whose type is the interface (`func NewRouter(...) server.Router`), and a type
+  collected by tag and reached no other way (`di.Define(..., di.Tag(...))`),
+  where there is nothing to name it by
 - Domain interfaces declared by **consumer**, not producer:
   - gRPC handler declares `type FooManagement interface { ... }` — what it needs from service
   - Service implements it without referencing `grpc.FooManagement` — wired via `di.Alias[grpc.FooManagement]()`
@@ -832,7 +847,21 @@ what follows is about editing one that exists.
 
 - `failure.Wrap(format, ...args)` / `failure.New(format, ...args)` — for errors that **cross service boundaries** (gRPC, AMQP, HTTP response bodies). Stable JSON wire format
 - `errors.New("...")` / `fmt.Errorf("%w: ...", parent, ...)` — internal errors that don't leave the process
-- Domain-level sentinel errors: `var ErrNotFound = errors.New("not found")`
+- **Domain-level sentinel errors: `failure.New`, never `errors.New`.** This is
+  what `waffle make:domain` writes into `model/errors.go`, and the reason is the
+  wire: `failure.New` registers a slug, and the slug is the `type` the HTTP
+  error renderer puts in the body.
+
+```go
+// domain/user/model/errors.go
+var ErrUserNotFound = failure.New("user is not found")
+// → {"code":500,"message":"user is not found","payload":{},"type":"user_is_not_found"}
+```
+
+A domain sentinel declared with `errors.New` reaches the client as
+`"type":"internal_error"` — one label for every failure the service can have,
+so no caller can tell them apart. A sentinel is domain-level precisely because
+it does leave the process.
 
 ## Rule #8 — observability
 
