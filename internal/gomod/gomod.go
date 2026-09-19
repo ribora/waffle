@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"golang.org/x/mod/modfile"
 )
 
 func Root() (string, error) {
@@ -25,6 +27,30 @@ func Root() (string, error) {
 		}
 		cwd = parent
 	}
+}
+
+// Empty for a module that is replaced: the replacement is a path on one
+// machine, and there is no released version to name.
+func Requires(root, module string) string {
+	data, err := os.ReadFile(filepath.Join(root, "go.mod"))
+	if err != nil {
+		return ""
+	}
+	parsed, err := modfile.Parse("go.mod", data, nil)
+	if err != nil {
+		return ""
+	}
+	for _, replaced := range parsed.Replace {
+		if replaced.Old.Path == module {
+			return ""
+		}
+	}
+	for _, required := range parsed.Require {
+		if required.Mod.Path == module {
+			return required.Mod.Version
+		}
+	}
+	return ""
 }
 
 func Path(root string) (string, error) {

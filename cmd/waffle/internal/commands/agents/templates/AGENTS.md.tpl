@@ -17,7 +17,7 @@ service-specific notes go there and not here.
 ## This service
 
 - Module: `{{ .ModulePath }}`
-- Framework: [gorib](https://gitlab.com/gorib) + [waffle](https://gitlab.com/gorib/waffle){{ if .Domains }}
+- Framework: [gorib](https://gitlab.com/gorib) + [waffle](https://gitlab.com/gorib/waffle){{ if .WaffleVersion }} `{{ .WaffleVersion }}`{{ end }}{{ if .Domains }}
 - Domains: {{ range $i, $d := .Domains }}{{ if $i }}, {{ end }}`{{ $d }}`{{ end }}{{ end }}{{ if .Modules }}
 - Active waffle modules: {{ range $i, $m := .Modules }}{{ if $i }}, {{ end }}`{{ $m }}`{{ end }}{{ end }}{{ if .EnvVars }}
 - Env vars: {{ range $i, $e := .EnvVars }}{{ if $i }}, {{ end }}`{{ $e }}`{{ end }}{{ end }}
@@ -910,7 +910,9 @@ Rule #2 — `make generate && make audit && make`.
 
 ## Reference
 
-- Waffle docs: `gitlab.com/gorib/waffle/-/blob/main/docs/`
+{{ if .WaffleVersion }}- Waffle docs, the copy this service depends on: `$(go env GOMODCACHE)/gitlab.com/gorib/waffle@{{ .WaffleVersion }}/docs/`
+{{ else }}- Waffle docs: `gitlab.com/gorib/waffle/-/blob/main/docs/`
+{{ end }}
 - gorib core libs: `gitlab.com/gorib/<package>/README.md`
 - DI overview: `gorib/di/README.md`
 - DTO pattern: `waffle/docs/conventions/dto-conversion.md`

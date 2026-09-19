@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
+	"gitlab.com/gorib/waffle/internal/gomod"
 )
 
 //go:embed templates/*
@@ -46,19 +47,21 @@ func Generate(projectName string) error {
 }
 
 type serviceContext struct {
-	ModulePath string
-	Domains    []string
-	Modules    []string
-	EnvVars    []string
+	ModulePath    string
+	WaffleVersion string
+	Domains       []string
+	Modules       []string
+	EnvVars       []string
 }
 
 func scanContext(projectName string) serviceContext {
 	modules := scanModules()
 	return serviceContext{
-		ModulePath: projectName,
-		Domains:    scanDomains(),
-		Modules:    modules,
-		EnvVars:    scanEnvVars(modules),
+		ModulePath:    projectName,
+		WaffleVersion: gomod.Requires(".", wafflePath),
+		Domains:       scanDomains(),
+		Modules:       modules,
+		EnvVars:       scanEnvVars(modules),
 	}
 }
 
@@ -77,7 +80,10 @@ func scanDomains() []string {
 	return domains
 }
 
-const modulePrefix = "gitlab.com/gorib/waffle/config/"
+const (
+	wafflePath   = "gitlab.com/gorib/waffle"
+	modulePrefix = wafflePath + "/config/"
+)
 
 // Parsed, not matched: the scaffolded modules.go ships with seven commented-out
 // blank imports, and a regexp counts them as active.
