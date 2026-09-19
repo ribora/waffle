@@ -71,20 +71,82 @@ func TestDocsLinksResolve(t *testing.T) {
 
 func TestReadmeListsEveryPage(t *testing.T) {
 	root := repoRoot(t)
-	readme := read(t, filepath.Join(root, "README.md"))
+	index := read(t, filepath.Join(root, "docs/README.md"))
 
 	listed := map[string]bool{}
-	for _, m := range regexp.MustCompile(`\]\(docs/([^)]+\.md)\)`).FindAllStringSubmatch(readme, -1) {
+	for _, m := range regexp.MustCompile(`\]\(([^):#]+\.md)(?:#[^)]*)?\)`).FindAllStringSubmatch(index, -1) {
 		listed[m[1]] = true
 	}
 
 	for _, file := range markdownFiles(t) {
 		rel, err := filepath.Rel(filepath.Join(root, "docs"), file)
-		if err != nil || strings.HasPrefix(rel, "..") {
+		if err != nil || strings.HasPrefix(rel, "..") || rel == "README.md" {
 			continue
 		}
-		if !listed[rel] {
-			t.Errorf("docs/%s exists but README.md does not link it — a page nobody can find", rel)
+		if !listed[filepath.ToSlash(rel)] {
+			t.Errorf("docs/%s exists but docs/README.md does not link it — a page nobody can find", rel)
+		}
+	}
+}
+
+// The index reaches every page; this is the way back. Without it a reader who
+// arrives from a deep link has no route to anything else.
+func TestEveryPageLinksBackToTheIndex(t *testing.T) {
+	root := repoRoot(t)
+	for _, file := range markdownFiles(t) {
+		rel, err := filepath.Rel(filepath.Join(root, "docs"), file)
+		if err != nil || strings.HasPrefix(rel, "..") || rel == "README.md" {
+			continue
+		}
+		if !strings.Contains(read(t, file), "[Docs](") {
+			t.Errorf("docs/%s has no breadcrumb back to the index", rel)
+		}
+	}
+}
+
+// TestDocsLinksResolve stops at the file. An anchor that no heading produces is
+// the other half, and the one that had actually rotted: `#waffle.yaml` loses its
+// dot in the slug, and a heading renamed leaves every link to it pointing at the
+// top of the page instead of failing.
+var headingLine = regexp.MustCompile(`(?m)^#{1,6}\s+(.*)$`)
+
+// GitHub and GitLab both lowercase, drop all but word characters, spaces and
+// hyphens, then replace each remaining space with a hyphen.
+var notSlug = regexp.MustCompile(`[^\p{L}\p{N}_\s-]`)
+
+func anchors(t *testing.T, path string) map[string]bool {
+	t.Helper()
+	out := map[string]bool{}
+	for _, m := range headingLine.FindAllStringSubmatch(read(t, path), -1) {
+		slug := notSlug.ReplaceAllString(strings.ToLower(strings.TrimSpace(m[1])), "")
+		out[strings.ReplaceAll(slug, " ", "-")] = true
+	}
+	return out
+}
+
+var anchoredLink = regexp.MustCompile(`\]\((?:\./)?([^):#]*\.md)?#([^)\s]+)\)`)
+
+func TestDocsAnchorsResolve(t *testing.T) {
+	root := repoRoot(t)
+	known := map[string]map[string]bool{}
+
+	for _, file := range markdownFiles(t) {
+		for _, m := range anchoredLink.FindAllStringSubmatch(read(t, file), -1) {
+			target := file
+			if m[1] != "" {
+				target = filepath.Join(filepath.Dir(file), m[1])
+				if _, err := os.Stat(target); err != nil {
+					continue // TestDocsLinksResolve reports the missing file
+				}
+			}
+			if _, done := known[target]; !done {
+				known[target] = anchors(t, target)
+			}
+			if !known[target][m[2]] {
+				rel, _ := filepath.Rel(root, file)
+				where, _ := filepath.Rel(root, target)
+				t.Errorf("%s links to #%s in %s, which has no such heading", rel, m[2], where)
+			}
 		}
 	}
 }
