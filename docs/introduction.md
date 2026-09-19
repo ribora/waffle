@@ -1,5 +1,7 @@
 # Introduction
 
+[Docs](README.md)
+
 Waffle is a meta-framework for building Go microservices: one way to do each thing, and one place to look for it. It replaces no individual tool — it connects specialized gorib packages into a predictable shape with almost no wiring code, and every tool on the path is something you opt into.
 
 ## The Golden Path
@@ -30,7 +32,7 @@ Waffle orchestrates these gorib packages:
 | `gitlab.com/gorib/sql` | SQL query builder and repository |
 | `gitlab.com/gorib/amqp` | RabbitMQ consumer and publisher (see [tools/scribus](tools/scribus.md)) |
 | `gitlab.com/gorib/hilton` | Distributed tracing & metrics abstraction (see [tools/hilton](tools/hilton.md)) |
-| `gitlab.com/gorib/redis` | Redis client with command tracing and pool gauges |
+| `gitlab.com/gorib/redis` | Redis client with command tracing |
 | `gitlab.com/gorib/elastic` | Elasticsearch client with tracing |
 
 `redis` and `elastic` are registered the same way as `sql`, `pry` and `hilton` — a blank import of the matching `config/service/…` module. See [reference/environment](reference/environment.md) for the variables each of them reads.
@@ -63,37 +65,43 @@ api/                     ← API initialization, proto definitions
 
 ### Commands
 
-The app discovers **Commands** at startup. Each runtime concern is a command:
+The app discovers **Commands** at startup. Each runtime concern is a command, and
+waffle ships six: `http`, `grpc`, `scribus`, `outbox`, `cron` and `migrate`. You
+pick which ones your service has by adding the matching blank import to
+`config/di/modules.go` — there is no registry to edit and no flag to pass. The
+full table, with the import line and the daemon marker for each, is
+[core/commands](core/commands.md#built-in-commands).
 
-| Built-in command | Enable with (blank import in `config/di/modules.go`)                  |
-|-----------------|-----------------------------------------------------------------------|
-| `http` | `_ "gitlab.com/gorib/waffle/config/tools/http"`                       |
-| `grpc` | `_ "gitlab.com/gorib/waffle/config/tools/grpc"`                       |
-| `migrate` | `_ "gitlab.com/gorib/waffle/config/tools/migrate"`                    |
-| `scribus` (single mode) | `_ ".../config/tools/scribus/amqp"` and `_ ".../config/tools/scribus/single"` |
-| `scribus` (batch mode) | `_ ".../config/tools/scribus/amqp"` and `_ ".../config/tools/scribus/batch"`  |
-
-You pick which commands your service needs by adding the corresponding blank import to `config/di/modules.go`. Commands are invoked by name:
+Commands are invoked by name:
 
 ```sh
 ./app http
 ./app grpc
 ./app migrate up
-./app scribus amqp://... exchange queue:routing.key
+./app scribus
 ```
+
+A command your service needs and waffle does not have is a type implementing
+`app.Command` and one `di.Tag(app.CommandTag)` — it lands in the same registry
+and the same `--help`. See [core/commands](core/commands.md#writing-a-custom-command).
 
 ## Package layout
 
 ```
 waffle/
-├── app/          Core application lifecycle and command system
-├── resource/     The component-harness seam — external systems a test runs against
+├── app/           Core application lifecycle and command system
+├── resource/      The component-harness seam — external systems a test runs against
+├── replacements/  The check behind `waffle tests:replacements check`
+├── boundaries/    The check behind the modular monolith's boundary rule
 ├── tools/
-│   ├── http/     HTTP server command and middleware registry
-│   ├── grpc/     gRPC server command, middleware and error mapping
-│   ├── migrate/  Database migration command (goose)
-│   └── scribus/  Event consumer command, over a broker driver
-└── cmd/waffle/   Scaffolding CLI (waffle init:service, make:domain, …)
+│   ├── http/      HTTP server command and middleware registry
+│   ├── grpc/      gRPC server command, middleware and error mapping
+│   ├── migrate/   Database migration command (goose)
+│   ├── cron/      Scheduler that runs other commands
+│   ├── outbox/    Transactional outbox: rows, relay and drivers
+│   └── scribus/   Event consumer command, over a broker driver
+├── config/        The modules a service pulls in by blank import
+└── cmd/waffle/    Scaffolding CLI (waffle init:service, make:domain, …)
 ```
 
 ## Testing

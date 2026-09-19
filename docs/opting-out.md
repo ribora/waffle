@@ -1,5 +1,7 @@
 # What each tool replaces, and what you lose by skipping it
 
+[Docs](README.md)
+
 Waffle is opinionated about the **path**, not about the tools on it. The entry
 point takes three things:
 

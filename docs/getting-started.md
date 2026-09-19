@@ -1,5 +1,7 @@
 # Getting Started
 
+[Docs](README.md)
+
 From an empty directory to a service that answers `curl` with JSON. Nothing has
 to be running — no database, no broker, no docker.
 
@@ -65,6 +67,7 @@ $ waffle init:service
   + waffle.yaml
   + AGENTS.md
   + added tool gitlab.com/gorib/di/cmd/diogen
+  + added tool gitlab.com/gorib/waffle/cmd/waffle
 ```
 
 The command then runs `make .tidy generate`, which writes
@@ -293,7 +296,6 @@ import (
 	"context"
 
 	httpServer "gitlab.com/gorib/http/server"
-	"gitlab.com/gorib/http/server/middleware"
 	"gitlab.com/gorib/pry"
 
 	"catalog/domain/product/model"
@@ -305,25 +307,20 @@ type ProductManagement interface {
 
 func NewRouter(
 	productHandler Routes,
-	standard *middleware.Standard,
 	logger pry.Logger,
 ) httpServer.Router {
 	return &router{
 		productHandler: productHandler,
-		standard:       standard,
 		logger:         logger,
 	}
 }
 
 type router struct {
 	productHandler Routes
-	standard       *middleware.Standard
 	logger         pry.Logger
 }
 
 func (r *router) Setup(mux httpServer.Mux) {
-	mux.Use(r.standard.All()...)
-
 	mux.Get("/products/{id}", httpServer.Handle(r.productHandler.Get))
 }
 ```
@@ -381,7 +378,7 @@ That is the whole path, and these are the files on it:
 | `.env` | `DAEMON_HOST` / `DAEMON_PORT` — where the server listens |
 | `config/di/modules.go` | that this service has an `http` command at all |
 | `config/di/di_product_http.go` | that the router is collected under `RouterTag`, and what fills `Routes` and `ProductManagement` |
-| `domain/product/cmd/http/main.go` | the middleware chain and the route table |
+| `domain/product/cmd/http/main.go` | the route table |
 | `domain/product/cmd/http/product.go` | the handler, and the JSON that goes out |
 | `domain/product/service/service.go` | the answer itself |
 

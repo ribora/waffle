@@ -1,5 +1,7 @@
 # Recommended architectures
 
+[Docs](README.md)
+
 Waffle scaffolds one tree. A domain written as the second of twenty in a single
 binary and a domain written as the only one in its own service are the same
 eleven files — `waffle make:domain <domain>` does not ask which you are building.
@@ -99,24 +101,31 @@ outside every domain, not about a directory anyone thought to name. A `lib/`
 invented next week is refused without the rule being edited.
 
 A composition root is whatever carries a `//go:generate diogen` line, plus the
-directory its `-output` writes to. No path is spelled anywhere in the check, so a
+directory its `-output` writes to — the module root when the line names none,
+which is diogen's own default. No path is spelled anywhere in the check, so a
 service with two containers gets both wherever they sit, and a domain that
 registers itself is exempt inside its own tree.
 
-That finds a root by the generator's own contract, and a service that
-[skips diogen](opting-out.md#diogen) has no such contract to be found by. It says
-so where the check runs:
+That finds a root by the generator's own contract, so the test `waffle
+tests:harness init` writes names nothing at all:
 
 ```go
 func TestDomainsStayBehindTheirAdapters(t *testing.T) {
-    if err := boundaries.Check(boundaries.Roots("config/di")); err != nil {
+    if err := boundaries.Check(); err != nil {
         t.Fatal(err)
     }
 }
 ```
 
-That line is not an exception list. It states where composition lives — a fact
-about the tree, in the service's own source, in the diff of whoever moved it.
+A service that [skips diogen](opting-out.md#diogen) has no such contract to be
+found by, and says where composition lives in that same line:
+
+```go
+    if err := boundaries.Check(boundaries.Roots("config/di")); err != nil {
+```
+
+That option is not an exception list. It states a fact about the tree, in the
+service's own source, in the diff of whoever moved it.
 Nothing is granted by it that `config/di` did not already have.
 
 Whatever the root imports is its business; what it may **wire** is the rule in
