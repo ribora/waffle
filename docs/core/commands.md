@@ -1,5 +1,7 @@
 # Commands
 
+[Docs](../README.md) · Core
+
 Commands are the unit of work in a waffle application. Each runtime concern — serving HTTP, running migrations, consuming a queue — is a command. The app discovers all registered commands at startup and dispatches to the one named on the CLI.
 
 ## Interfaces
@@ -23,43 +25,100 @@ type Command interface {
 
 ## Writing a custom command
 
-Implement the `Command` interface. Embed `app.BaseCommand` (the interface) and store the result of `app.NewCommand` in it:
+A command that belongs to a domain is scaffolded. Do not write this one by hand:
+
+```sh
+waffle make:domain:command media sweep-otp
+```
+
+```
+  + domain/media/cmd/sweep-otp/main.go
+  + config/di/di_media_sweep_otp.go
+```
+
+The one operand decides every name — the CLI token `media:sweep-otp`, the
+directory, the package `sweepotp`, `NewSweepOtpCommand`, `InitMediaSweepOtp` —
+and the rules it has to satisfy are in [CLI overview](../cli/overview.md#command-names).
+The command runs `make .tidy generate` itself, so the container has the
+registration when it returns. What is left for you is the `Run` body and the
+methods on the management interface the scaffold declared empty.
 
 ```go
-type warmCacheCommand struct {
-    app.BaseCommand
-    cache  *Cache
-    prefix string
+// domain/media/cmd/sweep-otp/main.go
+package sweepotp
+
+type MediaManagement interface {
+    // Methods consumed by this command go here.
 }
 
-func NewWarmCacheCommand(cache *Cache) app.Command {
-    return &warmCacheCommand{
-        BaseCommand: app.NewCommand("warm-cache", "Pre-warm the Redis cache"),
-        cache:       cache,
+func NewSweepOtpCommand(mediaManagement MediaManagement) *sweepOtpCommand {
+    return &sweepOtpCommand{
+        // Prefixed: a bare name can collide with a framework command, and app.Init fails.
+        BaseCommand:     app.NewCommand("media:sweep-otp", "Sweep otp media"),
+        mediaManagement: mediaManagement,
     }
 }
 
-func (c *warmCacheCommand) Run(ctx context.Context) error {
+type sweepOtpCommand struct {
+    app.BaseCommand
+    mediaManagement MediaManagement
+}
+
+func (c *sweepOtpCommand) Run(ctx context.Context) error {
     if err := c.Usage(ctx); err != nil {
         return err
     }
-    return c.cache.Warm(ctx, c.prefix)
+    // TODO: implement
+    return nil
 }
 ```
 
+Three things in that shape are conventions, and the scaffold gets all three right.
+
+**The token carries its domain.** The framework's own commands are bare words —
+`http`, `grpc`, `migrate`, `cron`, `scribus`, `outbox` — in the same registry, and
+a second command answering to one of them fails `app.Init`. That does not break
+the one command; the binary refuses to start, taking every other command with it.
+
+**`MediaManagement` is declared in the command's own package**, the same way a
+transport declares what it asks of the domain. The command never imports the
+service.
+
+**`Run` calls `Usage(ctx)` first**, even with no flags of its own — that is what
+makes `--help` work and what reads argv off the context rather than `os.Args`.
+
+### By hand
+
+`make:domain:command` takes a domain, so a command that belongs to no domain —
+a one-off import, a maintenance task over several domains, anything at the level
+of the service — is the case you write yourself. It is the same file without the
+domain prefix in its name, which is exactly where the collision above becomes
+your problem: pick a token no tool ships.
+
 ## Registering a custom command
 
-Add the registration inside `InitDi()` in `config/di/di.go`:
+The scaffold writes this file; you write it only for the by-hand case, and then
+it goes in `config/di/di.go`:
 
 ```go
-di.Define(NewWarmCacheCommand, di.Tag(app.CommandTag))
+di.Define(sweepotp.NewSweepOtpCommand, di.Tag(app.CommandTag))
 ```
 
-After `make generate`, the app will list and dispatch `warm-cache` alongside the built-in commands.
+`di.Define`, because the constructor returns the unexported `*sweepOtpCommand`
+and the tag collects it into `[]app.Command` regardless — a command is reached
+through the registry by name, never as a dependency of something else, so there
+is nothing here that wants an interface. The tool commands are the exception and
+say why: they wire a marker interface (`di.Wire[http.HttpCommand](…)`) so that
+`di.For[http.HttpCommand]()` can give that one command its own `BaseCommand`.
+
+After `make generate` the app lists and dispatches `media:sweep-otp` alongside
+the built-in commands. If it does not appear in `--help`, the container is stale.
 
 ## Flag parsing inside a command
 
 Waffle uses `github.com/pborman/getopt/v2`. Each command parses its own argv from the context — never from `os.Args` directly — so cron and any other scheduler can invoke commands without race conditions on the global flag set.
+
+The scaffold writes this method with `--help` and nothing else. A flag of your own is two lines in it — the declaration, and the field it lands in:
 
 ```go
 import (
@@ -71,11 +130,11 @@ import (
     "gitlab.com/gorib/waffle/app"
 )
 
-func (c *warmCacheCommand) Usage(ctx context.Context) error {
+func (c *sweepOtpCommand) Usage(ctx context.Context) error {
     opts := getopt.New()
     var help bool
     opts.FlagLong(&help, "help", 'h', "Display this help message")
-    prefix := opts.StringLong("prefix", 'p', "", "Key prefix to warm")
+    olderThan := opts.StringLong("older-than", 'o', "24h", "Sweep media older than this")
     if err := opts.Getopt(app.Args(ctx), nil); err != nil {
         return err
     }
@@ -85,7 +144,7 @@ func (c *warmCacheCommand) Usage(ctx context.Context) error {
         opts.PrintUsage(os.Stderr)
         return app.ErrUsage
     }
-    c.prefix = *prefix
+    c.olderThan = *olderThan
     return nil
 }
 ```
@@ -138,12 +197,28 @@ Cron is the only built-in `CommandsAware` consumer. Custom orchestrators are pos
 
 ## Built-in commands
 
-The following commands are provided by waffle tools. Include each tool's `Init...()` in your `modules.go` to register the corresponding command.
+This is the full set waffle ships. Each arrives with a blank import in
+`config/di/modules.go` and with nothing else — no flag, no registry entry, no
+line in `main.go` — so this table is also the list of modules a binary can
+carry.
 
-| Name | Package | Documentation |
-|------|---------|---------------|
-| `http` | `tools/http` | [tools/http.md](../tools/http.md) |
-| `grpc` | `tools/grpc` | [tools/grpc.md](../tools/grpc.md) |
-| `migrate` | `tools/migrate` | [tools/migrate.md](../tools/migrate.md) |
-| `scribus` | `tools/scribus` | [tools/scribus.md](../tools/scribus.md) |
-| `cron` | `tools/cron` | [tools/cron.md](../tools/cron.md) |
+| Name | Daemon | Enable with | Read |
+|---|---|---|---|
+| `http` | yes | `_ ".../config/tools/http"` | [tools/http](../tools/http.md) |
+| `grpc` | yes | `_ ".../config/tools/grpc"` | [tools/grpc](../tools/grpc.md) |
+| `scribus` | yes | `_ ".../config/tools/scribus/<driver>"` **and** a mode, `.../single` or `.../batch` | [tools/scribus](../tools/scribus.md) |
+| `outbox` | yes | `_ ".../config/tools/outbox/<driver>"` | [tools/outbox](../tools/outbox.md) |
+| `cron` | no | `_ ".../config/tools/cron"` | [tools/cron](../tools/cron.md) |
+| `migrate` | no | `_ ".../config/tools/migrate"` | [tools/migrate](../tools/migrate.md) |
+
+The **Daemon** column is the `Daemon()` marker above, and cron refuses to
+schedule anything in a `yes` row. The marker is on the command, not on the
+subcommand, so `outbox status` and `outbox reset` return promptly and are still
+refused — run those from a Kubernetes `CronJob` or by hand. `cron` itself is
+long-running and unmarked: it is the scheduler, not something scheduled.
+
+Two of them take a driver rather than naming a broker, which is why their import
+line has a second segment. What each module needs running and in `.env` is
+[reference/running-locally](../reference/running-locally.md#by-module); the
+names that would collide with a domain command are [CLI
+overview](../cli/overview.md#command-names).

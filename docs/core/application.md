@@ -1,5 +1,7 @@
 # Application
 
+[Docs](../README.md) · Core
+
 The `app` package provides the application lifecycle: command discovery, CLI parsing, signal handling, and graceful shutdown.
 
 ## Initialization
@@ -7,10 +9,10 @@ The `app` package provides the application lifecycle: command discovery, CLI par
 ```go
 import "gitlab.com/gorib/waffle/app"
 
-application, err := app.Init(commands, logger)
+application, err := app.Init(commands, logger, provider)
 ```
 
-`Init` accepts a slice of `Command` values and a `pry.Logger`. In practice you never call this directly — it is registered via a blank import in your `config/di/modules.go`:
+`Init` accepts a slice of `Command` values, a `pry.Logger` and a `hilton.Provider`. In practice you never call this directly — it is registered via a blank import in your `config/di/modules.go`:
 
 ```go
 import _ "gitlab.com/gorib/waffle/config/app"
@@ -23,6 +25,10 @@ di.Wire[app.App](app.Init, di.Args(map[string]any{
     "commands": di.Tags[app.Command](app.CommandTag),
 }))
 ```
+
+Only `commands` is named, because only a collection has to be: the logger and
+the provider are ordinary dependencies the container resolves from
+`config/service/pry` and `config/service/hilton/otel`.
 
 Your `main.go` calls `config.Init()` which delegates to the generated DI container:
 
@@ -49,16 +55,21 @@ The standard entry point for production. It:
 
 1. Starts `Watch()` in a goroutine to listen for `SIGINT` and `SIGTERM`
 2. Calls `Run()` to execute the requested command
+3. Cancels the watcher, waits for the shutdown to finish, and exits with the code `Run()` earned
+
+A shutdown error is printed to stderr and does not change the exit code: the
+command already succeeded or failed on its own, and reporting a failed `Close`
+as a failed run would make a retry look necessary when nothing is left to do.
 
 ### Run
 
 ```go
-a.Run()
+err := a.Run()
 ```
 
-Parses `os.Args`, finds the matching command by name, creates a context via `NewContextWithCommand`, and calls `command.Run(ctx)`. 
+Parses `os.Args`, finds the matching command by name, creates a context via `NewContextWithCommand`, and calls `command.Run(ctx)` inside `failure.Catch`, so a panic comes back as an error rather than killing the process.
 
-If the command returns an error, it is logged via `pry.Logger` and the process exits with status 1. If no command matches, it prints usage and exits with status 2.
+The error decides the exit code: `nil` is 0, `app.ErrUsage` is 2 — an unknown command, no command at all, or `--help` — and anything else is 1, logged through `pry.Logger` first. Around the call the app opens a `cmd.<name>` span and records `cli.command.duration`; see [tools/hilton](../tools/hilton.md).
 
 ### Stop
 
@@ -101,30 +112,34 @@ func InitDi() (app.App, error) {
 
 ## Signal handling
 
-`Watch()` blocks on `SIGINT` (Ctrl-C) and `SIGTERM` (sent by container orchestrators). When either signal arrives, it calls `Stop()`. If `Stop()` returns an error, `Watch()` will panic.
+```go
+func (a *app) Watch(ctx context.Context, closed chan error)
+```
+
+`Watch` blocks until `SIGINT` (Ctrl-C), `SIGTERM` (sent by container orchestrators) or a cancelled `ctx` — whichever comes first — then calls `Stop()` and reports its error on `closed`. `RunUntilStop` cancels that context when the command returns, so the closer runs exactly once whether the process was signalled or the command simply finished.
 
 ## Usage output
 
-When invoked without arguments or with an unknown command, the app prints:
+When invoked without arguments or with an unknown command, the app prints getopt's own usage line, then the registry:
 
 ```
-Usage: <binary> <command> [options]
-
-Commands:
-  grpc      Start grpc server
-  http      Start web server
-  migrate   Run migrations
-  scribus   Start queue consumer
+Usage: app [-h] command
+ -h, --help  Display this help message
+Available commands:
+	grpc   	Start grpc server
+	http   	Start web server
+	migrate	Run migrations
+	scribus	Start queue consumer
 ```
 
-Commands are listed in alphabetical order.
+Commands are listed in alphabetical order. An unknown name is preceded by `Unknown command '<name>'.` in red. Either way the process exits 2, because `Run()` returns `app.ErrUsage`.
 
 ## Interfaces
 
 ```go
 type App interface {
     RunUntilStop()
-    Run()
+    Run() error
     Stop() error
 }
 
@@ -135,3 +150,13 @@ type HasCloser interface {
 ```
 
 `*app` implements both. `HasCloser` is used by the DI container to inject the closer after all dependencies are wired.
+
+## Next
+
+| | |
+|---|---|
+| The commands this dispatches to, and writing your own | [core/commands](commands.md) |
+| What the context it builds carries | [core/context](context.md) |
+| How `Shutdown()` is derived from `io.Closer` | [di/overview](../di/overview.md#automatic-resource-cleanup) |
+| The span and the histogram around every run | [tools/hilton](../tools/hilton.md#what-gets-instrumented) |
+| Running without waffle's lifecycle at all | [What is optional](../opting-out.md#walking-back-out) |

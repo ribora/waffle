@@ -1,5 +1,7 @@
 # Dependency Injection Overview
 
+[Docs](../README.md) · Dependency injection
+
 Waffle uses `gitlab.com/gorib/di` for dependency injection. All wiring is resolved at compile time — there is no reflection, no container lookup at runtime, and no magic. The DI container is a generated Go file that is re-created every time you run `make generate`.
 
 ## API
@@ -27,8 +29,8 @@ di.Define(constructor, opts...)
 Registers a concrete type (no interface). Use this when the type is injected by its concrete type, or when registering tagged implementations collected into a slice.
 
 ```go
-di.Define(heraldGrpc.NewNotificationService, di.Tag(grpcCommand.ServiceTag))
-di.Define(heraldGrpc.NewErrorHandler, di.Tag(grpcCommand.MiddlewareTag))
+di.Define(notifyGrpc.NewNotificationService, di.Tag(grpcCommand.ServiceTag))
+di.Define(notifyGrpc.NewErrorHandler, di.Tag(grpcCommand.MiddlewareTag))
 ```
 
 `di.Define` answers with a **handle**, and `di.Wire` takes one in place of a
@@ -60,8 +62,8 @@ Use `di.Alias` when the same concrete instance must satisfy multiple interfaces:
 ```go
 di.Define(notificationService.NewNotificationManagement,
     di.Alias[scribusCommand.NotificationManagement](),
-    di.Alias[heraldGrpc.ChannelManagement](),
-    di.Alias[heraldGrpc.NotificationManagement](),
+    di.Alias[notifyGrpc.ChannelManagement](),
+    di.Alias[notifyGrpc.NotificationManagement](),
 )
 ```
 
@@ -129,7 +131,7 @@ func InitHttp() {
     di.Wire[server.Mux](server.New)
     di.Wire[middleware.Session](middleware.NewSession, di.Fallback())
     // ... the rest of the standard middlewares ...
-    di.Wire[*middleware.Standard](middleware.NewStandard)
+    di.Wire[Global](middleware.NewStandard, di.Fallback())
     di.Wire[app.BaseCommand](
         func() app.BaseCommand { return app.NewCommand("http", "Start web server") },
         di.For[HttpCommand](),
@@ -172,13 +174,17 @@ DI configuration lives in two directories:
 
 ```
 config/
-└── di/
-    ├── modules.go    Blank imports of waffle modules — no other code.
-    ├── di.go         Hand-written wiring. Contains //go:generate directive and InitDi().
-    └── diogen/
-        ├── di.go     Hand-written adapter. Calls InitApp() and wires the closer.
-        └── di_gen.go Generated container. Do not edit.
+├── di/
+│   ├── modules.go    Blank imports of waffle modules — no other code.
+│   └── di.go         Hand-written wiring. Contains //go:generate directive and InitDi().
+└── diogen/
+    ├── di.go         Hand-written adapter. Calls InitApp() and wires the closer.
+    └── di_gen.go     Generated container. Do not edit.
 ```
+
+They are siblings, not nested: `diogen` reads `config/di` and the `-output`
+flag on the directive writes into `config/diogen`, so a generator never writes
+inside the directory it reads.
 
 ### config/di/modules.go
 
@@ -329,6 +335,8 @@ func (s *Store) Close() error { return s.db.Close() }
 
 Anything that does **not** implement `io.Closer` is simply ignored during shutdown.
 
+A failed `InitApp()` closes them itself, in the same order: it returns no container, so nothing else could. A `Close()` that fails on the way out is joined onto the error that stopped the build rather than replacing it.
+
 ## Testing with the container
 
 A component test usually wants the real graph with a couple of fakes. The generated `Replacements` struct is that seam: supply a value and the constructor that would have produced it is never called.
@@ -365,7 +373,7 @@ Note that `InitDi()` in `config/diogen/di.go` calls `InitApp()`, which passes no
 
 Registrations that write the same container field — the two branches of an `if`/`else` over an env var, for instance — share a single entry, because which of them wins is decided at run time. Supplying it skips both branches.
 
-See the [diogen README](https://gitlab.com/gorib/di/-/blob/master/README.md#7-testing-services-that-use-diogen) for the full rules.
+See the [diogen README](https://gitlab.com/gorib/di/-/blob/main/README.md#7-testing-services-that-use-diogen) for the full rules.
 
 ## What generation refuses, and what it would have been
 
@@ -394,7 +402,7 @@ That is the line the generator draws: output that does not compile is the
 compiler's problem, output that compiles and is wrong is the generator's.
 
 The full list of generator errors, each with the registrations that produce it,
-is in the [diogen README](https://gitlab.com/gorib/di/-/blob/master/README.md#8-troubleshooting).
+is in the [diogen README](https://gitlab.com/gorib/di/-/blob/main/README.md#8-troubleshooting).
 For the other two generators on the path see
 [input parsing](../conventions/input-parsing.md#troubleshooting-generation) (whisk)
 and [make:domain](../cli/make-domain.md#troubleshooting-store) (store).

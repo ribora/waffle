@@ -1,11 +1,13 @@
 # Context
 
+[Docs](../README.md) · Core
+
 Every command receives a `context.Context` populated with session metadata. This ensures that structured logging, tracing, and correlation IDs work consistently whether a request arrives over HTTP, gRPC, or the CLI.
 
 ## NewContextWithCommand
 
 ```go
-func NewContextWithCommand(name string, args []string) context.Context
+func NewContextWithCommand(name string, args []string, provider hilton.Provider, logger pry.Logger) context.Context
 ```
 
 Creates a `context.Background()` enriched with a `session.Session`:
@@ -18,7 +20,16 @@ Creates a `context.Background()` enriched with a `session.Session`:
 
 The context is created in `Run()` before the command's `Run(ctx)` method is called. You do not call `NewContextWithCommand` directly.
 
-The same call also stashes the raw argv in the context. Commands retrieve it via `app.Args(ctx)` rather than touching `os.Args` — see [Args](#args).
+It carries three more things, and they are the reason a command needs no constructor argument for any of them:
+
+| Read it back with | What it is |
+|---|---|
+| `app.Args(ctx)` | the raw argv, so a command never touches `os.Args` — see [Args](#args) |
+| `hilton.ProviderFromContext(ctx)` | the tracing and metrics provider, so an adapter instruments itself wherever the context reaches |
+| `pry.LoggerFromContext(ctx)` | the logger, for code too far down to have been handed one |
+
+The HTTP and gRPC middlewares put the same three on a request context, which is
+what makes a service package identical under a transport and under the CLI.
 
 ## Args
 
@@ -76,4 +87,13 @@ func (c *migrateCommand) Run(ctx context.Context) error {
 
 ## HTTP and gRPC contexts
 
-When a request arrives over HTTP or gRPC, the respective middleware populates the context with a session before it reaches your handler. The session shape is the same — `FromContext` works identically regardless of transport.
+When a request arrives over HTTP or gRPC, the respective middleware populates the context with a session before it reaches your handler — `middleware.Session` and `interceptor.NewSessionMW`, with the logger and provider arriving from their own neighbours in the same chain. The session shape is the same, so `FromContext` works identically regardless of transport, and a service package cannot tell which one it is under.
+
+## Next
+
+| | |
+|---|---|
+| Parsing flags out of `app.Args(ctx)` | [core/commands](commands.md#flag-parsing-inside-a-command) |
+| Who builds this context, and when | [core/application](application.md#run) |
+| Why cron passes its own argv rather than the process's | [tools/cron](../tools/cron.md#how-a-tick-runs) |
+| What the provider on the context is for | [tools/hilton](../tools/hilton.md#provider-lifecycle) |

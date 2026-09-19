@@ -1,5 +1,7 @@
 # DI Tags
 
+[Docs](../README.md) · Dependency injection
+
 Tags are empty struct values used to group multiple values of the same interface into a collected slice. Each waffle tool defines its own tags. You register your implementations under those tags; the tool's `InitXxx` registrations collect them using `di.Tags[Interface](tag)`.
 
 **A tagged registration is a collection member and nothing else.** It never competes for a slot, and it cannot satisfy a plain constructor argument either: a parameter of type `server.Interceptor` will not be filled with one of the interceptors you tagged, because picking one of several would be an arbitrary choice. Diogen refuses to generate instead:
@@ -18,7 +20,7 @@ A tagged registration has no `Replacements` entry of its own, since replacing on
 
 | Tag | Package | Register with | Interface collected |
 |-----|---------|--------------|-------------------|
-| `app.CommandTag` | `waffle/app` | `di.Wire[app.Command](..., di.Tag(app.CommandTag))` | `[]app.Command` |
+| `app.CommandTag` | `waffle/app` | `di.Define(..., di.Tag(app.CommandTag))` | `[]app.Command` |
 | `grpc.ServiceTag` | `tools/grpc` | `di.Define(..., di.Tag(grpc.ServiceTag))` | `[]ServiceHandler` |
 | `grpc.MiddlewareTag` | `tools/grpc` | `di.Define(..., di.Tag(grpc.MiddlewareTag))` | `[]server.Interceptor` |
 | `grpc.StreamMiddlewareTag` | `tools/grpc` | `di.Define(..., di.Tag(grpc.StreamMiddlewareTag))` | `[]server.StreamInterceptor` |
@@ -37,10 +39,21 @@ A tagged registration has no `Replacements` entry of its own, since replacing on
 Collects every `app.Command` in the container. The app uses this slice to populate the command registry.
 
 ```go
-di.Wire[app.Command](mycommand.NewWarmCacheCommand, di.Tag(app.CommandTag))
+di.Define(sweepotp.NewSweepOtpCommand, di.Tag(app.CommandTag))
 ```
 
-All tool `InitXxx` registrations wire their command under this tag. Custom commands use it too.
+`di.Define`, because a command is looked up in the registry by name and is never
+a dependency of anything else — nothing here wants an interface. That is what
+`waffle make:domain:command` writes.
+
+The tool commands are the one exception, and for a reason that does not
+generalise: each wires a marker interface of its own —
+`di.Wire[http.HttpCommand](http.NewHttpCommand, di.Tag(app.CommandTag), …)` — so
+that `di.For[http.HttpCommand]()` can give that command its own `app.BaseCommand`
+without every other command in the container claiming the same slot. A service
+with one name and one description per command needs none of it.
+
+See [core/commands](../core/commands.md#registering-a-custom-command).
 
 ---
 
@@ -109,7 +122,7 @@ di.Define(userHttp.NewRouter, di.Tag(httpCommand.RouterTag))
 di.Define(billingHttp.NewRouter, di.Tag(httpCommand.RouterTag))
 ```
 
-On startup the `http` command calls `Setup(mux)` on each collected router, over one mux. Two of them claiming the same method and path is an error that names both, and an empty collection is an error too — see [tools/http](../tools/http.md#one-server-every-domains-routes).
+On startup the `http` command hands the collection to `http.Setup`, which puts the global chain on the mux once and then calls each router's `Setup` with a group of its own — so the routes share one mux while a `Use` stays with the router that added it. Two routers claiming the same method and path is an error that names both, and an empty collection is an error too — see [tools/http](../tools/http.md#one-server-every-domains-routes).
 
 There is no untagged form: `di.Wire[server.Router](...)` fills a slot nothing asks for any more, so a router registered that way reaches no server at all.
 
@@ -127,7 +140,7 @@ di.Define(interceptor.NewLog, di.Tag(scribus.MiddlewareTag))
 di.Define(interceptor.NewRecover, di.Tag(scribus.MiddlewareTag))
 ```
 
-(HTTP middleware is not tag-collected — it's a `server.Layer` applied via `mux.Use` in the router's `Setup`.)
+(HTTP middleware is not tag-collected — the chain around every request is one `http.Global`, and anything narrower is a `server.Layer` on a route, a group, or the router's own `mux`.)
 
 ---
 
@@ -143,9 +156,16 @@ Each domain's migrate package exports `NewMigrations()` returning the embedded S
 // domain/user/cmd/migrate/main.go
 package migrate
 
-import "embed"
+import (
+    "embed"
+    "io/fs"
+)
 
-//go:embed migrations/*.sql
+type Migration interface {
+    fs.FS
+}
+
+//go:embed migrations/*
 var migrations embed.FS
 
 func NewMigrations() embed.FS {
@@ -153,15 +173,19 @@ func NewMigrations() embed.FS {
 }
 ```
 
-Register with `di.Define`. `diogen` uses the return type (`embed.FS`) as the field type and prefixes the field name with the constructor's package alias (e.g. `userMigrateEmbedFS`) to avoid collisions between domains:
+Register with `di.Wire` under that domain's own `Migration`, which is what
+`waffle make:domain:migrate` writes:
 
 ```go
-import userMigrate "mymodule/domain/user/cmd/migrate"
+import userMigration "mymodule/domain/user/cmd/migrate"
 
-di.Define(userMigrate.NewMigrations, di.Tag(migrate.MigrationsTag))
+di.Wire[userMigration.Migration](userMigration.NewMigrations, di.Tag(migrate.MigrationsTag))
 ```
 
-All collected sources are applied in sequence when the `migrate` command runs.
+The one-line interface per domain is the point: a container field is named
+after the type it is exposed as, so `di.Define` on `embed.FS` would give every
+domain's migrations the same name. All collected sources are applied in
+sequence when the `migrate` command runs.
 
 ---
 
