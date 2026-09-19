@@ -1,4 +1,4 @@
-# Waffle Documentation
+# Waffle
 
 **Waffle gives a Go microservice one way to do each thing.**
 
@@ -8,49 +8,49 @@ That one way is about the **path**, not the tools on it. The entry point takes t
 
 And leaving is as cheap as arriving. Delete a `//go:generate` line and the file it produced stays where it is, as ordinary Go you keep editing by hand — no generated container imports `gitlab.com/gorib/di` at all, and dropping whisk costs copying two small files. Waffle itself goes the same way: write your own `main`, build the container, keep whatever architecture and layout you like. See [What is optional](docs/opting-out.md) for what each tool replaces, what skipping it costs, and how to walk back out.
 
-## Contents
+## Install
 
-### Getting Started
-- [Introduction](docs/introduction.md) — What waffle is, ecosystem map, architecture overview
-- [Recommended architectures](docs/architectures.md) — Single service, modular monolith, service fleet, and what it takes to change your mind
-- [Getting Started](docs/getting-started.md) — Install the CLI, scaffold a service, first route answering `curl`
-- [What is optional](docs/opting-out.md) — What each tool replaces, the mandatory core, and the cost of skipping
+```sh
+go install gitlab.com/gorib/waffle/cmd/waffle@latest
+```
 
-### Core
-- [Application](docs/core/application.md) — Lifecycle, `RunUntilStop`, graceful shutdown, signal handling
-- [Commands](docs/core/commands.md) — `Command` interface, `CommandList`, writing custom commands
-- [Context](docs/core/context.md) — CLI context, session metadata, correlation IDs
+```sh
+mkdir catalog
+cd catalog
+go mod init catalog
+waffle init:service
+```
 
-### CLI Scaffolding
-- [Overview](docs/cli/overview.md) — Project root detection, template system, idempotent writes
-- [init:service](docs/cli/init-service.md) — Bootstrap a new microservice project
-- [make:domain](docs/cli/make-domain.md) — Model, service, postgres adapter, stored struct
-- [make:domain:grpc](docs/cli/make-domain-grpc.md) — Proto definition, gRPC handler, error mapping
-- [make:domain:migrate](docs/cli/make-domain-migrate.md) — Migration runner, SQL files, goose format
-- [agents](docs/cli/agents.md) — Regenerate AGENTS.md (run after every waffle upgrade)
+## Documentation
 
-### Tools
-- [HTTP](docs/tools/http.md) — chi-based server, middleware registry, route registration
-- [HTTP Handler](docs/tools/http-handler.md) — Handler signature, request DTOs, responses
-- [gRPC](docs/tools/grpc.md) — gRPC server, interceptors, error mapping
-- [gRPC Handler](docs/tools/grpc-handler.md) — Handler struct, bare interfaces, error mapping
-- [Migrate](docs/tools/migrate.md) — Database migrations, multiple sources, goose subcommands
-- [Scribus](docs/tools/scribus.md) — RabbitMQ consumer, single and batch handler modes
-- [Outbox](docs/tools/outbox.md) — Events that commit with the change that caused them
-- [Cron](docs/tools/cron.md) — Running other commands on a schedule
-- [Hilton](docs/tools/hilton.md) — Tracing and metrics behind one interface
+**[docs/](docs/README.md)** is the full index, with a reading path for each way in. The four that answer most first questions:
 
-### Dependency Injection
-- [Overview](docs/di/overview.md) — How `diogen` works, `InitXxx` convention, compile-time safety
-- [Tags](docs/di/tags.md) — Every DI tag with registration and collection examples
+| | |
+|---|---|
+| [Introduction](docs/introduction.md) | what waffle is, and which gorib packages it connects |
+| [Getting Started](docs/getting-started.md) | an empty directory to a route answering `curl` |
+| [Recommended architectures](docs/architectures.md) | single service, modular monolith, fleet — and the exit from each |
+| [What is optional](docs/opting-out.md) | what every tool replaces, and the cost of skipping it |
 
-### Conventions
-- [Input Parsing](docs/conventions/input-parsing.md) — Binding and validation by codegen, custom tags, escape hatches
-- [DTO Conversion](docs/conventions/dto-conversion.md) — goverter pattern, project-wide whitelist of conversion helpers
-- [AI-native development](docs/conventions/ai-native.md) — Specification before code, the component-test cut, and what is not built yet
-- [Component harness](docs/conventions/component-harness.md) — The resource seam, real postgres and elasticsearch, recorders instead of silent stand-ins
+## Package layout
 
-### Reference
-- [Interfaces](docs/reference/interfaces.md) — Every interface a service implements or is handed
-- [Running locally](docs/reference/running-locally.md) — What each module needs running and in `.env`
-- [Environment Variables](docs/reference/environment.md) — All env vars read by waffle tools
+```
+waffle/
+├── app/           Core application lifecycle and command system
+├── resource/      The component-harness seam — external systems a test runs against
+├── replacements/  The check behind `waffle tests:replacements check`
+├── boundaries/    The check behind the modular monolith's boundary rule
+├── tools/
+│   ├── http/      HTTP server command and middleware registry
+│   ├── grpc/      gRPC server command, middleware and error mapping
+│   ├── migrate/   Database migration command (goose)
+│   ├── cron/      Scheduler that runs other commands
+│   ├── outbox/    Transactional outbox: rows, relay and drivers
+│   └── scribus/   Event consumer command, over a broker driver
+├── config/        The modules a service pulls in by blank import
+└── cmd/waffle/    Scaffolding CLI (waffle init:service, make:domain, …)
+```
+
+## License
+
+See [LICENSE](LICENSE).
