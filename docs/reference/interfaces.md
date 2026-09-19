@@ -243,39 +243,61 @@ type ScribusCommand interface {
 }
 ```
 
-Marker interface for the RabbitMQ consumer command.
+Marker interface for the event consumer command, whatever driver it runs on.
 
 ### Handler
 
 ```go
 type Handler interface {
     Keys() []string
-    Run(src amqp.Source) error
+    Run(src scan.Source) error
 }
 ```
 
-A single-mode message handler. `Keys()` declares which routing keys this handler subscribes to. Tag with `scribus.CommandTag`. Parse the body with `scan.Into[T](src)`.
+A single-mode message handler. `Keys()` declares which subjects this handler subscribes to. Tag with `scribus.CommandTag`. Parse the body with `scan.Into[T](src)`.
 
 ### BatchHandler
 
 ```go
 type BatchHandler interface {
     Keys() []string
-    Run(msgs []amqp.Source) error
+    Run(msgs []scan.Source) error
 }
 ```
 
-A batch-mode message handler. Receives a slice of `amqp.Source` flushed together. Provide exactly one without a tag.
+A batch-mode message handler. Receives a slice of `scan.Source` flushed together. Provide exactly one without a tag.
+
+### Subjects
+
+```go
+type Subjects interface {
+    Of(src scan.Source) string
+    Match(pattern, subject string) bool
+    Overlap(a, b string) bool
+}
+```
+
+The routing semantics of the broker in use: where the subject sits on a source, what a pattern matches, and whether two patterns can claim the same message. Comes from the driver — `amqp.Subjects` for RabbitMQ — and is the reason scribus itself names no broker.
+
+### Transport
+
+```go
+type Transport interface {
+    Params() []string
+    Apply(args []string) error
+}
+```
+
+What the broker needs to be reached, named by the driver: `dsn exchange queue` for AMQP, `brokers topic group` for a Kafka driver, one queue URL for SQS. The command prints the names in `--help`, counts the operands against them and hands the values back in that order — it never names a connection parameter itself.
 
 ### Consumer
 
 ```go
 type Consumer interface {
-    SetHandler(handler func(msgs []amqp.Source) error) error
-    SetDsn(dsn string) error
-    SetExchange(exchange string) error
-    SetQueue(queue string) error
-    Bind(routingKey string) error
+    Transport
+
+    SetHandler(handler func(msgs []scan.Source) error) error
+    Bind(subject string) error
     SetPageSize(pageSize uint16) error
     SetFlushInterval(flushInterval time.Duration) error
     SetReconnectInterval(interval time.Duration) error
@@ -283,7 +305,70 @@ type Consumer interface {
 }
 ```
 
-The AMQP consumer from `gitlab.com/gorib/amqp`. Configured and started by `scribusCommand.Run`, with `Bind` called once per routing key a handler declares. In production you do not implement this — it comes from the registrations in `tools/scribus/init.go` (see [Scribus Tool](../tools/scribus.md) for setup). A component test replaces it with `scribus.Recorder()`, which keeps that wiring and delivers through the handler the command installed (see [Component harness](../conventions/component-harness.md)).
+The consumer the driver supplies — `gitlab.com/gorib/amqp` for RabbitMQ. Configured and started by `scribusCommand.Run`, with `Bind` called once per subject a handler declares. Paging, flushing and reconnection are here because every broker has them; connecting is behind `Transport` because none of them spell it the same way. In production you do not implement this — it comes from the registrations in `config/tools/scribus/amqp/init.go` (see [Scribus Tool](../tools/scribus.md) for setup). A component test replaces it with `scribus.Recorder()`, which keeps that wiring and delivers through the handler the command installed (see [Component harness](../conventions/component-harness.md)).
+
+---
+
+## tools/outbox package
+
+### OutboxCommand
+
+```go
+type OutboxCommand interface {
+    app.Command
+}
+```
+
+Marker interface for the relay command, whatever driver it runs on.
+
+### Sender
+
+```go
+type Sender interface {
+    Encode(document any) ([]byte, error)
+    Send(ctx context.Context, subject string, payload []byte) error
+}
+```
+
+The broker half, from a driver — `tools/outbox/rabbit` over `gitlab.com/gorib/amqp`. `Send` must return an error when the broker has not confirmed: the relay marks the row sent on its word, so a transport that reports success for a message the broker never took loses events silently. `Encode` is here rather than on the publisher because the payload is stored in whatever shape the driver will send, and encoded once. A component test replaces it with `outbox.Recorder()`.
+
+### Store
+
+```go
+type Store interface {
+    Add(ctx context.Context, entry Entry) error
+    Claim(ctx context.Context, by string, staleAfter time.Duration) (*Entry, error)
+    Sent(ctx context.Context, id string) error
+    Failed(ctx context.Context, id string, cause error) error
+    Purge(ctx context.Context, olderThan time.Duration) (int, error)
+    Backlog(ctx context.Context) (Backlog, error)
+    Reset(ctx context.Context, id string) (int, error)
+}
+```
+
+The rows. `store.NewStore` over `gitlab.com/gorib/sql` is the one that ships. The requirement the signatures cannot express is that `Add` joins the transaction the context already carries — that is the whole mechanism, so a replacement runs [`outboxtest.Suite`](../../tools/outbox/outboxtest), whose first case catches an implementation that does not. `Claim` returns `nil, nil` when there is nothing to claim.
+
+### Publisher
+
+```go
+type Publisher interface {
+    Publish(ctx context.Context, subject string, document any) error
+    Enqueue(ctx context.Context, subject string, document any) error
+}
+```
+
+The seam a service points its own publisher interface at. The method name is the guarantee: `Publish` goes to the broker now, `Enqueue` writes a row in the caller's transaction. It deliberately has no `Close`, so it satisfies neither `Sender` nor `amqp.Publisher` — wiring it where one of those belongs would make the relay write rows instead of sending them, and that mistake does not compile.
+
+### Relay
+
+```go
+type Relay interface {
+    Run(ctx context.Context) error
+    Close() error
+}
+```
+
+Drains the outbox. Replace it to change how draining is paced; `outbox.NewRelay` takes the pacing as options.
 
 ---
 

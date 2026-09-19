@@ -20,8 +20,11 @@ about what the framework asks for.
 | `config/service/elastic` | Elasticsearch | `ES_HOST` | `ES_INDEX` |
 | `config/tools/http` | — | `DAEMON_HOST`, `DAEMON_PORT` | `HEALTH_PATH` |
 | `config/tools/grpc` | — | `DAEMON_HOST`, `DAEMON_PORT` | — |
-| `config/tools/scribus/single`<br>`config/tools/scribus/batch` | RabbitMQ | `RABBIT_DSN`, `RABBIT_EXCHANGE`, `RABBIT_QUEUE` | — |
-| `config/tools/migrate` | the database the migrations target | — | — |
+| `config/tools/scribus/amqp` | RabbitMQ | `RABBIT_DSN`, `RABBIT_EXCHANGE`, `RABBIT_QUEUE` | — |
+| `config/tools/scribus/single`<br>`config/tools/scribus/batch` | whatever the driver needs | — | — |
+| `config/service/amqp` | RabbitMQ | `RABBIT_DSN`, `RABBIT_EXCHANGE` | — |
+| `config/tools/outbox/amqp` | RabbitMQ and a database (the shipped table is PostgreSQL; MySQL and SQLite need it ported) | `RABBIT_DSN`, `RABBIT_EXCHANGE`, `DB_DRIVER`, `DB_DSN` | `OUTBOX_MAX_ATTEMPTS` (`10`), `OUTBOX_RELAY_NAME` (hostname), `OUTBOX_POLL_INTERVAL` (`5s`), `OUTBOX_STALE_AFTER` (`1m`), `OUTBOX_RETENTION` (`168h`), `OUTBOX_PURGE_INTERVAL` (`1h`) |
+| `config/tools/migrate` | the database the migrations target | `DB_DRIVER`, `DB_DSN` | — |
 | `config/tools/cron` | — | — | `CRON_SCHEDULE`, `TZ` (`UTC`) |
 
 **Required** means `env.NeedValue` — the process stops at startup if the
@@ -30,8 +33,9 @@ the default shown in brackets; an empty default usually means the feature is
 off, so no `SENTRY_DSN` means no Sentry channel and no
 `OTEL_EXPORTER_OTLP_ENDPOINT` means spans go nowhere.
 
-`config/tools/migrate` reads nothing itself: it runs against whatever
-`config/service/sql` connected to.
+`config/tools/migrate` pulls in `config/service/sql` and runs against whatever it
+connected to, which is where both of its variables come from. `DB_DRIVER` also
+names the goose dialect — see [tools/migrate](../tools/migrate.md).
 
 ## The minimum
 
@@ -57,6 +61,7 @@ import (
     _ "gitlab.com/gorib/waffle/config/service/sql"
     _ "gitlab.com/gorib/waffle/config/tools/http"
     _ "gitlab.com/gorib/waffle/config/tools/migrate"
+    _ "gitlab.com/gorib/waffle/config/tools/scribus/amqp"
     _ "gitlab.com/gorib/waffle/config/tools/scribus/single"
 )
 ```

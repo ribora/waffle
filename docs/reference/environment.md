@@ -74,6 +74,32 @@ Both servers read the same pair, so a service running HTTP and gRPC in one proce
 
 Page size and flush interval are wired as constants in the module, not read from the environment; both can be overridden per run with `--page` and `--flush-timeout`. See [tools/scribus.md](../tools/scribus.md).
 
+### `config/service/amqp`
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `RABBIT_DSN` | yes | — | `amqp://user:pass@host:port/` |
+| `RABBIT_EXCHANGE` | yes | — | Exchange the publisher writes to |
+
+The one place a publisher is built, so a service that also enables the outbox gets
+one instance on one connection rather than two.
+
+### `config/tools/outbox`
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `OUTBOX_MAX_ATTEMPTS` | no | `10` | Failures before an entry is left for `outbox reset` |
+| `OUTBOX_RELAY_NAME` | no | the hostname | Written into `claimed_by`, so a stuck claim names its pod |
+| `OUTBOX_POLL_INTERVAL` | no | `5s` | The longest pause between passes when the outbox is empty |
+| `OUTBOX_STALE_AFTER` | no | `1m` | How long a claim is honoured, and so how soon a failure is retried; under a second is raised to a second |
+| `OUTBOX_RETENTION` | no | `168h` | How long delivered entries are kept before the relay purges them; zero or less never purges |
+| `OUTBOX_PURGE_INTERVAL` | no | `1h` | How often the relay looks for delivered entries to purge |
+
+`DB_DRIVER` and `DB_DSN` come with `config/service/sql`, which this one pulls in.
+The broker's variables belong to the driver beside it — `RABBIT_DSN` and
+`RABBIT_EXCHANGE` for `config/tools/outbox/amqp`, which reads them through
+`config/service/amqp`. See [tools/outbox.md](../tools/outbox.md).
+
 ### `config/tools/cron`
 
 | Variable | Required | Default | Description |
