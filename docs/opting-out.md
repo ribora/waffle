@@ -72,7 +72,7 @@ startup rather than a build error.
 
   By hand this is an `if` around a construction block, and every consumer below
   it has to be built inside both branches, or hoisted and reassigned.
-- **Collections across packages.** `di.Tag` / `di.Tags[T]` gather every
+- **Collections across packages.** `di.Tag` / `di.Tags` gather every
   implementation registered under a tag, including from packages your service
   only blank-imports. By hand, every middleware and interceptor is a line in a
   slice literal that somebody has to remember to update.

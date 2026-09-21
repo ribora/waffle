@@ -35,7 +35,7 @@ import (
 
 func InitDi() {
     di.Wire[server.ErrorMapper](wgrpc.NewErrorMap, di.Args(map[string]any{
-        "mappers": di.Tags[server.ErrorMapper](wgrpc.ErrorMapperTag),
+        "mappers": di.Tags(wgrpc.ErrorMapperTag),
     }))
 
     di.Define(interceptor.NewTracingMW, di.Tag(wgrpc.MiddlewareTag))
@@ -59,9 +59,9 @@ func InitDi() {
         di.For[wgrpc.GrpcCommand](),
     )
     di.Wire[wgrpc.GrpcCommand](wgrpc.NewGrpcCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
-        "commands":           di.Tags[wgrpc.ServiceHandler](wgrpc.ServiceTag),
-        "interceptors":       di.Tags[server.Interceptor](wgrpc.MiddlewareTag),
-        "streamInterceptors": di.Tags[server.StreamInterceptor](wgrpc.StreamMiddlewareTag),
+        "commands":           di.Tags(wgrpc.ServiceTag),
+        "interceptors":       di.Tags(wgrpc.MiddlewareTag),
+        "streamInterceptors": di.Tags(wgrpc.StreamMiddlewareTag),
     }))
 }
 ```

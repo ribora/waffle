@@ -119,7 +119,7 @@ di.Wire[app.BaseCommand](
     di.For[whttp.HttpCommand](),
 )
 di.Wire[whttp.HttpCommand](whttp.NewHttpCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
-    "routers": di.Tags[server.Router](whttp.RouterTag),
+    "routers": di.Tags(whttp.RouterTag),
 }))
 ```
 

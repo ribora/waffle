@@ -10,7 +10,7 @@ import (
 
 func InitSingle() {
 	di.Wire[scribus.ScribusCommand](scribus.NewScribusCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
-		"commands":    di.Tags[scribus.Handler](scribus.CommandTag),
-		"middlewares": di.Tags[scribus.Middleware](scribus.MiddlewareTag),
+		"commands":    di.Tags(scribus.CommandTag),
+		"middlewares": di.Tags(scribus.MiddlewareTag),
 	}))
 }

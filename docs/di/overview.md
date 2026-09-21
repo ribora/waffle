@@ -16,7 +16,7 @@ Registers `constructor` as the provider for `Interface`. The generator resolves 
 
 ```go
 di.Wire[app.App](app.Init, di.Args(map[string]any{
-    "commands": di.Tags[app.Command](app.CommandTag),
+    "commands": di.Tags(app.CommandTag),
 }))
 ```
 
@@ -72,7 +72,8 @@ di.Define(notificationService.NewNotificationManagement,
 | Option | Description |
 |--------|-------------|
 | `di.Tag(tag)` | Register the result under a tag so it can be collected into a slice |
-| `di.Tags[I](tag)` | Collect all values registered under `tag` as `[]I` — used as an argument value |
+| `di.Tags(tag)` | Collect everything registered under `tag` — used as an argument value, and the parameter it fills says what they are collected as |
+| `di.List(h1, h2)` | The same slice from named `di.Define` handles, in the order written — when the order matters and the membership is yours, not a tool's |
 | `di.For[I]()` | Scope a registration to a specific interface (disambiguates when multiple `Wire` calls target the same interface) |
 | `di.Args(map[string]any{})` | Provide literal argument values instead of resolved types |
 | `di.Alias[I]()` | Expose the same concrete instance under an additional interface |
@@ -137,7 +138,7 @@ func InitHttp() {
         di.For[HttpCommand](),
     )
     di.Wire[HttpCommand](NewHttpCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
-        "routers": di.Tags[server.Router](RouterTag),
+        "routers": di.Tags(RouterTag),
     }))
 }
 ```
@@ -369,7 +370,7 @@ Note that `InitDi()` in `config/diogen/di.go` calls `InitApp()`, which passes no
 **Not every registration has an entry.** A `Replacements` field exists only where every type the registration is exposed as is an interface:
 
 - `di.Define(NewServer)` exposes the concrete `*Server` — declare an interface and wire it as that if you want the slot replaceable.
-- `di.Tag` members have no entry of their own: the membership of a collection is fixed at generation time, so replacing one member cannot change the set. But the collection its `di.Tags[T]` consumer gathers has its own entry — a `Replacements` field of type `[]T` — so you replace the whole `[]server.Interceptor` chain directly, without touching the server. A member's own constructor is skipped only if it feeds nothing but that one collection; a member feeding more than one collection always builds for real regardless of what you supply.
+- `di.Tag` members have no entry of their own: the membership of a collection is fixed at generation time, so replacing one member cannot change the set. But the collection its `di.Tags` consumer gathers has its own entry — a `Replacements` field of type `[]T` — so you replace the whole `[]server.Interceptor` chain directly, without touching the server. A member's own constructor is skipped only if it feeds nothing but that one collection; a member feeding more than one collection always builds for real regardless of what you supply.
 
 Registrations that write the same container field — the two branches of an `if`/`else` over an env var, for instance — share a single entry, because which of them wins is decided at run time. Supplying it skips both branches.
 

@@ -35,7 +35,7 @@ di.Wire[app.BaseCommand](
     di.For[migrate.MigrateCommand](),
 )
 di.Wire[migrate.MigrateCommand](migrate.NewMigrateCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
-    "migrations": di.Tags[fs.FS](migrate.MigrationsTag),
+    "migrations": di.Tags(migrate.MigrationsTag),
     "driver":     env.NeedValue[string]("DB_DRIVER"),
 }))
 ```

@@ -14,7 +14,7 @@ import (
 
 func InitGrpc() {
 	di.Wire[server.ErrorMapper](grpc.NewErrorMap, di.Args(map[string]any{
-		"mappers": di.Tags[server.ErrorMapper](grpc.ErrorMapperTag),
+		"mappers": di.Tags(grpc.ErrorMapperTag),
 	}))
 
 	di.Define(interceptor.NewTracingMW, di.Tag(grpc.MiddlewareTag))
@@ -39,8 +39,8 @@ func InitGrpc() {
 
 	di.Wire[app.BaseCommand](func() app.BaseCommand { return app.NewCommand("grpc", "Start grpc server") }, di.For[grpc.GrpcCommand]())
 	di.Wire[grpc.GrpcCommand](grpc.NewGrpcCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
-		"commands":           di.Tags[grpc.ServiceHandler](grpc.ServiceTag),
-		"interceptors":       di.Tags[server.Interceptor](grpc.MiddlewareTag),
-		"streamInterceptors": di.Tags[server.StreamInterceptor](grpc.StreamMiddlewareTag),
+		"commands":           di.Tags(grpc.ServiceTag),
+		"interceptors":       di.Tags(grpc.MiddlewareTag),
+		"streamInterceptors": di.Tags(grpc.StreamMiddlewareTag),
 	}))
 }

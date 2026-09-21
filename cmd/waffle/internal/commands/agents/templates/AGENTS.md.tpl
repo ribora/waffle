@@ -673,7 +673,8 @@ di.Wire[Interface](constructor, ...opts)        // bind concrete to interface
 di.Define(constructor, ...opts)                  // bind without interface; answers with a handle
 di.Wire[Interface](handle)                       // bind a handle di.Define answered with
 di.Tag(SomeTag)                                  // mark for collection
-di.Tags[T](SomeTag)                              // collect all values tagged
+di.Tags(SomeTag)                                 // collect all values tagged; the parameter says as what
+di.List(handleA, handleB)                        // the same slice, in the order written
 di.For[Consumer]()                               // scope binding to one consumer
 di.Args(map[string]any{...})                     // override constructor args
 di.Alias[OtherInterface]()                       // expose same instance under multiple ifaces
@@ -692,7 +693,7 @@ is a generation error, not last-wins.
 - ❌ Adding entries to `di.go` for waffle tools — use **blank import** in `modules.go`
 - ❌ Taking a tagged type as a plain constructor argument. A `di.Tag`
   registration is a collection member and nothing else: it never fills a slot
-  and never answers a single-value dependency. Collect with `di.Tags[T](tag)`,
+  and never answers a single-value dependency. Collect with `di.Tags(tag)`,
   or drop the tag from the registration you meant to wire directly
 - ❌ `di.Wire[T](someVar)` where `someVar` is a local. Only the value returned by
   `di.Define` is a handle — the generator cannot copy a local of `InitDi()` into
@@ -717,8 +718,9 @@ here is why a registration has no entry, and how *not* to substitute one:
 interface.** `di.Define(NewServer)` exposes the concrete `*Server` and gets no
 field. A `di.Tag` member gets no seam of its own either — membership is fixed at
 generation time, so replacing one member cannot change the set — but the
-collection its `di.Tags[T]` consumer gathers does: a `Replacements` field of type
-`[]T` replaces the whole collection at once.
+collection its `di.Tags` consumer gathers does: a `Replacements` field of the slice
+type it asked for replaces the whole collection at once. A `di.List` behaves the
+same way, named after the consumer and the argument instead of after a tag.
 
 - ❌ `if env.Value("APP_ENV") == "test"` in `InitDi()` — that puts test knowledge
   into production wiring

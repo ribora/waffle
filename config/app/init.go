@@ -7,6 +7,6 @@ import (
 
 func InitApp() {
 	di.Wire[app.App](app.Init, di.Args(map[string]any{
-		"commands": di.Tags[app.Command](app.CommandTag),
+		"commands": di.Tags(app.CommandTag),
 	}))
 }

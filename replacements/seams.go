@@ -238,7 +238,7 @@ func importAliases(file *ast.File) map[string]string {
 
 func typeRefs(expr ast.Expr, aliases map[string]string, self string) ([]TypeRef, error) {
 	switch t := expr.(type) {
-	// A di.Tags[T](tag)
+	// A di.Tags(tag)
 	case *ast.ArrayType:
 		if t.Len != nil {
 			return nil, fmt.Errorf("unexpected fixed-size array — every seam is an interface or a []T tag collection")

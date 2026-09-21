@@ -2,7 +2,9 @@
 
 [Docs](../README.md) · Dependency injection
 
-Tags are empty struct values used to group multiple values of the same interface into a collected slice. Each waffle tool defines its own tags. You register your implementations under those tags; the tool's `InitXxx` registrations collect them using `di.Tags[Interface](tag)`.
+Tags are empty struct values used to group multiple values of the same interface into a collected slice. Each waffle tool defines its own tags. You register your implementations under those tags; the tool's `InitXxx` registrations collect them using `di.Tags(tag)`.
+
+A tag is an open set — that is the point, since a blank import is what adds a member — and its order is not a contract. For a slice of your own whose order matters, `di.List` names the members in one call instead; the tool tags below are all the open kind.
 
 **A tagged registration is a collection member and nothing else.** It never competes for a slot, and it cannot satisfy a plain constructor argument either: a parameter of type `server.Interceptor` will not be filled with one of the interceptors you tagged, because picking one of several would be an arbitrary choice. Diogen refuses to generate instead:
 
@@ -14,7 +16,7 @@ collection member — collect them with di.Tags, or drop the tag to wire it dire
 
 If you need the same implementation both in a collection and as a direct dependency, take `[]I` and pick from it. Registering the same constructor twice does not work: both registrations would be built and would claim the same container field, and Diogen refuses to generate (`is registered twice and both registrations are built`).
 
-A tagged registration has no `Replacements` entry of its own, since replacing one member cannot change the membership of the collection — but the collection itself does: `di.Tags[Interface](tag)`'s consumer gets a `Replacements` field of type `[]Interface` that replaces the whole collection at once. A member's own constructor is skipped only if it feeds nothing but that one collection; one feeding more than one collection (two tags on one registration, or one tag gathered under two different interfaces) always builds for real regardless of what you supply. See [Testing with the container](overview.md#testing-with-the-container).
+A tagged registration has no `Replacements` entry of its own, since replacing one member cannot change the membership of the collection — but the collection itself does: the consumer of `di.Tags(tag)` gets a `Replacements` field of the slice type it asked for, replacing the whole collection at once. A member's own constructor is skipped only if it feeds nothing but that one collection; one feeding more than one collection (two tags on one registration, or one tag gathered under two different interfaces) always builds for real regardless of what you supply. See [Testing with the container](overview.md#testing-with-the-container).
 
 ## Quick reference
 

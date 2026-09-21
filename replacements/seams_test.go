@@ -96,7 +96,7 @@ func TestReadSeams(t *testing.T) {
 	}
 }
 
-// A di.Tags[T](tag) collection: []T, not an interface
+// A di.Tags(tag) collection: []T, not an interface
 func TestReadSeamsForTagCollection(t *testing.T) {
 	c := writeContainer(t, `package diogen
 

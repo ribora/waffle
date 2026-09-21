@@ -51,8 +51,8 @@ di.Define(interceptor.NewRecover, di.Tag(wscribus.MiddlewareTag))
 
 // single-mode — from config/tools/scribus/single
 di.Wire[wscribus.ScribusCommand](wscribus.NewScribusCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
-    "commands":    di.Tags[wscribus.Handler](wscribus.CommandTag),
-    "middlewares": di.Tags[wscribus.Middleware](wscribus.MiddlewareTag),
+    "commands":    di.Tags(wscribus.CommandTag),
+    "middlewares": di.Tags(wscribus.MiddlewareTag),
 }))
 ```
 
