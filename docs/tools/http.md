@@ -58,7 +58,9 @@ func (r *router) Setup(mux server.Mux) {
 
 The `mux` a router is handed is its own: a `mux.Use` here covers the routes below it and no neighbour's.
 
-Route patterns use chi syntax — `{id}`, `{id:[0-9]+}`, trailing `/*` wildcard. Register the router under `RouterTag`:
+Route patterns use chi syntax — `{id}`, `{id:[0-9]+}`, trailing `/*` wildcard. Matching is on the decoded path, so a path parameter always arrives decoded and a `%2F` in one is a separator: a value that can carry a slash goes in a query parameter or the body, not in a segment. The [path matching section](https://gitlab.com/gorib/http#path-matching) of the `http` README has the why.
+
+Register the router under `RouterTag`:
 
 ```go
 di.Define(userHttp.NewRouter, di.Tag(httpCommand.RouterTag))
