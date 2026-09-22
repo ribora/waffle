@@ -38,13 +38,17 @@ func InitDi() {
         "mappers": di.Tags(wgrpc.ErrorMapperTag),
     }))
 
-    di.Define(interceptor.NewTracingMW, di.Tag(wgrpc.MiddlewareTag))
-    di.Define(interceptor.NewStatusMW, di.Tag(wgrpc.MiddlewareTag))
-    di.Define(interceptor.NewSessionMW, di.Tag(wgrpc.MiddlewareTag))
-    di.Define(interceptor.NewLogMW, di.Tag(wgrpc.MiddlewareTag))
-    di.Define(interceptor.NewRecoverMW, di.Tag(wgrpc.MiddlewareTag))
+    session := di.Define(interceptor.NewSessionMW)
+    tracing := di.Define(interceptor.NewTracingMW)
+    logging := di.Define(interceptor.NewLogMW)
+    status := di.Define(interceptor.NewStatusMW)
+    recovering := di.Define(interceptor.NewRecoverMW)
 
-    // ... and the five NewStream…MW siblings under StreamMiddlewareTag ...
+    di.Wire[server.Interceptors](wgrpc.NewInterceptors, di.Fallback(), di.Args(map[string]any{
+        "interceptors": di.List(session, tracing, logging, status, recovering),
+    }))
+
+    // ... and the five NewStream…MW siblings, as server.StreamInterceptors ...
 
     di.Wire[net.Addr](net.ResolveTCPAddr, di.For[wgrpc.GrpcCommand](), di.Args(map[string]any{
         "network": "tcp",
@@ -59,9 +63,7 @@ func InitDi() {
         di.For[wgrpc.GrpcCommand](),
     )
     di.Wire[wgrpc.GrpcCommand](wgrpc.NewGrpcCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
-        "commands":           di.Tags(wgrpc.ServiceTag),
-        "interceptors":       di.Tags(wgrpc.MiddlewareTag),
-        "streamInterceptors": di.Tags(wgrpc.StreamMiddlewareTag),
+        "commands": di.Tags(wgrpc.ServiceTag),
     }))
 }
 ```
@@ -119,28 +121,26 @@ All tagged handlers are passed to `NewGrpcCommand` and registered with the serve
 
 ## Interceptors
 
-Built-in interceptors (tracing, status, session, log, recover) are wired automatically by `tools/grpc`. User-defined interceptors are chained alongside them, ordered by `Order()` ascending (smaller = outer).
+Built-in interceptors (session, tracing, log, status, recover) are wired automatically by `tools/grpc`, as a `di.List` under `server.Interceptors`. The list is the order.
 
 ### Unary interceptor
 
 ```go
 // gitlab.com/gorib/grpc/server
 type Interceptor interface {
-    Name() string
-    Order() int
     Run() grpc.UnaryServerInterceptor
 }
 ```
 
-The five that ship occupy fixed positions. Pick `Order()` ≥ 1000 for your own.
+The five that ship, outermost first:
 
-| Order | Interceptor | Why there |
-|---|---|---|
-| 100 | `session` | builds the `session.Session` everything below it logs and traces under |
-| 200 | `tracing` | starts the `SERVER` span and records `rpc.server.duration` |
-| 300 | `log` | traces request and response, and picks trace vs error level by status code |
-| 400 | `status` | maps a domain error to a gRPC code and attaches the `failure` detail |
-| 500 | `recover` | turns a panic into `failure.Panic` |
+| Interceptor | Why there |
+|---|---|
+| `session` | builds the `session.Session` everything below it logs and traces under |
+| `tracing` | starts the `SERVER` span and records `rpc.server.duration` |
+| `log` | traces request and response, and picks trace vs error level by status code |
+| `status` | maps a domain error to a gRPC code and attaches the `failure` detail |
+| `recover` | turns a panic into `failure.Panic` |
 
 **The order is load-bearing in both directions, and getting it wrong is silent.**
 `status` sits **inside** tracing and log so that both observe the mapped code
@@ -150,20 +150,17 @@ rather than the raw error — outside them, every failure is recorded as
 the process.
 
 That is also why `UnaryChain` is exported: a component test chains the
-container's own interceptor list with the same function the daemon uses, rather
-than sorting a copy. See [conventions/component-harness](../conventions/component-harness.md#the-in-process-server).
+container's own interceptor list with the same function the daemon uses. See [conventions/component-harness](../conventions/component-harness.md#the-in-process-server).
 
 The full table, with what each one puts on the context and which methods skip
 tracing, is [Interceptor order](https://gitlab.com/gorib/grpc#interceptor-order)
-in the `grpc` README. The stream set has the same five orders.
+in the `grpc` README. The stream set belongs in the same order.
 
 ```go
 type LoggingInterceptor struct {
     logger pry.Logger
 }
 
-func (LoggingInterceptor) Name() string { return "audit" }
-func (LoggingInterceptor) Order() int   { return 1000 }
 func (m *LoggingInterceptor) Run() grpc.UnaryServerInterceptor {
     return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
         m.logger.Info(info.FullMethod, pry.Ctx(ctx))
@@ -176,10 +173,18 @@ func (m *LoggingInterceptor) Run() grpc.UnaryServerInterceptor {
 }
 ```
 
-Tag with `grpcCommand.MiddlewareTag` using `di.Define`:
+Write your own list, with yours in the position you want. Naming the shipped
+constructors again is how you keep them — the default list then feeds nobody and
+drops out of the container whole:
 
 ```go
-di.Define(NewLoggingInterceptor, di.Tag(grpcCommand.MiddlewareTag))
+audit := di.Define(NewLoggingInterceptor)
+session := di.Define(interceptor.NewSessionMW)
+// ... the rest you want to keep
+
+di.Wire[server.Interceptors](wgrpc.NewInterceptors, di.Args(map[string]any{
+    "interceptors": di.List(session, audit /* ... */),
+}))
 ```
 
 ### Stream interceptor
@@ -187,13 +192,11 @@ di.Define(NewLoggingInterceptor, di.Tag(grpcCommand.MiddlewareTag))
 ```go
 // gitlab.com/gorib/grpc/server
 type StreamInterceptor interface {
-    Name() string
-    Order() int
     Run() grpc.StreamServerInterceptor
 }
 ```
 
-Tag with `grpcCommand.StreamMiddlewareTag` using `di.Define`.
+Same again, under `server.StreamInterceptors`.
 
 ## Error mapping
 
@@ -236,9 +239,10 @@ The same `ErrorMapper` instance feeds both unary and stream `status` interceptor
 | Tag | Collects |
 |-----|---------|
 | `grpc.ServiceTag` | All `ServiceHandler` implementations |
-| `grpc.MiddlewareTag` | All `Interceptor` (unary) implementations |
-| `grpc.StreamMiddlewareTag` | All `StreamInterceptor` implementations |
 | `grpc.ErrorMapperTag` | All `ErrorMapper` implementations |
+
+Interceptors are not collected by a tag: their order is a contract, so they are
+listed under `server.Interceptors` instead.
 
 ## Graceful shutdown
 

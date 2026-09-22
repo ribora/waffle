@@ -45,14 +45,17 @@ di.Wire[wscribus.Consumer](amqp.NewConsumer, di.Args(map[string]any{
     },
 }))
 di.Wire[wscribus.Subjects](amqp.Subjects)
-di.Define(interceptor.NewTracing, di.Tag(wscribus.MiddlewareTag))
-di.Define(interceptor.NewLog,     di.Tag(wscribus.MiddlewareTag))
-di.Define(interceptor.NewRecover, di.Tag(wscribus.MiddlewareTag))
+tracing := di.Define(interceptor.NewTracing)
+logging := di.Define(interceptor.NewLog)
+recovering := di.Define(interceptor.NewRecover)
+
+di.Wire[wscribus.Middlewares](wscribus.NewMiddlewares, di.Fallback(), di.Args(map[string]any{
+    "middlewares": di.List(tracing, logging, recovering),
+}))
 
 // single-mode — from config/tools/scribus/single
 di.Wire[wscribus.ScribusCommand](wscribus.NewScribusCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
-    "commands":    di.Tags(wscribus.CommandTag),
-    "middlewares": di.Tags(wscribus.MiddlewareTag),
+    "commands": di.Tags(wscribus.CommandTag),
 }))
 ```
 
@@ -322,10 +325,11 @@ The refusal covers the flag. A service that registers its own `scribus.Consumer`
 | Tag | Collects |
 |-----|---------|
 | `scribus.CommandTag` | All `Handler` implementations (single mode) |
-| `scribus.MiddlewareTag` | All `Middleware` implementations, driver's and yours alike |
 
-`BatchHandler` is provided without a tag — only one may be registered. Both tags
-in full, with the other seven, are [di/tags](../di/tags.md#quick-reference).
+`BatchHandler` is provided without a tag — only one may be registered.
+Middlewares are not collected either: they are listed in order under
+`scribus.Middlewares`. The tag in full, with the others, is
+[di/tags](../di/tags.md#quick-reference).
 
 ## Logging
 
@@ -352,7 +356,7 @@ that is not acceptable for what your queues carry.
 |---|---|
 | Parsing the message body — the same tags an HTTP DTO uses | [conventions/input-parsing](../conventions/input-parsing.md) |
 | `Handler`, `BatchHandler`, `Consumer`, `Subjects`, `Transport` | [reference/interfaces](../reference/interfaces.md#toolsscribus-package) |
-| `CommandTag` and `MiddlewareTag` | [di/tags](../di/tags.md#scribuscommandtag) |
+| `CommandTag` | [di/tags](../di/tags.md#scribuscommandtag) |
 | Publishing an event that must not be lost | [tools/outbox](outbox.md) |
 | What has to be running and in `.env` | [reference/running-locally](../reference/running-locally.md#by-module) |
 | Delivering an event through the real consumer in a test | [conventions/component-harness](../conventions/component-harness.md#delivering-an-event) |

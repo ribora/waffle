@@ -17,17 +17,24 @@ func InitGrpc() {
 		"mappers": di.Tags(grpc.ErrorMapperTag),
 	}))
 
-	di.Define(interceptor.NewTracingMW, di.Tag(grpc.MiddlewareTag))
-	di.Define(interceptor.NewStatusMW, di.Tag(grpc.MiddlewareTag))
-	di.Define(interceptor.NewSessionMW, di.Tag(grpc.MiddlewareTag))
-	di.Define(interceptor.NewLogMW, di.Tag(grpc.MiddlewareTag))
-	di.Define(interceptor.NewRecoverMW, di.Tag(grpc.MiddlewareTag))
+	session := di.Define(interceptor.NewSessionMW)
+	tracing := di.Define(interceptor.NewTracingMW)
+	logging := di.Define(interceptor.NewLogMW)
+	status := di.Define(interceptor.NewStatusMW)
+	recovering := di.Define(interceptor.NewRecoverMW)
 
-	di.Define(interceptor.NewStreamTracingMW, di.Tag(grpc.StreamMiddlewareTag))
-	di.Define(interceptor.NewStreamStatusMW, di.Tag(grpc.StreamMiddlewareTag))
-	di.Define(interceptor.NewStreamSessionMW, di.Tag(grpc.StreamMiddlewareTag))
-	di.Define(interceptor.NewStreamLogMW, di.Tag(grpc.StreamMiddlewareTag))
-	di.Define(interceptor.NewStreamRecoverMW, di.Tag(grpc.StreamMiddlewareTag))
+	streamSession := di.Define(interceptor.NewStreamSessionMW)
+	streamTracing := di.Define(interceptor.NewStreamTracingMW)
+	streamLogging := di.Define(interceptor.NewStreamLogMW)
+	streamStatus := di.Define(interceptor.NewStreamStatusMW)
+	streamRecovering := di.Define(interceptor.NewStreamRecoverMW)
+
+	di.Wire[server.Interceptors](grpc.NewInterceptors, di.Fallback(), di.Args(map[string]any{
+		"interceptors": di.List(session, tracing, logging, status, recovering),
+	}))
+	di.Wire[server.StreamInterceptors](grpc.NewStreamInterceptors, di.Fallback(), di.Args(map[string]any{
+		"interceptors": di.List(streamSession, streamTracing, streamLogging, streamStatus, streamRecovering),
+	}))
 
 	di.Wire[net.Addr](net.ResolveTCPAddr, di.For[grpc.GrpcCommand](), di.Args(map[string]any{
 		"network": "tcp",
@@ -39,8 +46,6 @@ func InitGrpc() {
 
 	di.Wire[app.BaseCommand](func() app.BaseCommand { return app.NewCommand("grpc", "Start grpc server") }, di.For[grpc.GrpcCommand]())
 	di.Wire[grpc.GrpcCommand](grpc.NewGrpcCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
-		"commands":           di.Tags(grpc.ServiceTag),
-		"interceptors":       di.Tags(grpc.MiddlewareTag),
-		"streamInterceptors": di.Tags(grpc.StreamMiddlewareTag),
+		"commands": di.Tags(grpc.ServiceTag),
 	}))
 }

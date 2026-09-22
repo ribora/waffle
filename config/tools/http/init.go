@@ -15,20 +15,20 @@ import (
 func InitHttp() {
 	di.Wire[server.Mux](server.New)
 
-	// Fallbacks: a service can replace any of these by registering its own
-	// di.Wire[middleware.X] (no di.Fallback) — the default is then dropped.
-	di.Wire[middleware.Compress](middleware.NewCompress, di.Fallback())
-	di.Wire[middleware.Health](middleware.NewHealth, di.Args(map[string]any{
+	compress := di.Define(middleware.NewCompress)
+	health := di.Define(middleware.NewHealth, di.Args(map[string]any{
 		// Empty → NewHealth uses DefaultHealthPath.
 		"path": env.Value("HEALTH_PATH", ""),
-	}), di.Fallback())
-	di.Wire[middleware.Session](middleware.NewSession, di.Fallback())
-	di.Wire[middleware.Tracing](middleware.NewTracing, di.Fallback())
-	di.Wire[middleware.Log](middleware.NewLog, di.Fallback())
-	di.Wire[middleware.Error](middleware.NewErrorRenderer, di.Fallback())
-	di.Wire[middleware.Recover](middleware.NewRecover, di.Fallback())
+	}))
+	session := di.Define(middleware.NewSession)
+	tracing := di.Define(middleware.NewTracing)
+	logging := di.Define(middleware.NewLog)
+	rendering := di.Define(middleware.NewErrorRenderer)
+	recovering := di.Define(middleware.NewRecover)
 
-	di.Wire[http.Global](middleware.NewStandard, di.Fallback())
+	di.Wire[http.Global](http.NewGlobal, di.Fallback(), di.Args(map[string]any{
+		"layers": di.List(compress, health, session, tracing, logging, rendering, recovering),
+	}))
 
 	di.Wire[net.Addr](net.ResolveTCPAddr, di.For[http.HttpCommand](), di.Args(map[string]any{
 		"network": "tcp",

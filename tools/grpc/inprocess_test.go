@@ -36,13 +36,9 @@ func (s *echoService) Calls() int {
 }
 
 type tag struct {
-	name  string
-	order int
-	log   *entered
+	name string
+	log  *entered
 }
-
-func (t tag) Name() string { return t.name }
-func (t tag) Order() int   { return t.order }
 
 func (t tag) Run() baseGrpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *baseGrpc.UnaryServerInfo, handler baseGrpc.UnaryHandler) (any, error) {
@@ -86,14 +82,14 @@ func TestServeReachesTheHandlerOverAConnection(t *testing.T) {
 	}
 }
 
-func TestServeRunsTheInterceptorsByOrder(t *testing.T) {
+func TestServeRunsTheInterceptorsInTheOrderGiven(t *testing.T) {
 	log := &entered{}
 	server, err := Serve(
 		[]ServiceHandler{&echoService{}},
-		[]grpc.Interceptor{
-			tag{name: "inner", order: 30, log: log},
-			tag{name: "outer", order: 10, log: log},
-			tag{name: "middle", order: 20, log: log},
+		grpc.Interceptors{
+			tag{name: "outer", log: log},
+			tag{name: "middle", log: log},
+			tag{name: "inner", log: log},
 		},
 		nil,
 	)
@@ -111,11 +107,11 @@ func TestServeRunsTheInterceptorsByOrder(t *testing.T) {
 	}
 }
 
-func TestUnaryChainOrdersSmallestOutermost(t *testing.T) {
+func TestUnaryChainKeepsTheOrderGiven(t *testing.T) {
 	log := &entered{}
-	chain := UnaryChain([]grpc.Interceptor{
-		tag{name: "second", order: 2, log: log},
-		tag{name: "first", order: 1, log: log},
+	chain := UnaryChain(grpc.Interceptors{
+		tag{name: "first", log: log},
+		tag{name: "second", log: log},
 	})
 
 	if len(chain) != 2 {
@@ -126,20 +122,6 @@ func TestUnaryChainOrdersSmallestOutermost(t *testing.T) {
 	}
 	if got := log.String(); got != "first second" {
 		t.Fatalf("entered: %q", got)
-	}
-}
-
-func TestUnaryChainLeavesTheInputAlone(t *testing.T) {
-	log := &entered{}
-	given := []grpc.Interceptor{
-		tag{name: "second", order: 2, log: log},
-		tag{name: "first", order: 1, log: log},
-	}
-
-	UnaryChain(given)
-
-	if given[0].Name() != "second" {
-		t.Fatalf("the input was reordered: %s", given[0].Name())
 	}
 }
 

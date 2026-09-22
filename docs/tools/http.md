@@ -188,9 +188,9 @@ How many documents to keep follows where the **prose** differs, not where the co
 
 Middleware is a `server.Layer`: `func(next server.Handler) server.Handler`.
 
-The chain that runs around **every** request is `httpCommand.Global` — one method, `All() []server.Layer` — and the command puts it on the mux once, before any router registers a route. It sits outside routing, so it also covers what no route matched.
+The chain that runs around **every** request is `httpCommand.Global` — a `[]server.Middleware` — and the command puts it on the mux once, before any router registers a route. It sits outside routing, so it also covers what no route matched.
 
-`config/tools/http` answers it with `*middleware.Standard`, in this order,
+`config/tools/http` answers it with a `di.List`, in this order,
 outer to inner:
 
 | | Layer | Why there |
@@ -207,10 +207,11 @@ The two bold rows are the load-bearing ones — the same shape as the gRPC chain
 where `status` sits inside tracing and log for the same reason ([tools/grpc](grpc.md#unary-interceptor)).
 A layer a route or a router adds composes **inside** `recover`.
 
-There are two levels of replacement, and they answer different questions:
-
-- **One layer**, keeping the set and the order: each layer of `Standard` is a `di.Fallback` default, so `di.Wire[middleware.Session](NewMySession)` wins over the shipped one.
-- **The set or the order itself**: `Standard` is a struct, so its fields are all it can express. Register your own `di.Wire[httpCommand.Global](NewMyChain)` — without `di.Fallback()`, so it drops the default — and `All()` returns whatever you want, in whatever order.
+The whole chain is the unit of replacement. Register your own
+`di.Wire[httpCommand.Global](httpCommand.NewGlobal)` — without `di.Fallback()`, so it
+drops the default — and pass a `di.List` of exactly the layers you want, in the
+order you want them. The layers the default list named are then built by nobody
+and drop out of the container with it.
 
 ### Custom middleware
 
@@ -236,14 +237,16 @@ func (r *router) Setup(mux server.Mux) {
 }
 ```
 
-To place it outside the global chain instead — the usual want for auth or cors — put it in your own `Global`:
+To place it outside the global chain instead — the usual want for auth or cors — write your own list with it first:
 
 ```go
-func NewChain(standard *middleware.Standard, auth server.Layer) *chain { ... }
+cors := di.Define(NewCors)
+compress := di.Define(middleware.NewCompress)
+// ... the rest of the layers you want
 
-func (c *chain) All() []server.Layer {
-    return append([]server.Layer{c.auth}, c.standard.All()...)
-}
+di.Wire[httpCommand.Global](httpCommand.NewGlobal, di.Args(map[string]any{
+    "layers": di.List(cors, compress /* ... */),
+}))
 ```
 
 or scope it to a route / group:

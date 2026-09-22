@@ -110,12 +110,10 @@ The one interface a service implements for every domain that serves HTTP, scaffo
 
 ```go
 // gitlab.com/gorib/waffle/tools/http
-type Global interface {
-    All() []server.Layer
-}
+type Global []server.Middleware
 ```
 
-The chain that runs around every request, put on the mux once before any router registers a route. `config/tools/http` answers it with `*middleware.Standard`, whose individual layers are replaceable one at a time; the set and the order are what a struct cannot express, so replacing those means registering a `Global` of your own. See [tools/http](../tools/http.md#middleware).
+The chain that runs around every request, put on the mux once before any router registers a route. `config/tools/http` answers it with a `di.List`, so the order is the order written there. Replacing it means registering a `Global` of your own with a list of your own. See [tools/http](../tools/http.md#middleware).
 
 ### Mux
 
@@ -150,7 +148,7 @@ type Layer   = func(next Handler) Handler
 
 Not interfaces, but the two shapes everything else composes around. A handler returning a nil renderer and a nil error renders 204.
 
-`Layer` is a type **alias**, so a named function type — `middleware.Compress`, your own auth layer — is assignable without conversion. Middleware is therefore a `Layer` and not a tool-specific interface; the chain that runs around every request is `httpCommand.Global`, answered by `*middleware.Standard` and put on the mux once by the http command. Its order is load-bearing in two places — `log` outside `error` so it sees the rendered status, `recover` innermost so a panic becomes an error something can render. The whole chain, in order, is [tools/http](../tools/http.md#middleware).
+`Layer` is a type **alias**, so a named function type — your own auth layer — is assignable without conversion. Middleware is therefore a `Layer` and not a tool-specific interface; the chain that runs around every request is `httpCommand.Global`, a `[]server.Middleware` put on the mux once by the http command. Its order is load-bearing in two places — `log` outside `error` so it sees the rendered status, `recover` innermost so a panic becomes an error something can render. The whole chain, in order, is [tools/http](../tools/http.md#middleware).
 
 `server.Handle` adapts a handler into a layer; `server.Bind` does the same for a typed `func(ctx, *Req) (*Response[Res], error)` and records the two types on the route.
 
@@ -234,26 +232,22 @@ The listening half of the command, as the command sees it. `grpcCommand.Run` bui
 ```go
 // gitlab.com/gorib/grpc/server
 type Interceptor interface {
-    Name() string
-    Order() int
     Run() grpc.UnaryServerInterceptor
 }
 ```
 
-A unary gRPC interceptor. Tag with `grpc.MiddlewareTag`. Chained by `Order()` ascending — **smaller is further out**. The five that ship take 100 `session`, 200 `tracing`, 300 `log`, 400 `status`, 500 `recover`; `status` is inside tracing and log on purpose, and moving it out reports every failure as `Unknown`. Take ≥ 1000, and see [tools/grpc](../tools/grpc.md#unary-interceptor) before picking anything below it.
+A unary gRPC interceptor. Chained in the order `server.Interceptors` lists them, first is outermost. The five that ship go `session`, `tracing`, `log`, `status`, `recover`; `status` is inside tracing and log on purpose, and moving it out reports every failure as `Unknown`. Adding your own means writing the list yourself — see [tools/grpc](../tools/grpc.md#unary-interceptor).
 
 ### StreamInterceptor
 
 ```go
 // gitlab.com/gorib/grpc/server
 type StreamInterceptor interface {
-    Name() string
-    Order() int
     Run() grpc.StreamServerInterceptor
 }
 ```
 
-A stream gRPC interceptor. Tag with `grpc.StreamMiddlewareTag`.
+A stream gRPC interceptor. Listed under `server.StreamInterceptors`, the same way.
 
 ### ErrorMapper
 
@@ -323,13 +317,11 @@ A single-mode message handler. `Keys()` declares which subjects this handler sub
 
 ```go
 type Middleware interface {
-    Name() string
-    Order() int
     Wrap(next func(msgs []scan.Source) error) func(msgs []scan.Source) error
 }
 ```
 
-Wraps the dispatch handler, in `Order()` ascending with the smallest outermost — the same shape as a gRPC `Interceptor`, over a page rather than over a call. Tag with `scribus.MiddlewareTag`. Tracing, log and recover come from the driver; yours goes beside them. Note that it wraps the whole page, so a middleware counting messages counts pages unless it walks the slice.
+Wraps the dispatch handler, in the order `scribus.Middlewares` lists them with the first outermost — the same shape as a gRPC `Interceptor`, over a page rather than over a call. Tracing, log and recover come from the driver; adding yours means writing the list. Note that it wraps the whole page, so a middleware counting messages counts pages unless it walks the slice.
 
 ### BatchHandler
 

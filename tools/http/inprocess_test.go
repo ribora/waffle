@@ -90,7 +90,7 @@ func (t *tally) layer(name string) server.Layer {
 	}
 }
 
-func (t *tally) All() []server.Layer { return []server.Layer{t.layer("global")} }
+func (t *tally) global() Global { return Global{server.Middleware(t.layer("global"))} }
 
 type layeredRouter struct {
 	name  string
@@ -110,7 +110,7 @@ func (r layeredRouter) Setup(mux server.Mux) {
 func layered(t *testing.T) (*tally, *InProcess) {
 	t.Helper()
 	seen := &tally{}
-	inproc, err := Serve(server.New(), seen, []server.Router{
+	inproc, err := Serve(server.New(), seen.global(), []server.Router{
 		layeredRouter{name: "first", path: "/first", tally: seen},
 		layeredRouter{name: "second", path: "/second", tally: seen},
 	})

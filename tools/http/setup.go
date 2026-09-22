@@ -9,9 +9,9 @@ import (
 
 var ErrNoRouters = errors.New("http: no server.Router is registered; register one with di.Define(NewRouter, di.Tag(http.RouterTag))")
 
-type Global interface {
-	All() []server.Layer
-}
+type Global []server.Middleware
+
+func NewGlobal(layers []server.Middleware) Global { return layers }
 
 // chi keeps the last registration for a pattern and says nothing, so without
 // this check the domain that loses is simply unreachable.
@@ -19,8 +19,8 @@ func Setup(mux server.Mux, global Global, routers []server.Router) error {
 	if len(routers) == 0 {
 		return ErrNoRouters
 	}
-	if global != nil {
-		mux.Use(global.All()...)
+	for _, layer := range global {
+		mux.Use(layer)
 	}
 	owner := map[string]string{}
 	for _, router := range routers {

@@ -22,7 +22,11 @@ func InitScribusAmqp() {
 	}))
 	di.Wire[scribus.Subjects](amqp.Subjects)
 
-	di.Define(interceptor.NewTracing, di.Tag(scribus.MiddlewareTag))
-	di.Define(interceptor.NewLog, di.Tag(scribus.MiddlewareTag))
-	di.Define(interceptor.NewRecover, di.Tag(scribus.MiddlewareTag))
+	tracing := di.Define(interceptor.NewTracing)
+	logging := di.Define(interceptor.NewLog)
+	recovering := di.Define(interceptor.NewRecover)
+
+	di.Wire[scribus.Middlewares](scribus.NewMiddlewares, di.Fallback(), di.Args(map[string]any{
+		"middlewares": di.List(tracing, logging, recovering),
+	}))
 }

@@ -94,7 +94,7 @@ func read(container replacements.Container, seams []replacements.Seam) (shape, e
 	if out.Http.Mux != "" && out.Http.Global == "" {
 		return shape{}, fmt.Errorf("%s passes no http.Global to NewHttpCommand: the global "+
 			"middleware chain belongs to the server now, not to a router — regenerate the "+
-			"container and take *middleware.Standard out of your routers", container.File)
+			"container and take the middleware chain out of your routers", container.File)
 	}
 	return out, nil
 }

@@ -1,12 +1,10 @@
 package grpc
 
 import (
-	"cmp"
 	"context"
 	"fmt"
 	"net"
 	"os"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -19,17 +17,13 @@ import (
 )
 
 type (
-	serviceTag          struct{}
-	middlewareTag       struct{}
-	streamMiddlewareTag struct{}
-	errorMapperTag      struct{}
+	serviceTag     struct{}
+	errorMapperTag struct{}
 )
 
 var (
-	ServiceTag          = serviceTag{}
-	MiddlewareTag       = middlewareTag{}
-	StreamMiddlewareTag = streamMiddlewareTag{}
-	ErrorMapperTag      = errorMapperTag{}
+	ServiceTag     = serviceTag{}
+	ErrorMapperTag = errorMapperTag{}
 )
 
 type GrpcCommand interface {
@@ -45,7 +39,7 @@ type Server interface {
 	Close() error
 }
 
-func NewGrpcCommand(commands []ServiceHandler, interceptors []grpc.Interceptor, streamInterceptors []grpc.StreamInterceptor, command app.BaseCommand, addr net.Addr, logger pry.Logger) *grpcCommand {
+func NewGrpcCommand(commands []ServiceHandler, interceptors grpc.Interceptors, streamInterceptors grpc.StreamInterceptors, command app.BaseCommand, addr net.Addr, logger pry.Logger) *grpcCommand {
 	return &grpcCommand{
 		commands:    commands,
 		middlewares: UnaryChain(interceptors),
@@ -56,26 +50,24 @@ func NewGrpcCommand(commands []ServiceHandler, interceptors []grpc.Interceptor, 
 	}
 }
 
-// Ascending Order(), smaller outermost. Exported so an in-process test server
-// chains them identically — getting this order wrong has already cost one bug.
-func UnaryChain(interceptors []grpc.Interceptor) []baseGrpc.UnaryServerInterceptor {
-	return chain[baseGrpc.UnaryServerInterceptor](interceptors)
+func NewInterceptors(interceptors []grpc.Interceptor) grpc.Interceptors { return interceptors }
+
+func NewStreamInterceptors(interceptors []grpc.StreamInterceptor) grpc.StreamInterceptors {
+	return interceptors
 }
 
-func StreamChain(interceptors []grpc.StreamInterceptor) []baseGrpc.StreamServerInterceptor {
-	return chain[baseGrpc.StreamServerInterceptor](interceptors)
+// Exported so an in-process test server builds the chain the same way.
+func UnaryChain(interceptors grpc.Interceptors) []baseGrpc.UnaryServerInterceptor {
+	built := make([]baseGrpc.UnaryServerInterceptor, 0, len(interceptors))
+	for _, interceptor := range interceptors {
+		built = append(built, interceptor.Run())
+	}
+	return built
 }
 
-type ordered[T any] interface {
-	Order() int
-	Run() T
-}
-
-func chain[T any, I ordered[T]](interceptors []I) []T {
-	sorted := slices.Clone(interceptors)
-	slices.SortStableFunc(sorted, func(a, b I) int { return cmp.Compare(a.Order(), b.Order()) })
-	built := make([]T, 0, len(sorted))
-	for _, interceptor := range sorted {
+func StreamChain(interceptors grpc.StreamInterceptors) []baseGrpc.StreamServerInterceptor {
+	built := make([]baseGrpc.StreamServerInterceptor, 0, len(interceptors))
+	for _, interceptor := range interceptors {
 		built = append(built, interceptor.Run())
 	}
 	return built

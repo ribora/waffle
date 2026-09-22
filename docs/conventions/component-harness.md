@@ -337,7 +337,7 @@ err = w.app.Consumer.Deliver(ctx, delivery)   // nil settled, error requeued
 
 `waffleGrpc.Serve` runs the handlers over `bufconn` and chains the interceptors with **`UnaryChain`, the exact function the daemon uses**. That is the point of it being exported: interceptor order has caused a real production bug (see [tools/grpc](../tools/grpc.md)), and a harness that sorted its own copy would be checking its copy of the order rather than the service's.
 
-The **lists** come from the container for the same reason — `a.ServerInterceptorAsMiddlewareTag()` and its two siblings, and the router collection beside them, not the members written out one by one. A tagged registration added later reaches the daemon and the suite together; written out, it would reach only the daemon, and the scenarios would go on passing against a chain that no longer ships.
+The **lists** come from the container for the same reason — `a.ServerInterceptors()` and its siblings, and the router collection beside them, not the members written out one by one. A registration added to the chain later reaches the daemon and the suite together; written out, it would reach only the daemon, and the scenarios would go on passing against a chain that no longer ships.
 
 `waffleHttp.Serve` is the same idea over `httptest`. It returns a `URL` and a `Client` — an ordinary `*http.Client`, so a scenario writes an ordinary request. The routers and the global chain are the container's own, and `Setup` is the same function the daemon runs, so the routes, the collision check and the middleware under test are the ones that ship — including its two errors, which is why `Serve` returns one. Both `InProcess` types close in `Clients.Close`.
 

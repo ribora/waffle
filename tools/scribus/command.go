@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"slices"
-	"sort"
 	"strings"
 	"time"
 
@@ -17,15 +16,9 @@ import (
 	"gitlab.com/gorib/whisk/scan"
 )
 
-type (
-	commandTag    struct{}
-	middlewareTag struct{}
-)
+type commandTag struct{}
 
-var (
-	CommandTag    = commandTag{}
-	MiddlewareTag = middlewareTag{}
-)
+var CommandTag = commandTag{}
 
 type ScribusCommand interface {
 	app.Command
@@ -54,15 +47,15 @@ type Consumer interface {
 }
 
 type Middleware interface {
-	Name() string
-	Order() int
 	Wrap(next func(msgs []scan.Source) error) func(msgs []scan.Source) error
 }
 
-func applyMiddlewares(handler func(msgs []scan.Source) error, middlewares []Middleware) func(msgs []scan.Source) error {
-	sorted := append([]Middleware(nil), middlewares...)
-	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Order() < sorted[j].Order() })
-	for _, s := range slices.Backward(sorted) {
+type Middlewares []Middleware
+
+func NewMiddlewares(middlewares []Middleware) Middlewares { return middlewares }
+
+func applyMiddlewares(handler func(msgs []scan.Source) error, middlewares Middlewares) func(msgs []scan.Source) error {
+	for _, s := range slices.Backward(middlewares) {
 		handler = s.Wrap(handler)
 	}
 	return handler
@@ -80,7 +73,7 @@ type BatchHandler interface {
 
 func NewScribusCommand(
 	commands []Handler,
-	middlewares []Middleware,
+	middlewares Middlewares,
 	subjects Subjects,
 	command app.BaseCommand,
 	consumer Consumer,
@@ -144,7 +137,7 @@ func NewScribusCommand(
 
 func NewBatchScribusCommand(
 	handler BatchHandler,
-	middlewares []Middleware,
+	middlewares Middlewares,
 	command app.BaseCommand,
 	consumer Consumer,
 	logger pry.Logger,

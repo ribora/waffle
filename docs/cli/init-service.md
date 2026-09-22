@@ -111,9 +111,11 @@ Each tool page shows the exact block to copy inside `InitDi()` when you need man
 
 ```go
 di.Wire[server.Mux](server.New)
-di.Wire[middleware.Session](middleware.NewSession, di.Fallback())
+session := di.Define(middleware.NewSession)
 // ... the rest of the standard middlewares ...
-di.Wire[whttp.Global](middleware.NewStandard, di.Fallback())
+di.Wire[whttp.Global](whttp.NewGlobal, di.Fallback(), di.Args(map[string]any{
+    "layers": di.List(compress, health, session /* ... */),
+}))
 di.Wire[app.BaseCommand](
     func() app.BaseCommand { return app.NewCommand("http", "Start web server") },
     di.For[whttp.HttpCommand](),

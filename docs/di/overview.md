@@ -30,7 +30,7 @@ Registers a concrete type (no interface). Use this when the type is injected by 
 
 ```go
 di.Define(notifyGrpc.NewNotificationService, di.Tag(grpcCommand.ServiceTag))
-di.Define(notifyGrpc.NewErrorHandler, di.Tag(grpcCommand.MiddlewareTag))
+di.Define(notifyGrpc.NewErrorMap, di.Tag(grpcCommand.ErrorMapperTag))
 ```
 
 `di.Define` answers with a **handle**, and `di.Wire` takes one in place of a
@@ -115,7 +115,7 @@ Properties:
 - The included package's whole AST is scanned for `di.Wire` / `di.Define` (it doesn't matter that they sit inside an unused `InitXxx()` function — Diogen never calls it)
 - Includes are **transitive**: A blank-imports B, B blank-imports C — all three are merged
 - **Cycles** (A → B → A) are caught by the Go compiler as a real import cycle
-- **Tags match across packages**: a tool registering `di.Tag(MiddlewareTag)` and your code registering under the same constant are collected together
+- **Tags match across packages**: a tool registering `di.Tag(ServiceTag)` and your code registering under the same constant are collected together
 
 Constraints:
 
@@ -130,9 +130,11 @@ For example, `config/tools/http/init.go`:
 ```go
 func InitHttp() {
     di.Wire[server.Mux](server.New)
-    di.Wire[middleware.Session](middleware.NewSession, di.Fallback())
+    session := di.Define(middleware.NewSession)
     // ... the rest of the standard middlewares ...
-    di.Wire[Global](middleware.NewStandard, di.Fallback())
+    di.Wire[Global](NewGlobal, di.Fallback(), di.Args(map[string]any{
+        "layers": di.List(compress, health, session /* ... */),
+    }))
     di.Wire[app.BaseCommand](
         func() app.BaseCommand { return app.NewCommand("http", "Start web server") },
         di.For[HttpCommand](),
@@ -299,8 +301,8 @@ rule](../architectures.md#the-boundary-rule).
 // Register a gRPC handler
 di.Define(usergrpc.NewUserGrpc, di.Tag(grpcCommand.ServiceTag))
 
-// Register a scribus interceptor
-di.Define(interceptor.NewTracing, di.Tag(scribusCommand.MiddlewareTag))
+// Register a gRPC error mapper
+di.Define(usergrpc.NewErrorMap, di.Tag(grpcCommand.ErrorMapperTag))
 ```
 
 ## Code generation

@@ -27,16 +27,13 @@ func (h *capturing) Run(src scan.Source) error {
 }
 
 type tagging struct {
-	order int
-	log   *[]string
+	name string
+	log  *[]string
 }
-
-func (m tagging) Name() string { return "tagging" }
-func (m tagging) Order() int   { return m.order }
 
 func (m tagging) Wrap(next func(msgs []scan.Source) error) func(msgs []scan.Source) error {
 	return func(msgs []scan.Source) error {
-		*m.log = append(*m.log, m.Name())
+		*m.log = append(*m.log, m.name)
 		return next(msgs)
 	}
 }
@@ -96,7 +93,7 @@ func TestDeliverGoesThroughTheMiddlewares(t *testing.T) {
 	var passed []string
 	consumer := Recorder()
 	handler := &capturing{key: "contracts.updated"}
-	command(t, consumer, handler, tagging{order: 1, log: &passed})
+	command(t, consumer, handler, tagging{name: "tagging", log: &passed})
 
 	if err := consumer.Deliver(message{key: "contracts.updated"}); err != nil {
 		t.Fatalf("deliver: %v", err)

@@ -24,11 +24,8 @@ A tagged registration has no `Replacements` entry of its own, since replacing on
 |-----|---------|--------------|-------------------|
 | `app.CommandTag` | `waffle/app` | `di.Define(..., di.Tag(app.CommandTag))` | `[]app.Command` |
 | `grpc.ServiceTag` | `tools/grpc` | `di.Define(..., di.Tag(grpc.ServiceTag))` | `[]ServiceHandler` |
-| `grpc.MiddlewareTag` | `tools/grpc` | `di.Define(..., di.Tag(grpc.MiddlewareTag))` | `[]server.Interceptor` |
-| `grpc.StreamMiddlewareTag` | `tools/grpc` | `di.Define(..., di.Tag(grpc.StreamMiddlewareTag))` | `[]server.StreamInterceptor` |
 | `grpc.ErrorMapperTag` | `tools/grpc` | `di.Define(..., di.Tag(grpc.ErrorMapperTag))` | `[]server.ErrorMapper` |
 | `http.RouterTag` | `tools/http` | `di.Define(..., di.Tag(http.RouterTag))` | `[]server.Router` |
-| `scribus.MiddlewareTag` | `tools/scribus` | `di.Define(..., di.Tag(scribus.MiddlewareTag))` | `[]Middleware` |
 | `migrate.MigrationsTag` | `tools/migrate` | `di.Wire[domainMigrate.Migration](..., di.Tag(migrate.MigrationsTag))` | `[]fs.FS` |
 | `scribus.CommandTag` | `tools/scribus` | `di.Wire[scribus.Handler](..., di.Tag(scribus.CommandTag))` | `[]Handler` |
 
@@ -76,31 +73,6 @@ On startup, `GrpcCommand` calls `Start(registrar)` on each collected handler.
 
 ---
 
-## grpc.MiddlewareTag
-
-**Package:** `gitlab.com/gorib/waffle/tools/grpc`
-
-Collects unary server interceptors (built-in tracing/status/session/log/recover plus user-defined). Chained by `Order()` ascending (smaller = outer).
-
-```go
-di.Define(NewAuthInterceptor, di.Tag(grpcCommand.MiddlewareTag))
-di.Define(NewAuditInterceptor, di.Tag(grpcCommand.MiddlewareTag))
-```
-
----
-
-## grpc.StreamMiddlewareTag
-
-**Package:** `gitlab.com/gorib/waffle/tools/grpc`
-
-Same as `MiddlewareTag` but for stream interceptors.
-
-```go
-di.Define(NewStreamAuditInterceptor, di.Tag(grpcCommand.StreamMiddlewareTag))
-```
-
----
-
 ## grpc.ErrorMapperTag
 
 **Package:** `gitlab.com/gorib/waffle/tools/grpc`
@@ -130,19 +102,14 @@ There is no untagged form: `di.Wire[server.Router](...)` fills a slot nothing as
 
 ---
 
-## scribus.MiddlewareTag
+## Chains are not tags
 
-**Package:** `gitlab.com/gorib/waffle/tools/scribus`
-
-Collects `scribus.Middleware` interceptors — each wraps `func([]scan.Source) error` — applied around the consumer's dispatch handler in `Order()` sequence.
-
-```go
-di.Define(interceptor.NewTracing, di.Tag(scribus.MiddlewareTag))
-di.Define(interceptor.NewLog, di.Tag(scribus.MiddlewareTag))
-di.Define(interceptor.NewRecover, di.Tag(scribus.MiddlewareTag))
-```
-
-(HTTP middleware is not tag-collected — the chain around every request is one `http.Global`, and anything narrower is a `server.Layer` on a route, a group, or the router's own `mux`.)
+No middleware set is tag-collected, because a tag has no order and every one of
+these chains has one. They are `di.List` registrations instead: `http.Global`,
+`server.Interceptors`, `server.StreamInterceptors`, `scribus.Middlewares`.
+Replacing a chain means registering it with a list of your own; anything
+narrower than the whole chain is a `server.Layer` on a route, a group, or the
+router's own `mux`.
 
 ---
 
