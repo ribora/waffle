@@ -107,7 +107,7 @@ service with two containers gets both wherever they sit, and a domain that
 registers itself is exempt inside its own tree.
 
 That finds a root by the generator's own contract, so the test `waffle
-tests:harness init` writes names nothing at all:
+tests:harness` writes names nothing at all:
 
 ```go
 func TestDomainsStayBehindTheirAdapters(t *testing.T) {
@@ -181,7 +181,7 @@ at the price of a `go.mod` and a `replace` per domain inside one repository.
 
 So the boundary is a check over the import graph, with the layer table above as
 its rule. `boundaries.Check()` runs it as an ordinary test from
-`config/diogen/boundaries_test.go`, which `waffle tests:harness init` writes.
+`config/diogen/boundaries_test.go`, which `waffle tests:harness` writes.
 
 There is no exception list, and that is deliberate. `replacements.allow` has one
 because a replacement is legitimately different from service to service; a

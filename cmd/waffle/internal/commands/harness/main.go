@@ -1,10 +1,13 @@
 package harness
 
 import (
+	"bytes"
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"go/format"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -18,195 +21,284 @@ import (
 //go:embed templates/*
 var templates embed.FS
 
+const generated = "harness_gen.go"
+
+var harnessDir = filepath.Join("tests", "internal", "harness")
+
 func New() *cmd {
 	return &cmd{command.New("tests:harness",
-		"Report the component harness, and write what is missing with init",
-		templates, nil).
-		WithUsage("[init]\n" +
-			"  init  write the files that are not there yet, leaving the rest alone")}
+		"Regenerate the component harness from the container; the first run also scaffolds the suite",
+		templates, nil)}
 }
 
 type cmd struct {
 	*command.Command
 }
 
+// Run from the module root or, through the go:generate line in harness.go, from
+// the harness package: every path below is the root's.
 func (c *cmd) Run(_ context.Context, args ...string) error {
-	if err := c.Operands(args, 0, 1); err != nil {
+	if err := c.Operands(args, 0, 0); err != nil {
 		return err
 	}
-	write := len(args) == 1
-	if write && args[0] != "init" {
-		return fmt.Errorf("unknown subcommand %q\n%s", args[0], c.Usage())
-	}
-
-	sources, params, err := c.plan()
+	root, err := command.ModuleRoot()
 	if err != nil {
 		return err
 	}
-	if !write {
-		return state(sources)
-	}
-	return c.scaffold(sources, params)
-}
-
-func (c *cmd) scaffold(sources map[string]string, params map[string]any) error {
-	fresh := absent(sources)
-	if err := c.Write(sources, params); err != nil {
+	if err := os.Chdir(root); err != nil {
 		return err
 	}
-	// Conditional imports come out as Go but not as gofmt's Go. Only what this
-	// run wrote: reformatting somebody's edited file is a change nobody asked for.
-	for _, target := range fresh {
-		if err := reformat(target); err != nil {
+
+	own, names, err := readPackage(harnessDir)
+	if err != nil {
+		return err
+	}
+	params, found, err := c.plan(root, own)
+	if err != nil {
+		return err
+	}
+
+	// The package's own file is what marks a harness as started, so a scaffold
+	// somebody deleted on purpose is not written back on every generate.
+	if _, err := os.Stat(filepath.Join(harnessDir, "harness.go")); errors.Is(err, os.ErrNotExist) {
+		if err := c.Write(scaffold(params, found), params); err != nil {
 			return err
 		}
 	}
-	return nil
+
+	rendered, err := c.Render(tpl(generated+".tpl"), params)
+	if err != nil {
+		return err
+	}
+	formatted, err := format.Source(rendered)
+	if err != nil {
+		return fmt.Errorf("the generated %s does not parse: %w", generated, err)
+	}
+	if err := collisions(formatted, names); err != nil {
+		return err
+	}
+	for _, member := range found.missed {
+		command.ReportWarning("no Register…Server call found for the handler " + member + ": write its client by hand")
+	}
+	return write(filepath.Join(harnessDir, generated), formatted)
 }
 
-func state(sources map[string]string) error {
-	targets := slices.Sorted(maps(sources))
-	var present, missing []string
-	for _, target := range targets {
-		if _, err := os.Stat(target); err == nil {
-			present = append(present, target)
-			continue
-		}
-		missing = append(missing, target)
-	}
-	command.ReportKept(present...)
-	command.ReportMissing(missing...)
-	if len(missing) > 0 {
-		command.ReportWarning("run `waffle tests:harness init` to write them")
-	}
-	return nil
-}
-
-func absent(sources map[string]string) []string {
-	var out []string
-	for _, target := range sources {
-		if _, err := os.Stat(target); err != nil {
-			out = append(out, target)
-		}
-	}
-	return out
-}
-
-func reformat(target string) error {
-	if !strings.HasSuffix(target, ".go") {
+func write(target string, body []byte) error {
+	if current, err := os.ReadFile(target); err == nil && bytes.Equal(current, body) {
 		return nil
 	}
-	body, err := os.ReadFile(target)
-	if err != nil {
-		return fmt.Errorf("failed to read %s: %w", target, err)
+	if err := os.MkdirAll(filepath.Dir(target), os.ModePerm); err != nil {
+		return err
 	}
-	formatted, err := format.Source(body)
-	if err != nil {
-		return fmt.Errorf("the scaffolded %s does not parse: %w", target, err)
+	if err := os.WriteFile(target, body, 0o644); err != nil {
+		return err
 	}
-	return os.WriteFile(target, formatted, 0o644)
+	command.ReportAction("generated " + target)
+	return nil
 }
 
-func maps(sources map[string]string) func(func(string) bool) {
-	return func(yield func(string) bool) {
-		for _, target := range sources {
-			if !yield(target) {
-				return
-			}
-		}
-	}
+type found struct {
+	shape
+	missed []string
 }
 
-func (c *cmd) plan() (map[string]string, map[string]any, error) {
+func scaffold(params map[string]any, found found) map[string]string {
+	container := params["ContainerDir"].(string)
+	sources := map[string]string{
+		tpl("harness.go.tpl"):           filepath.Join(harnessDir, "harness.go"),
+		tpl("suite_test.go.tpl"):        filepath.Join("tests", "suite_test.go"),
+		tpl("boot_test.go.tpl"):         filepath.Join("tests", "boot_test.go"),
+		tpl("replacements_test.go.tpl"): filepath.Join(container, "replacements_test.go"),
+		tpl("boundaries_test.go.tpl"):   filepath.Join(container, "boundaries_test.go"),
+	}
+	if len(found.Postgres) > 0 {
+		sources[tpl("migrations_test.go.tpl")] = filepath.Join("tests", "migrations_test.go")
+	}
+	return sources
+}
+
+func (c *cmd) plan(root string, own hooks) (map[string]any, found, error) {
 	module, err := c.FindProjectName()
 	if err != nil {
-		return nil, nil, err
+		return nil, found{}, err
 	}
 	containers, err := replacements.DiscoverContainers(".")
 	if err != nil {
-		return nil, nil, err
+		return nil, found{}, err
 	}
 	container := containers[0]
 	importPath := path.Join(module, filepath.ToSlash(container.Dir))
 
 	seams, err := replacements.ReadSeams(container, importPath)
 	if err != nil {
-		return nil, nil, err
+		return nil, found{}, err
 	}
-	found, err := read(container, seams)
+	s, err := read(container, seams)
 	if err != nil {
-		return nil, nil, err
+		return nil, found{}, err
 	}
+	missed := s.readClients(module, root)
 
 	service := path.Base(module)
+	migrations := migrations(module)
 	p := map[string]any{
 		"Module":           module,
 		"Service":          service,
-		"Env":              strings.ToUpper(strings.ReplaceAll(service, "-", "_")),
+		"EnvPrefix":        strings.ToUpper(strings.ReplaceAll(service, "-", "_")),
 		"Container":        importPath,
+		"ContainerDir":     container.Dir,
 		"Package":          container.Package,
-		"Postgres":         found.Postgres,
-		"Redis":            found.Redis,
-		"Resources":        registry(found),
-		"Logger":           found.Logger,
-		"Hilton":           found.Hilton,
-		"Consumer":         found.Consumer,
-		"Migrations":       migrations(module),
-		"Dead":             dead(found.Dead),
-		"GrpcHandlers":     found.Grpc.Handlers,
-		"GrpcInterceptors": found.Grpc.Interceptors,
-		"GrpcStream":       found.Grpc.Stream,
-		"HttpMux":          found.Http.Mux,
-		"HttpGlobal":       found.Http.Global,
-		"HttpRouters":      found.Http.Routers,
+		"Imports":          imports(s, own, migrations, importPath, container.Package),
+		"Resources":        registry(s),
+		"Migrations":       migrations,
+		"Postgres":         s.Postgres,
+		"Redis":            s.Redis,
+		"Logger":           s.Logger,
+		"Hilton":           s.Hilton,
+		"Consumer":         s.Consumer,
+		"Publisher":        s.Publisher,
+		"Dead":             records(s.Dead, func(c conn) map[string]string { return map[string]string{"Field": c.Field, "Label": c.Label} }),
+		"Variables":        records(s.Variables, variableRecord),
+		"Fallbacks":        slices.ContainsFunc(s.Variables, func(v variable) bool { return !v.Always }),
+		"Clients":          records(s.Clients, func(c client) map[string]string { return map[string]string{"Field": c.Field, "Alias": c.Alias, "Service": c.Service} }),
+		"Grpc":             s.Grpc.Handlers != "",
+		"GrpcHandlers":     s.Grpc.Handlers,
+		"GrpcInterceptors": s.Grpc.Interceptors,
+		"GrpcStream":       s.Grpc.Stream,
+		"Http":             s.Http.Mux != "",
+		"HttpMux":          s.Http.Mux,
+		"HttpGlobal":       s.Http.Global,
+		"HttpRouters":      s.Http.Routers,
+		"HookEnv":          own.Env,
+		"HookSetup":        own.Setup,
+		"HookResources":    own.Resources,
+		"HookBoot":         own.Boot,
+		"HookExtra":        own.Extra,
 	}
+	return p, found{shape: s, missed: missed}, nil
+}
 
-	// tests/feature holds the .feature files alone: only one of the two is a
-	// specification, and it is read by someone who does not read the other.
-	harnessDir := filepath.Join("tests", "internal", "harness")
-	testsDir := "tests"
-	sources := map[string]string{
-		tpl("resources.go.tpl"):         filepath.Join(harnessDir, "resources.go"),
-		tpl("boot.go.tpl"):              filepath.Join(harnessDir, "boot.go"),
-		tpl("suite_test.go.tpl"):        filepath.Join(testsDir, "suite_test.go"),
-		tpl("boot_test.go.tpl"):         filepath.Join(testsDir, "boot_test.go"),
-		tpl("replacements_test.go.tpl"): filepath.Join(container.Dir, "replacements_test.go"),
-		tpl("boundaries_test.go.tpl"):   filepath.Join(container.Dir, "boundaries_test.go"),
+func variableRecord(v variable) map[string]string {
+	flag := func(b bool) string {
+		if b {
+			return "true"
+		}
+		return ""
 	}
-	// Both when the service serves both — two of nine in sherpa do, and two files
-	// could not coexist: each would declare Clients and Serve in one package.
-	if found.Grpc.Present() || found.Http.Present() {
-		sources[tpl("serve.go.tpl")] = filepath.Join(harnessDir, "serve.go")
+	return map[string]string{"Key": v.Key, "Type": v.Type, "Default": v.Default, "List": flag(v.List), "Always": flag(v.Always)}
+}
+
+// Records as maps, the shape every command hands its templates.
+func records[T any](items []T, record func(T) map[string]string) []map[string]string {
+	out := make([]map[string]string, 0, len(items))
+	for _, item := range items {
+		out = append(out, record(item))
 	}
-	return sources, p, nil
+	return out
 }
 
 func tpl(name string) string { return filepath.Join("templates", name) }
 
+// Standard library first, then the rest in path order, the way goimports groups.
+func imports(s shape, own hooks, migrations []map[string]string, container, pkg string) []map[string]string {
+	std := []string{"context", "fmt", "os", "testing"}
+	var rest []map[string]string
+	add := func(alias, p string) { rest = append(rest, map[string]string{"Alias": alias, "Path": p}) }
+
+	lists := slices.ContainsFunc(s.Variables, func(v variable) bool { return v.List })
+	if lists {
+		std = append(std, "strings")
+	}
+	if slices.ContainsFunc(s.Variables, func(v variable) bool { return v.List && !v.Always }) {
+		std = append(std, "slices")
+	}
+	// What a variable's type or fallback names, under the alias its source used.
+	aliases := map[string]string{}
+	for _, v := range s.Variables {
+		for alias, p := range v.imports {
+			aliases[alias] = p
+		}
+	}
+	for _, alias := range slices.Sorted(maps.Keys(aliases)) {
+		p := aliases[alias]
+		switch {
+		case slices.Contains(std, p):
+		case !strings.Contains(strings.Split(p, "/")[0], ".") && alias == path.Base(p):
+			std = append(std, p)
+		default:
+			add(alias, p)
+		}
+	}
+	add("", "gitlab.com/gorib/waffle/resource")
+	add(pkg, container)
+	if len(s.Postgres) > 0 {
+		std = append(std, "io/fs")
+		add("", "gitlab.com/gorib/sql/sqltest")
+		add("waffleMigrate", "gitlab.com/gorib/waffle/tools/migrate")
+		for _, m := range migrations {
+			add(m["Alias"], m["Path"])
+		}
+	}
+	if len(s.Redis) > 0 {
+		add("", "gitlab.com/gorib/redis/redistest")
+	}
+	if len(s.Logger) > 0 {
+		add("", "gitlab.com/gorib/pry")
+	}
+	if len(s.Hilton) > 0 {
+		add("", "gitlab.com/gorib/hilton")
+	}
+	if len(s.Consumer) > 0 {
+		add("", "gitlab.com/gorib/waffle/tools/scribus")
+	}
+	if len(s.Publisher) > 0 {
+		add("", "gitlab.com/gorib/amqp")
+	}
+	if len(s.Dead) > 0 {
+		add("grpcClient", "gitlab.com/gorib/grpc/client")
+	}
+	if s.Grpc.Present() {
+		add("waffleGrpc", "gitlab.com/gorib/waffle/tools/grpc")
+	}
+	if s.Http.Present() {
+		add("waffleHttp", "gitlab.com/gorib/waffle/tools/http")
+	}
+	seen := map[string]bool{}
+	for _, c := range s.Clients {
+		if !seen[c.Path] {
+			seen[c.Path] = true
+			add(c.Alias, c.Path)
+		}
+	}
+
+	slices.Sort(std)
+	slices.SortFunc(rest, func(a, b map[string]string) int { return strings.Compare(a["Path"], b["Path"]) })
+	out := make([]map[string]string, 0, len(std)+len(rest)+1)
+	for _, p := range std {
+		out = append(out, map[string]string{"Alias": "", "Path": p})
+	}
+	out = append(out, map[string]string{"Alias": "", "Path": ""}) // the blank line between the groups
+	return append(out, rest...)
+}
+
 // The literal resource.New is given, in the order the systems are declared
 // above it. Empty for a service that reaches no infrastructure at all, and Up,
 // Reset and Down then do nothing.
-func registry(found shape) []string {
+func registry(s shape) []string {
 	var out []string
-	if found.Postgres {
+	if len(s.Postgres) > 0 {
 		out = append(out, "postgres")
 	}
-	if found.Redis {
+	if len(s.Redis) > 0 {
 		out = append(out, "cache")
 	}
 	return out
 }
 
-func dead(conns []conn) []map[string]string {
-	out := make([]map[string]string, 0, len(conns))
-	for _, c := range conns {
-		out = append(out, map[string]string{"Field": c.Field, "Name": c.Name})
-	}
-	return out
-}
-
-// The migration packages a domain gets from make:domain:migrate. Discovered
-// rather than configured: the directory is where the command puts it.
+// The migration packages a domain gets from make:domain:migrate, discovered
+// rather than configured: the directory is where the command puts it. In name
+// order, because no domain's migrations may depend on another's —
+// CheckMigrations is what holds that.
 func migrations(module string) []map[string]string {
 	entries, err := os.ReadDir("domain")
 	if err != nil {
@@ -222,10 +314,11 @@ func migrations(module string) []map[string]string {
 			continue
 		}
 		out = append(out, map[string]string{
+			"Name":  entry.Name(),
 			"Alias": entry.Name() + "Migrate",
 			"Path":  path.Join(module, filepath.ToSlash(dir)),
 		})
 	}
-	slices.SortFunc(out, func(a, b map[string]string) int { return strings.Compare(a["Alias"], b["Alias"]) })
+	slices.SortFunc(out, func(a, b map[string]string) int { return strings.Compare(a["Name"], b["Name"]) })
 	return out
 }

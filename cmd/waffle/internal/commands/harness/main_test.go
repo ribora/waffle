@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -16,32 +17,53 @@ import (
 const grpcContainer = `package diogen
 
 import (
-	sql "gitlab.com/gorib/sql"
-	pry "gitlab.com/gorib/pry"
-	baseGrpc "google.golang.org/grpc"
-	grpcCommand "gitlab.com/gorib/waffle/tools/grpc"
+	"time"
+
+	env "gitlab.com/gorib/env"
+	grpcClient "gitlab.com/gorib/grpc/client"
 	server "gitlab.com/gorib/grpc/server"
+	pry "gitlab.com/gorib/pry"
+	sql "gitlab.com/gorib/sql"
+	grpcCommand "gitlab.com/gorib/waffle/tools/grpc"
+	contractProto "example.test/api/contract"
+	shopGrpc "example.test/shop/domain/shop/cmd/grpc"
+	baseGrpc "google.golang.org/grpc"
 )
 
 type Replacements struct {
-	SqlDb                                        sql.Db
-	PryLogger                                    pry.Logger
+	SqlDb                                                            sql.Db
+	PryLogger                                                        pry.Logger
 	BaseGrpcClientConnInterfaceForContractProtoContractServiceClient baseGrpc.ClientConnInterface
+	ContractProtoContractServiceClient                               contractProto.ContractServiceClient
+	ShopThing                                                        shopGrpc.Thing
+	GrpcCommandServiceHandlerAsServiceTag                            []grpcCommand.ServiceHandler
 }
 
 // Diogen assigns every tagged collection to a field of its own and passes the
 // field. A fixture that inlined the literals would test a container shape the
 // generator does not produce.
 type Application struct {
-	sqlDb                                        sql.Db
-	pryLogger                                    pry.Logger
+	sqlDb                                                            sql.Db
+	pryLogger                                                        pry.Logger
 	baseGrpcClientConnInterfaceForContractProtoContractServiceClient baseGrpc.ClientConnInterface
-	grpcCommandServiceHandlerAsServiceTag        []grpcCommand.ServiceHandler
-	serverInterceptorAsMiddlewareTag             []server.Interceptor
-	serverStreamInterceptorAsStreamMiddlewareTag []server.StreamInterceptor
+	contractProtoContractServiceClient                               contractProto.ContractServiceClient
+	shopThing                                                        shopGrpc.Thing
+	grpcCommandServiceHandlerAsServiceTag                            []grpcCommand.ServiceHandler
+	serverInterceptorAsMiddlewareTag                                 []server.Interceptor
+	serverStreamInterceptorAsStreamMiddlewareTag                     []server.StreamInterceptor
 }
 
 func InitAppWith(replacements Replacements) (*Application, error) {
+	container.sqlDb = replacements.SqlDb
+
+	if container.sqlDb == nil {
+		s, err := sql.NewDb(env.NeedValue[string]("DB_DRIVER"), env.NeedValue[string]("DB_DSN"))
+		if err != nil {
+			return nil, err
+		}
+		container.sqlDb = s
+	}
+
 	container.baseGrpcClientConnInterfaceForContractProtoContractServiceClient = replacements.BaseGrpcClientConnInterfaceForContractProtoContractServiceClient
 
 	if container.baseGrpcClientConnInterfaceForContractProtoContractServiceClient == nil {
@@ -51,7 +73,35 @@ func InitAppWith(replacements Replacements) (*Application, error) {
 		}
 		container.baseGrpcClientConnInterfaceForContractProtoContractServiceClient = s
 	}
-	container.grpcCommandServiceHandlerAsServiceTag = []grpcCommand.ServiceHandler{container.shopGrpcOrderServiceAsGrpcCommandServiceHandler}
+
+	container.contractProtoContractServiceClient = replacements.ContractProtoContractServiceClient
+
+	if container.contractProtoContractServiceClient == nil {
+		s := contractProto.NewContractServiceClient(container.baseGrpcClientConnInterfaceForContractProtoContractServiceClient)
+		container.contractProtoContractServiceClient = s
+	}
+
+	container.shopThing = replacements.ShopThing
+
+	if container.shopThing == nil {
+		s := shopGrpc.NewThing(env.NeedValue[string]("THING_URL"), env.NeedValue[uint16]("THING_PORT"), env.NeedValue[time.Duration]("THING_TTL"), env.NeedJson[shopGrpc.Config]("THING_CONFIG"),
+			env.NeedArray[int]("THING_SHARDS"), env.Value("LOGLEVEL", "info"), env.Value("POLL", 5*time.Second), env.Array("ORIGINS", []string{}),
+			env.Value("LOCAL", shopGrpc.Fallback), env.Value("SQL_DSN", "x"), env.NeedValue[string]("Custom"))
+		container.shopThing = s
+	}
+	if container.sqlDb == nil {
+		_ = env.Value("SQL_DSN", "x")
+	}
+
+	container.grpcCommandServiceHandlerAsServiceTag = replacements.GrpcCommandServiceHandlerAsServiceTag
+
+	if container.grpcCommandServiceHandlerAsServiceTag == nil {
+		s := shopGrpc.NewOrderService(container.sqlDb)
+		container.shopGrpcOrderServiceAsGrpcCommandServiceHandler = s
+	}
+	if container.grpcCommandServiceHandlerAsServiceTag == nil {
+		container.grpcCommandServiceHandlerAsServiceTag = []grpcCommand.ServiceHandler{container.shopGrpcOrderServiceAsGrpcCommandServiceHandler}
+	}
 	container.serverInterceptorAsMiddlewareTag = []server.Interceptor{container.interceptorLogMWAsServerInterceptor}
 	container.serverStreamInterceptorAsStreamMiddlewareTag = []server.StreamInterceptor{container.interceptorStreamLogMWAsServerStreamInterceptor}
 	{
@@ -64,6 +114,27 @@ func InitAppWith(replacements Replacements) (*Application, error) {
 		container.grpcGrpcCommand = s
 	}
 	return container, nil
+}
+`
+
+const orderHandler = `package grpc
+
+import (
+	"google.golang.org/grpc"
+
+	proto "example.test/api/order"
+)
+
+func NewOrderService(db any) *orderService {
+	return &orderService{}
+}
+
+type orderService struct {
+	proto.OrderServiceServer
+}
+
+func (s *orderService) Start(server grpc.ServiceRegistrar) {
+	proto.RegisterOrderServiceServer(server, s)
 }
 `
 
@@ -195,39 +266,24 @@ func InitAppWith(replacements Replacements) (*Application, error) {
 }
 `
 
-const consumerContainer = `package diogen
+const recorderContainer = `package diogen
 
 import (
+	amqp "gitlab.com/gorib/amqp"
 	pry "gitlab.com/gorib/pry"
 	scribus "gitlab.com/gorib/waffle/tools/scribus"
-	grpcCommand "gitlab.com/gorib/waffle/tools/grpc"
-	server "gitlab.com/gorib/grpc/server"
 )
 
 type Replacements struct {
 	PryLogger       pry.Logger
 	ScribusConsumer scribus.Consumer
+	AmqpPublisher   amqp.Publisher
+	PryLoggers      []pry.Logger
 }
 
-type Application struct {
-	pryLogger                             pry.Logger
-	scribusConsumer                       scribus.Consumer
-	grpcCommandServiceHandlerAsServiceTag []grpcCommand.ServiceHandler
-	serverInterceptorAsMiddlewareTag      []server.Interceptor
-}
+type Application struct{}
 
 func InitAppWith(replacements Replacements) (*Application, error) {
-	container.grpcCommandServiceHandlerAsServiceTag = []grpcCommand.ServiceHandler{container.shopGrpcOrderServiceAsGrpcCommandServiceHandler}
-	container.serverInterceptorAsMiddlewareTag = []server.Interceptor{container.interceptorLogMWAsServerInterceptor}
-	{
-		s := grpcCommand.NewGrpcCommand(
-			container.grpcCommandServiceHandlerAsServiceTag,
-			container.serverInterceptorAsMiddlewareTag,
-			nil,
-			container.appBaseCommandForGrpcCommandGrpcCommand,
-		)
-		container.grpcGrpcCommand = s
-	}
 	return container, nil
 }
 `
@@ -239,8 +295,6 @@ import (
 	redis "gitlab.com/gorib/redis"
 	hilton "gitlab.com/gorib/hilton"
 	pry "gitlab.com/gorib/pry"
-	grpcCommand "gitlab.com/gorib/waffle/tools/grpc"
-	server "gitlab.com/gorib/grpc/server"
 )
 
 type Replacements struct {
@@ -250,16 +304,9 @@ type Replacements struct {
 	PryLogger      pry.Logger
 }
 
+type Application struct{}
+
 func InitAppWith(replacements Replacements) (*Application, error) {
-	{
-		s := grpcCommand.NewGrpcCommand(
-			[]grpcCommand.ServiceHandler{container.shopGrpcOrderServiceAsGrpcCommandServiceHandler},
-			[]server.Interceptor{container.interceptorLogMWAsServerInterceptor},
-			nil,
-			container.appBaseCommandForGrpcCommandGrpcCommand,
-		)
-		container.grpcGrpcCommand = s
-	}
 	return container, nil
 }
 `
@@ -278,13 +325,25 @@ func module(t *testing.T, container string, extra map[string]string) {
 		files[name] = body
 	}
 	for name, body := range files {
-		path := filepath.FromSlash(name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
-			t.Fatal(err)
-		}
+		place(t, name, body)
+	}
+}
+
+func place(t *testing.T, name, body string) {
+	t.Helper()
+	path := filepath.FromSlash(name)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func run(t *testing.T, args ...string) {
+	t.Helper()
+	if err := New().Run(t.Context(), args...); err != nil {
+		t.Fatalf("run: %v", err)
 	}
 }
 
@@ -297,189 +356,312 @@ func written(t *testing.T, name string) string {
 	return string(body)
 }
 
-func TestBareRunWritesNothing(t *testing.T) {
-	module(t, grpcContainer, nil)
+func generatedFile(t *testing.T) string {
+	t.Helper()
+	return written(t, "tests/internal/harness/harness_gen.go")
+}
 
-	if err := New().Run(t.Context()); err != nil {
-		t.Fatalf("bare run: %v", err)
-	}
-
-	if _, err := os.Stat(filepath.FromSlash("tests/internal/harness/resources.go")); err == nil {
-		t.Fatal("a bare run wrote the harness")
+func contains(t *testing.T, name, body string, wants ...string) {
+	t.Helper()
+	for _, want := range wants {
+		if !strings.Contains(body, want) {
+			t.Errorf("%s is missing %q:\n%s", name, want, body)
+		}
 	}
 }
 
-func TestInitWritesTheHarnessForAServiceWithADatabase(t *testing.T) {
+func lacks(t *testing.T, name, body string, unwanted ...string) {
+	t.Helper()
+	for _, bad := range unwanted {
+		if strings.Contains(body, bad) {
+			t.Errorf("%s holds %q:\n%s", name, bad, body)
+		}
+	}
+}
+
+func TestFirstRunScaffoldsTheSuiteAndGeneratesTheHarness(t *testing.T) {
 	module(t, grpcContainer, map[string]string{
 		"domain/order/cmd/migrate/main.go": "package migrate\n",
 	})
 
-	if err := New().Run(t.Context(), "init"); err != nil {
-		t.Fatalf("init: %v", err)
-	}
+	run(t)
 
-	resources := written(t, "tests/internal/harness/resources.go")
-	for _, want := range []string{
+	contains(t, "harness.go", written(t, "tests/internal/harness/harness.go"), "//go:generate go tool waffle tests:harness")
+	contains(t, "suite_test.go", written(t, "tests/suite_test.go"), "harness.Main(m)")
+	contains(t, "boot_test.go", written(t, "tests/boot_test.go"), "harness.Boot(")
+	contains(t, "migrations_test.go", written(t, "tests/migrations_test.go"), "harness.CheckMigrations(")
+	contains(t, "replacements_test.go", written(t, "config/diogen/replacements_test.go"), "replacements.Check()")
+	contains(t, "boundaries_test.go", written(t, "config/diogen/boundaries_test.go"), "boundaries.Check()")
+
+	contains(t, "harness_gen.go", generatedFile(t),
+		"// Code generated by waffle tests:harness. DO NOT EDIT.",
 		`sqltest.Env("SHOP_TEST_DSN")`,
 		`sqltest.Database("shop_test")`,
 		"sqltest.Ephemeral()",
-		"sqltest.Migrations(waffleMigrate.Up(",
 		"orderMigrate.NewMigrations()",
-		"resource.New(postgres)",
-	} {
-		if !strings.Contains(resources, want) {
-			t.Errorf("resources.go is missing %q:\n%s", want, resources)
-		}
-	}
-	// The loop belongs to the migrate command, so a harness that spells goose
-	// out again is one that can build a schema the daemon does not.
-	if strings.Contains(resources, "goose.") {
-		t.Errorf("resources.go drives goose itself:\n%s", resources)
-	}
-
-	boot := written(t, "tests/internal/harness/boot.go")
-	for _, want := range []string{
-		"cut.SqlDb = postgres.Db()",
-		"cut.PryLogger = logger",
-		`grpcClient.Dead("contract")`,
+		"resource.New(postgres",
 		// Boot brings the resources up itself, so a scenario cannot forget.
 		"if err := Up(ctx); err != nil {",
+		"if cut.SqlDb == nil {\n\t\tcut.SqlDb = postgres.Db()",
+	)
+}
+
+// The loop belongs to the migrate command, so a harness that spells goose out
+// again is one that can build a schema the daemon does not.
+func TestMigrationsGoThroughTheCommandsOwnLoopInNameOrder(t *testing.T) {
+	module(t, grpcContainer, map[string]string{
+		"domain/rent/cmd/migrate/main.go":    "package migrate\n",
+		"domain/invoice/cmd/migrate/main.go": "package migrate\n",
+	})
+
+	run(t)
+
+	body := generatedFile(t)
+	lacks(t, "harness_gen.go", body, "goose.")
+	if strings.Index(body, "invoiceMigrate.NewMigrations(),\n\trentMigrate") < 0 {
+		t.Errorf("the sources are not in name order:\n%s", body)
+	}
+	contains(t, "harness_gen.go", body,
+		"waffleMigrate.CheckShared(sources)",
+		`"invoice": invoiceMigrate.NewMigrations()`,
+		"sqltest.Suffix(name)",
+	)
+}
+
+// Only the connection's label, and read off the container rather than off a
+// naming convention for environment variables.
+func TestDeadNamesTheClientsOnTheConnectionAndWhatItReads(t *testing.T) {
+	module(t, grpcContainer, nil)
+
+	run(t)
+
+	contains(t, "harness_gen.go", generatedFile(t),
+		"if cut.BaseGrpcClientConnInterfaceForContractProtoContractServiceClient == nil {",
+		`grpcClient.Dead("contract.ContractServiceClient (DUNGEON_HOST, DUNGEON_PORT)")`,
+	)
+}
+
+// A field per variable, typed as the read is, so a misspelt key or a wrong type
+// in the env hook does not compile.
+func TestVariablesHoldWhatAnUnreplacedConstructorReads(t *testing.T) {
+	module(t, grpcContainer, nil)
+
+	run(t)
+
+	body := generatedFile(t)
+	for _, field := range []string{
+		"THING_URL string", "THING_PORT uint16", "THING_TTL time.Duration", "THING_CONFIG string", "THING_SHARDS []int",
 	} {
-		if !strings.Contains(boot, want) {
-			t.Errorf("boot.go is missing %q:\n%s", want, boot)
+		name, typ, _ := strings.Cut(field, " ")
+		if !regexp.MustCompile(`(?m)^\t` + name + `\s+` + regexp.QuoteMeta(typ) + `$`).MatchString(body) {
+			t.Errorf("Variables has no %s:\n%s", field, body)
 		}
+	}
+	contains(t, "harness_gen.go", body,
+		`"thing-url.harness.invalid"`,
+		`"null"`,
+		`put("THING_PORT", v.THING_PORT)`,
+		`put("THING_SHARDS", list(v.THING_SHARDS))`,
+		`"time"`,
+	)
+	// Under a seam Boot fills, so the constructor never runs.
+	lacks(t, "harness_gen.go", body, "\tDB_DSN ", "\tDUNGEON_HOST ")
+}
+
+// The fallback is the container's answer, so it is the field's default and is
+// written only when the hook changed it: [] does not survive the environment.
+func TestAFallbackIsSetOnlyWhenTheHookChangesIt(t *testing.T) {
+	module(t, grpcContainer, nil)
+
+	run(t)
+
+	body := generatedFile(t)
+	contains(t, "harness_gen.go", body,
+		`LOGLEVEL:`, `"info",`,
+		"5 * time.Second",
+		"[]string{}",
+		"if v.LOGLEVEL != d.LOGLEVEL {",
+		"if !slices.Equal(v.ORIGINS, d.ORIGINS) {",
+		// Read under a filled seam and under an unfilled one: the second decides.
+		"SQL_DSN",
+	)
+	// A fallback naming a declaration of its own file cannot be copied out of it.
+	lacks(t, "harness_gen.go", body, "LOCAL")
+}
+
+// The way out for a key no code reads through env, and not a way around a field:
+// a key that has one is refused.
+func TestCustomTakesWhatHasNoFieldAndRefusesWhatHasOne(t *testing.T) {
+	module(t, grpcContainer, nil)
+
+	run(t)
+
+	body := generatedFile(t)
+	contains(t, "harness_gen.go", body,
+		"Custom map[string]string",
+		`"THING_URL": true`,
+		"for key, value := range v.Custom {",
+		"if typed[key] {",
+	)
+	if got := strings.Count(body, "\tCustom "); got != 1 {
+		t.Errorf("Custom is declared %d times — a variable of that name took the field:\n%s", got, body)
+	}
+}
+
+func TestAVariableOnlyTheModuleReadsIsAFieldToo(t *testing.T) {
+	module(t, grpcContainer, map[string]string{
+		"domain/shop/adapter/client.go": "package adapter\n\nimport \"gitlab.com/gorib/env\"\n\n" +
+			"var key = env.NeedValue[string](\"SHOP_KEY\")\n\nvar skip = env.NeedValue[string](\"THING_URL\")\n",
+	})
+
+	run(t)
+
+	body := generatedFile(t)
+	contains(t, "harness_gen.go", body, `"shop-key.harness.invalid"`)
+	if got := strings.Count(body, "\tTHING_URL "); got != 1 {
+		t.Errorf("THING_URL is declared %d times:\n%s", got, body)
 	}
 }
 
 // A recorder the harness installs is not a seam the scenario has to be granted:
 // tests/internal is outside the allow-list scan, and the handle comes back on
 // App instead of going in through Replacements.
-func TestInitReturnsRecordersOnApp(t *testing.T) {
-	module(t, consumerContainer, nil)
+func TestRecordersComeBackOnApp(t *testing.T) {
+	module(t, recorderContainer, nil)
 
-	if err := New().Run(t.Context(), "init"); err != nil {
-		t.Fatalf("init: %v", err)
-	}
+	run(t)
 
-	boot := written(t, "tests/internal/harness/boot.go")
-	for _, want := range []string{
-		"*scribus.ConsumerRecorder",
-		"*pry.LogRecorder",
-		"consumer := scribus.Recorder()",
-		"logger := pry.Recorder()",
-		"cut.ScribusConsumer = consumer",
-		"Consumer: consumer",
-		"Logger: logger",
-	} {
-		if !strings.Contains(boot, want) {
-			t.Errorf("boot.go is missing %q:\n%s", want, boot)
-		}
-	}
+	body := generatedFile(t)
+	contains(t, "harness_gen.go", body,
+		"Logger    *pry.LogRecorder",
+		"Consumer  *scribus.ConsumerRecorder",
+		"Publisher *amqp.PublisherRecorder",
+		"cut.PryLogger, app.Logger = logger, logger",
+		"cut.ScribusConsumer, app.Consumer = consumer, consumer",
+		"cut.AmqpPublisher, app.Publisher = publisher, publisher",
+	)
+	// A collection of loggers is a di.Tags seam, and one recorder is not a list.
+	lacks(t, "harness_gen.go", body, "cut.PryLoggers")
 }
 
-func TestInitWritesAGrpcServer(t *testing.T) {
+func TestRedisBesideTheDatabaseAndTelemetryRecorded(t *testing.T) {
+	module(t, cacheContainer, nil)
+
+	run(t)
+
+	body := generatedFile(t)
+	contains(t, "harness_gen.go", body,
+		`redistest.Env("SHOP_TEST_REDIS")`,
+		`redistest.Docker("redis:8-alpine")`,
+		"resource.New(postgres, cache)",
+		"cut.RedisDb = cache.Db()",
+		"Telemetry *hilton.Recording",
+		"cut.HiltonProvider, app.Telemetry = telemetry, telemetry",
+	)
+	lacks(t, "harness_gen.go", body, "= hilton.Noop()")
+}
+
+func TestRedisIsLeftOutWhenTheContainerHasNone(t *testing.T) {
 	module(t, grpcContainer, nil)
 
-	if err := New().Run(t.Context(), "init"); err != nil {
-		t.Fatalf("init: %v", err)
-	}
+	run(t)
 
-	body := written(t, "tests/internal/harness/serve.go")
-	for _, want := range []string{
+	lacks(t, "harness_gen.go", generatedFile(t), "redistest", "cache")
+}
+
+func TestAGrpcServiceGetsATypedClientPerRegisteredHandler(t *testing.T) {
+	module(t, grpcContainer, map[string]string{
+		"domain/shop/cmd/grpc/service.go": orderHandler,
+	})
+
+	run(t)
+
+	body := generatedFile(t)
+	contains(t, "harness_gen.go", body,
+		`orderProto "example.test/api/order"`,
+		"Order orderProto.OrderServiceClient",
+		"clients.Order = orderProto.NewOrderServiceClient(conn)",
 		"waffleGrpc.Serve(",
 		"a.GrpcCommandServiceHandlerAsServiceTag()",
 		"a.ServerInterceptorAsMiddlewareTag()",
 		"a.ServerStreamInterceptorAsStreamMiddlewareTag()",
-	} {
-		if !strings.Contains(body, want) {
-			t.Errorf("serve.go is missing %q:\n%s", want, body)
-		}
-	}
+	)
 	// A member by name means the list was copied, and a tagged registration
 	// added later would reach the daemon and not the suite.
-	if strings.Contains(body, "a.InterceptorLogMWAsServerInterceptor()") {
-		t.Errorf("the interceptor list was expanded instead of read whole:\n%s", body)
+	lacks(t, "harness_gen.go", body, "a.InterceptorLogMWAsServerInterceptor()", "waffleHttp")
+}
+
+func TestServicesOfOneNameArePrefixedByTheirPackage(t *testing.T) {
+	clients := []client{
+		{Path: "example.test/api/notification", Service: "TemplateService"},
+		{Path: "example.test/api/document", Service: "TemplateService"},
+		{Path: "example.test/api/document", Service: "DocumentService"},
 	}
-	if strings.Contains(body, "waffleHttp") {
-		t.Errorf("a service that serves no HTTP got an HTTP server:\n%s", body)
+
+	name(clients)
+
+	got := map[string]string{}
+	for _, c := range clients {
+		got[c.Field] = c.Alias
+	}
+	want := map[string]string{
+		"NotificationTemplate": "notificationProto",
+		"DocumentTemplate":     "documentProto",
+		"Document":             "documentProto",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("fields %v, want %v", got, want)
 	}
 }
 
-// Two of the nine services in sherpa serve both, and two files could not
-// coexist: each would declare Clients and Serve in one package.
-func TestInitWritesBothTransportsIntoOneFile(t *testing.T) {
+// Two of the nine services in sherpa serve both, and one Clients has to carry
+// both transports.
+func TestBothTransportsShareOneClients(t *testing.T) {
 	module(t, bothContainer, nil)
 
-	if err := New().Run(t.Context(), "init"); err != nil {
-		t.Fatalf("init: %v", err)
-	}
+	run(t)
 
-	body := written(t, "tests/internal/harness/serve.go")
-	for _, want := range []string{
+	body := generatedFile(t)
+	contains(t, "harness_gen.go", body,
 		"waffleGrpc.Serve(",
-		"a.GrpcCommandServiceHandlerAsServiceTag()",
 		"waffleHttp.Serve(",
 		"a.HttpServerMux()",
 		"a.HttpCommandGlobal()",
 		"a.HttpServerRouterAsRouterTag()",
-	} {
-		if !strings.Contains(body, want) {
-			t.Errorf("serve.go is missing %q:\n%s", want, body)
-		}
-	}
+	)
 	if got := strings.Count(body, "type Clients struct"); got != 1 {
 		t.Errorf("Clients is declared %d times:\n%s", got, body)
 	}
 }
 
 // A gateway: no database at all, and the caller reaches it over HTTP.
-func TestInitWritesAnHttpServerAndAnEmptyResourceSet(t *testing.T) {
+func TestAGatewayGetsAnEmptyResourceSetAndAnHttpServer(t *testing.T) {
 	module(t, httpContainer, nil)
 
-	if err := New().Run(t.Context(), "init"); err != nil {
-		t.Fatalf("init: %v", err)
-	}
+	run(t)
 
-	resources := written(t, "tests/internal/harness/resources.go")
-	if !strings.Contains(resources, "resource.New()") {
-		t.Errorf("a service with no database did not get an empty set:\n%s", resources)
-	}
-	for _, unwanted := range []string{"sqltest", "postgres"} {
-		if strings.Contains(resources, unwanted) {
-			t.Errorf("a service with no database got %q:\n%s", unwanted, resources)
-		}
-	}
-	if boot := written(t, "tests/internal/harness/boot.go"); strings.Contains(boot, "cut.SqlDb") {
-		t.Errorf("a service with no database got a database in the cut:\n%s", boot)
-	}
-
-	server := written(t, "tests/internal/harness/serve.go")
-	for _, want := range []string{"waffleHttp.Serve(", "a.HttpServerMux()", "a.HttpCommandGlobal()", "a.HttpServerRouterAsRouterTag()"} {
-		if !strings.Contains(server, want) {
-			t.Errorf("serve.go is missing %q:\n%s", want, server)
-		}
-	}
-	if strings.Contains(server, "waffleGrpc") {
-		t.Errorf("a service that serves no gRPC got a gRPC server:\n%s", server)
+	body := generatedFile(t)
+	contains(t, "harness_gen.go", body, "resource.New()", "waffleHttp.Serve(")
+	lacks(t, "harness_gen.go", body, "sqltest", "postgres", "cut.SqlDb", "waffleGrpc", "CheckMigrations")
+	if _, err := os.Stat(filepath.FromSlash("tests/migrations_test.go")); err == nil {
+		t.Error("a service with no database got a migrations test")
 	}
 }
 
-// Nothing here compiles what it scaffolds, so the call is read against the
-// real signature instead.
-func TestInitWritesAServeCallThatFitsTheHelper(t *testing.T) {
+// Nothing here compiles what it generates, so the call is read against the real
+// signature instead.
+func TestTheServeCallFitsTheHelper(t *testing.T) {
 	module(t, httpContainer, nil)
 
-	if err := New().Run(t.Context(), "init"); err != nil {
-		t.Fatalf("init: %v", err)
-	}
+	run(t)
 
-	call, bound := serveCall(t, "tests/internal/harness/serve.go", "waffleHttp")
+	call, bound := serveCall(t, "tests/internal/harness/harness_gen.go", "waffleHttp")
 	signature := reflect.TypeOf(waffleHttp.Serve)
 	if len(call.Args) != signature.NumIn() {
-		t.Errorf("serve.go passes %d arguments, Serve takes %d", len(call.Args), signature.NumIn())
+		t.Errorf("Serve is passed %d arguments, and takes %d", len(call.Args), signature.NumIn())
 	}
 	if bound != signature.NumOut() {
-		t.Errorf("serve.go binds %d results, Serve returns %d", bound, signature.NumOut())
+		t.Errorf("Serve's results are bound to %d names, and it returns %d", bound, signature.NumOut())
 	}
 }
 
@@ -487,7 +669,7 @@ func serveCall(t *testing.T, name, pkg string) (call *ast.CallExpr, bound int) {
 	t.Helper()
 	file, err := parser.ParseFile(token.NewFileSet(), filepath.FromSlash(name), nil, parser.SkipObjectResolution)
 	if err != nil {
-		t.Fatalf("serve.go does not parse: %v", err)
+		t.Fatalf("%s does not parse: %v", name, err)
 	}
 
 	ast.Inspect(file, func(n ast.Node) bool {
@@ -510,17 +692,17 @@ func serveCall(t *testing.T, name, pkg string) (call *ast.CallExpr, bound int) {
 		return false
 	})
 	if call == nil {
-		t.Fatalf("serve.go has no %s.Serve call", pkg)
+		t.Fatalf("%s has no %s.Serve call", name, pkg)
 	}
 	return call, bound
 }
 
 // The alternative is silent: no router recognised reads as a service serving
 // no HTTP at all, and the suite loses its client.
-func TestInitRefusesAContainerWiredToASingleRouter(t *testing.T) {
+func TestAContainerWiredToASingleRouterIsRefused(t *testing.T) {
 	module(t, singleRouterContainer, nil)
 
-	err := New().Run(t.Context(), "init")
+	err := New().Run(t.Context())
 
 	if err == nil {
 		t.Fatal("a container that predates the collection was accepted")
@@ -532,10 +714,10 @@ func TestInitRefusesAContainerWiredToASingleRouter(t *testing.T) {
 	}
 }
 
-func TestInitRefusesAContainerWithNoGlobalChain(t *testing.T) {
+func TestAContainerWithNoGlobalChainIsRefused(t *testing.T) {
 	module(t, noGlobalContainer, nil)
 
-	err := New().Run(t.Context(), "init")
+	err := New().Run(t.Context())
 
 	if err == nil {
 		t.Fatal("a container that keeps the chain in its routers was accepted")
@@ -545,115 +727,99 @@ func TestInitRefusesAContainerWithNoGlobalChain(t *testing.T) {
 	}
 }
 
-// A second system is a second entry in the one registry, and the order of the
-// entries is the order they are declared above it.
-func TestInitWritesRedisBesideTheDatabase(t *testing.T) {
-	module(t, cacheContainer, nil)
-
-	if err := New().Run(t.Context(), "init"); err != nil {
-		t.Fatalf("init: %v", err)
-	}
-
-	resources := written(t, "tests/internal/harness/resources.go")
-	for _, want := range []string{
-		`redistest.Env("SHOP_TEST_REDIS")`,
-		`redistest.Docker("redis:8-alpine")`,
-		"resource.New(postgres, cache)",
-	} {
-		if !strings.Contains(resources, want) {
-			t.Errorf("resources.go is missing %q:\n%s", want, resources)
-		}
-	}
-
-	// The seam the container builds eagerly out of REDIS_HOST when nobody fills it.
-	if boot := written(t, "tests/internal/harness/boot.go"); !strings.Contains(boot, "cut.RedisDb = cache.Db()") {
-		t.Errorf("boot.go leaves redis to the environment:\n%s", boot)
-	}
-}
-
-// The container's own default is hilton.Noop(), so nothing breaks without this
-// — the span a scenario wants to read back merely does not exist.
-func TestInitRecordsTelemetryRatherThanSilencingIt(t *testing.T) {
-	module(t, cacheContainer, nil)
-
-	if err := New().Run(t.Context(), "init"); err != nil {
-		t.Fatalf("init: %v", err)
-	}
-
-	boot := written(t, "tests/internal/harness/boot.go")
-	for _, want := range []string{
-		"Telemetry *hilton.Recording",
-		"telemetry := hilton.Recorder()",
-		"cut.HiltonProvider = telemetry",
-		"Telemetry: telemetry",
-	} {
-		if !strings.Contains(boot, want) {
-			t.Errorf("boot.go is missing %q:\n%s", want, boot)
-		}
-	}
-	// The assignment, not the word: the comment above it names Noop as the thing
-	// being rejected.
-	if strings.Contains(boot, "= hilton.Noop()") {
-		t.Errorf("the harness silenced telemetry instead of recording it:\n%s", boot)
-	}
-}
-
-func TestInitLeavesRedisOutWhenTheContainerHasNone(t *testing.T) {
-	module(t, grpcContainer, nil)
-
-	if err := New().Run(t.Context(), "init"); err != nil {
-		t.Fatalf("init: %v", err)
-	}
-
-	resources := written(t, "tests/internal/harness/resources.go")
-	for _, unwanted := range []string{"redistest", "cache"} {
-		if strings.Contains(resources, unwanted) {
-			t.Errorf("a service with no redis got %q:\n%s", unwanted, resources)
-		}
-	}
-}
-
-func TestInitWritesTheSuiteAndTheChecks(t *testing.T) {
-	module(t, grpcContainer, nil)
-
-	if err := New().Run(t.Context(), "init"); err != nil {
-		t.Fatalf("init: %v", err)
-	}
-
-	if body := written(t, "tests/suite_test.go"); !strings.Contains(body, "harness.Down(") {
-		t.Errorf("main_test.go does not tear the resources down:\n%s", body)
-	}
-	if body := written(t, "tests/boot_test.go"); !strings.Contains(body, "harness.Boot(") {
-		t.Errorf("boot_test.go does not boot:\n%s", body)
-	}
-	if body := written(t, "config/diogen/replacements_test.go"); !strings.Contains(body, "replacements.Check()") {
-		t.Errorf("the allow-list test is missing:\n%s", body)
-	}
-	if body := written(t, "config/diogen/boundaries_test.go"); !strings.Contains(body, "boundaries.Check()") {
-		t.Errorf("the domain-boundary test is missing:\n%s", body)
-	}
-}
-
-func TestInitLeavesAnExistingFileAlone(t *testing.T) {
+func TestHooksAreCalledWhenThePackageDeclaresThem(t *testing.T) {
 	module(t, grpcContainer, map[string]string{
-		"tests/internal/harness/resources.go": "package harness // mine\n",
+		"tests/internal/harness/harness.go": "package harness\n\n" +
+			"func env(v *Variables) {}\n" +
+			"func setup() error { return nil }\n" +
+			"func resources() []resource.Resource { return nil }\n" +
+			"type extra struct{ Drivers any }\n" +
+			"func (a *App) boot(ctx context.Context, cut *diogen.Replacements) error { return nil }\n",
 	})
 
-	if err := New().Run(t.Context(), "init"); err != nil {
-		t.Fatalf("init: %v", err)
+	run(t)
+
+	contains(t, "harness_gen.go", generatedFile(t),
+		"env(&v)",
+		"if err := setup(); err != nil {",
+		"append([]resource.Resource{postgres}, resources()...)...",
+		"\textra\n",
+		"if err := app.boot(ctx, &cut); err != nil {",
+	)
+}
+
+func TestNoHookIsCalledWhenNoneIsDeclared(t *testing.T) {
+	module(t, grpcContainer, nil)
+
+	run(t)
+
+	lacks(t, "harness_gen.go", generatedFile(t), "env(&v)", "setup()", "resources()", "extra", "app.boot(")
+}
+
+// A scaffold deleted on purpose is not written back on every go generate, and
+// an edited one is not overwritten; the generated file always is.
+func TestALaterRunRewritesOnlyTheGeneratedFile(t *testing.T) {
+	module(t, grpcContainer, nil)
+	run(t)
+	place(t, "tests/boot_test.go", "package tests // mine\n")
+	if err := os.Remove(filepath.FromSlash("tests/suite_test.go")); err != nil {
+		t.Fatal(err)
+	}
+	place(t, "config/diogen/di_gen.go", cacheContainer)
+
+	run(t)
+
+	contains(t, "boot_test.go", written(t, "tests/boot_test.go"), "// mine")
+	if _, err := os.Stat(filepath.FromSlash("tests/suite_test.go")); err == nil {
+		t.Error("a deleted scaffold was written back")
+	}
+	contains(t, "harness_gen.go", generatedFile(t), "resource.New(postgres, cache)")
+}
+
+// go generate runs the directive from the harness package, not from the root.
+func TestARunFromTheHarnessPackageWritesAtTheRoot(t *testing.T) {
+	module(t, grpcContainer, map[string]string{
+		"tests/internal/harness/harness.go": "package harness\n",
+	})
+	t.Chdir(filepath.FromSlash("tests/internal/harness"))
+	beside, err := filepath.Abs(generated)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	if body := written(t, "tests/internal/harness/resources.go"); !strings.Contains(body, "// mine") {
-		t.Fatal("init overwrote a harness somebody had already written")
+	run(t)
+
+	if _, err := os.Stat(beside); err != nil {
+		t.Fatalf("the generated file is not beside harness.go: %v", err)
 	}
 }
 
-func TestUnknownSubcommandIsRefused(t *testing.T) {
+func TestAHandWrittenHarnessIsRefusedByName(t *testing.T) {
+	module(t, grpcContainer, map[string]string{
+		"tests/internal/harness/resources.go": "package harness\n\nfunc Up() {}\n\nvar postgres = 1\n",
+	})
+
+	err := New().Run(t.Context())
+
+	if err == nil {
+		t.Fatal("a package declaring Up beside the generated one was accepted")
+	}
+	for _, want := range []string{"resources.go", "Up", "postgres", "hooks"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the error does not name %q: %v", want, err)
+		}
+	}
+	if _, err := os.Stat(filepath.FromSlash("tests/internal/harness/harness_gen.go")); err == nil {
+		t.Error("the generated file was written beside a package it cannot compile with")
+	}
+}
+
+func TestAnOperandIsRefused(t *testing.T) {
 	module(t, grpcContainer, nil)
 
-	err := New().Run(t.Context(), "generate")
+	err := New().Run(t.Context(), "init")
 
-	if err == nil || !strings.Contains(err.Error(), "generate") {
+	if err == nil || !strings.Contains(err.Error(), "init") {
 		t.Fatalf("run: %v", err)
 	}
 }

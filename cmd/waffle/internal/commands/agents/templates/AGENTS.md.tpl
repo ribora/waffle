@@ -380,20 +380,23 @@ around it. The recognisable cases:
 - **the cut removes what the case was meant to exercise** — a repository
   replaced by a mock makes the test check the mock's SQL, not the schema's.
 
-**Do not build the infrastructure by hand.** `waffle tests:harness init` writes
-it, reading the container for what this service needs: the database and its
-migrations, the transport, the interceptor order, and a dead connection for every
-`ClientConnInterface` seam. A run needs no configuration either — with no DSN
-set, a postgres container is started and the next run reuses it, so do not ask
-for one. `docs/conventions/component-harness.md` in waffle is the reference.
+**Do not build the infrastructure by hand.** `waffle tests:harness` generates
+`tests/internal/harness/harness_gen.go` from the container — the database and its
+migrations, the transport and a typed client per handler, the interceptor order,
+a dead connection for every `ClientConnInterface` seam, a typed field for every
+variable the boot reads — and `make generate` regenerates it. Never edit that
+file. A run needs no configuration either — with no DSN set, a postgres
+container is started and the next run reuses it, so do not ask for one.
+`docs/conventions/component-harness.md` in waffle is the reference.
 
-**The boot smoke test comes before any case**, and `init` writes it: it brings
-the resources up, boots on the given cut and asserts only that the callers are
-non-nil. One run then tells you what the cut is missing instead of an hour inside
-a half-written suite.
+**The boot smoke test comes before any case**, and the first run writes it: it
+brings the resources up, boots on the given cut and asserts only that the callers
+are non-nil. One run then tells you what the cut is missing instead of an hour
+inside a half-written suite.
 
-What the command leaves for you is what the container cannot say: a second
-resource, extra environment, and which typed client belongs to which handler.
+What the container cannot say — a second resource, a value with a meaning — goes
+into hooks in `tests/internal/harness/harness.go`, which is the harness owner's
+file, not yours.
 
 Still no production code at this stage.
 

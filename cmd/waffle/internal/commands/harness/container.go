@@ -5,37 +5,41 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"path"
 	"slices"
+	"strconv"
 	"strings"
 	"unicode"
 
 	"gitlab.com/gorib/waffle/replacements"
 )
 
-const (
-	sqlDbPath    = "gitlab.com/gorib/sql"
-	sqlDbName    = "Db"
-	redisDbPath  = "gitlab.com/gorib/redis"
-	redisDbName  = "Db"
-	connPath     = "google.golang.org/grpc"
-	connName     = "ClientConnInterface"
-	loggerPath   = "gitlab.com/gorib/pry"
-	loggerName   = "Logger"
-	hiltonPath   = "gitlab.com/gorib/hilton"
-	hiltonName   = "Provider"
-	consumerPath = "gitlab.com/gorib/waffle/tools/scribus"
-	consumerName = "Consumer"
+var (
+	sqlDb        = replacements.TypeRef{Path: "gitlab.com/gorib/sql", Name: "Db"}
+	redisDb      = replacements.TypeRef{Path: "gitlab.com/gorib/redis", Name: "Db"}
+	grpcConn     = replacements.TypeRef{Path: "google.golang.org/grpc", Name: "ClientConnInterface"}
+	pryLogger    = replacements.TypeRef{Path: "gitlab.com/gorib/pry", Name: "Logger"}
+	hiltonTracer = replacements.TypeRef{Path: "gitlab.com/gorib/hilton", Name: "Provider"}
+	consumer     = replacements.TypeRef{Path: "gitlab.com/gorib/waffle/tools/scribus", Name: "Consumer"}
+	publisher    = replacements.TypeRef{Path: "gitlab.com/gorib/amqp", Name: "Publisher"}
 )
 
+// Every list holds Replacements fields: a type the container carries twice is
+// filled twice.
 type shape struct {
-	Postgres bool
-	Redis    bool
-	Logger   bool
-	Hilton   bool
-	Consumer bool
-	Dead     []conn
-	Grpc     wiring
-	Http     wiring
+	Postgres  []string
+	Redis     []string
+	Logger    []string
+	Hilton    []string
+	Consumer  []string
+	Publisher []string
+	Dead      []conn
+	Grpc      wiring
+	Http      wiring
+	Variables []variable
+	Clients   []client
+	Imports   map[string]string // alias -> path, as the container file spells them
+	file      *ast.File
 }
 
 // Each field is one container getter, not a list of members: the collection is
@@ -48,44 +52,59 @@ type wiring struct {
 	Mux          string
 	Global       string
 	Routers      string
+	handlers     string // the unexported field, for its members
 }
 
 func (w wiring) Present() bool { return w.Handlers != "" || w.Mux != "" }
 
 type conn struct {
 	Field string
-	Name  string
+	Label string
 }
 
 func read(container replacements.Container, seams []replacements.Seam) (shape, error) {
-	out := shape{}
-	for _, seam := range seams {
-		for _, ref := range seam.Types {
-			switch {
-			case ref.Path == sqlDbPath && ref.Name == sqlDbName:
-				out.Postgres = true
-			case ref.Path == redisDbPath && ref.Name == redisDbName:
-				out.Redis = true
-			case ref.Path == loggerPath && ref.Name == loggerName:
-				out.Logger = true
-			case ref.Path == hiltonPath && ref.Name == hiltonName:
-				out.Hilton = true
-			case ref.Path == consumerPath && ref.Name == consumerName:
-				out.Consumer = true
-			case ref.Path == connPath && ref.Name == connName:
-				out.Dead = append(out.Dead, conn{Field: seam.Field, Name: neighbour(seam.Field)})
-			}
-		}
-	}
-	slices.SortFunc(out.Dead, func(a, b conn) int { return strings.Compare(a.Field, b.Field) })
-
 	file, err := parser.ParseFile(token.NewFileSet(), container.File, nil, parser.SkipObjectResolution)
 	if err != nil {
 		return shape{}, err
 	}
-	types := containerFields(file)
-	out.Grpc = commandArgs(file, types, "NewGrpcCommand")
-	out.Http = commandArgs(file, types, "NewHttpCommand")
+	out := shape{file: file, Imports: importAliases(file)}
+	collections := collectionFields(file)
+	types := map[string]replacements.TypeRef{}
+	for _, seam := range seams {
+		if seam.Composite() || collections[seam.Field] {
+			continue
+		}
+		ref := seam.Types[0]
+		types[seam.Field] = ref
+		switch ref {
+		case sqlDb:
+			out.Postgres = append(out.Postgres, seam.Field)
+		case redisDb:
+			out.Redis = append(out.Redis, seam.Field)
+		case pryLogger:
+			out.Logger = append(out.Logger, seam.Field)
+		case hiltonTracer:
+			out.Hilton = append(out.Hilton, seam.Field)
+		case consumer:
+			out.Consumer = append(out.Consumer, seam.Field)
+		case publisher:
+			out.Publisher = append(out.Publisher, seam.Field)
+		case grpcConn:
+			out.Dead = append(out.Dead, conn{Field: seam.Field})
+		}
+	}
+
+	body := initAppWithBody(file)
+	graph := readGraph(file, body)
+	for i := range out.Dead {
+		out.Dead[i].Label = graph.label(out.Dead[i].Field, types)
+	}
+	slices.SortFunc(out.Dead, func(a, b conn) int { return strings.Compare(a.Field, b.Field) })
+	out.Variables = graph.variables(out.filled(), moduleReads())
+
+	fields := containerFields(file)
+	out.Grpc = commandArgs(body, fields, "NewGrpcCommand")
+	out.Http = commandArgs(body, fields, "NewHttpCommand")
 	if out.Http.Mux != "" && out.Http.Routers == "" {
 		return shape{}, fmt.Errorf("%s passes no []server.Router to NewHttpCommand: the http "+
 			"command collects its routers now — register each one with di.Define(NewRouter, "+
@@ -99,11 +118,149 @@ func read(container replacements.Container, seams []replacements.Seam) (shape, e
 	return out, nil
 }
 
+// What Boot supplies whenever the scenario did not, so the container never
+// reaches the constructors under these fields and never reads their variables.
+func (s shape) filled() map[string]bool {
+	out := map[string]bool{}
+	for _, list := range [][]string{s.Postgres, s.Redis, s.Logger, s.Hilton, s.Consumer, s.Publisher} {
+		for _, field := range list {
+			out[field] = true
+		}
+	}
+	for _, dead := range s.Dead {
+		out[dead.Field] = true
+	}
+	return out
+}
+
+// A di.Tags collection shares its element type with a single seam, and filling
+// a collection with one recorder would be a different container.
+func collectionFields(file *ast.File) map[string]bool {
+	out := map[string]bool{}
+	structure := structType(file, "Replacements")
+	if structure == nil {
+		return out
+	}
+	for _, field := range structure.Fields.List {
+		if _, ok := field.Type.(*ast.ArrayType); !ok {
+			continue
+		}
+		for _, name := range field.Names {
+			out[name.Name] = true
+		}
+	}
+	return out
+}
+
+// InitAppWith as a graph: which Replacements field guards each constructor,
+// what each constructor reads from the container and from the environment.
+type graph struct {
+	owner  map[string]string // container field -> Replacements field
+	blocks []block
+	reads  []envRead
+}
+
+type block struct {
+	guards []string // Replacements fields
+	reads  map[string]bool
+	keys   []string
+}
+
+func readGraph(file *ast.File, body *ast.BlockStmt) graph {
+	g := graph{owner: map[string]string{}}
+	if body != nil {
+		for _, stmt := range body.List {
+			if field, seam, ok := prologueAssignment(stmt); ok {
+				g.owner[field] = seam
+			}
+		}
+		for _, stmt := range body.List {
+			guarded, ok := stmt.(*ast.IfStmt)
+			if !ok {
+				continue
+			}
+			guards := g.owners(guardedFields(guarded.Cond))
+			if len(guards) == 0 {
+				continue
+			}
+			b := block{guards: guards, reads: containerReads(guarded.Body)}
+			for _, read := range envReads(file, guarded.Body, nil) {
+				b.keys = append(b.keys, read.Key)
+			}
+			g.blocks = append(g.blocks, b)
+		}
+	}
+	g.reads = envReads(file, file, g.owners)
+	return g
+}
+
+func (g graph) owners(fields []string) []string {
+	var out []string
+	for _, field := range fields {
+		if seam, ok := g.owner[field]; ok && !slices.Contains(out, seam) {
+			out = append(out, seam)
+		}
+	}
+	return out
+}
+
+// Who the connection was built for and what it reads: the panic has to say
+// which replacement did not take, and nothing here knows a naming convention.
+func (g graph) label(field string, types map[string]replacements.TypeRef) string {
+	var own []string
+	for container, seam := range g.owner {
+		if seam == field {
+			own = append(own, container)
+		}
+	}
+	var consumers, keys []string
+	for _, b := range g.blocks {
+		if slices.Contains(b.guards, field) {
+			keys = append(keys, b.keys...)
+			continue
+		}
+		if !slices.ContainsFunc(own, func(c string) bool { return b.reads[c] }) {
+			continue
+		}
+		for _, guard := range b.guards {
+			if ref, ok := types[guard]; ok {
+				consumers = append(consumers, path.Base(ref.Path)+"."+ref.Name)
+			}
+		}
+	}
+	slices.Sort(consumers)
+	consumers = slices.Compact(consumers)
+	slices.Sort(keys)
+	keys = slices.Compact(keys)
+
+	label := field
+	if len(consumers) > 0 {
+		label = strings.Join(consumers, ", ")
+	}
+	if len(keys) > 0 {
+		label += " (" + strings.Join(keys, ", ") + ")"
+	}
+	return label
+}
+
 // Field name to the name of its type, off the Application struct. Arguments to
 // the daemon's constructors are bare container fields, so this is what says
 // which of them is the interceptor chain and which is the handler list.
 func containerFields(file *ast.File) map[string]string {
 	out := map[string]string{}
+	structure := structType(file, "Application")
+	if structure == nil {
+		return out
+	}
+	for _, field := range structure.Fields.List {
+		for _, name := range field.Names {
+			out[name.Name] = typeName(field.Type)
+		}
+	}
+	return out
+}
+
+func structType(file *ast.File, name string) *ast.StructType {
 	for _, decl := range file.Decls {
 		generic, ok := decl.(*ast.GenDecl)
 		if !ok {
@@ -111,52 +268,21 @@ func containerFields(file *ast.File) map[string]string {
 		}
 		for _, spec := range generic.Specs {
 			typed, ok := spec.(*ast.TypeSpec)
-			if !ok || typed.Name.Name != "Application" {
+			if !ok || typed.Name.Name != name {
 				continue
 			}
-			structure, ok := typed.Type.(*ast.StructType)
-			if !ok {
-				continue
-			}
-			for _, field := range structure.Fields.List {
-				for _, name := range field.Names {
-					out[name.Name] = typeName(field.Type)
-				}
+			if structure, ok := typed.Type.(*ast.StructType); ok {
+				return structure
 			}
 		}
 	}
-	return out
-}
-
-// BaseGrpcClientConnInterfaceForContractProtoContractServiceClient → contract.
-// Only a label for the panic message, so a miss costs nothing.
-func neighbour(field string) string {
-	_, after, found := strings.Cut(field, "For")
-	if !found {
-		after = field
-	}
-	for _, suffix := range []string{"ServiceClient", "Client", "Proto"} {
-		after = strings.TrimSuffix(after, suffix)
-	}
-	if after == "" {
-		return "neighbour"
-	}
-	// The first word is the neighbour: ContractProtoContract → contract.
-	end := len(after)
-	for i, r := range after {
-		if i > 0 && unicode.IsUpper(r) {
-			end = i
-			break
-		}
-	}
-	return strings.ToLower(after[:end])
+	return nil
 }
 
 // Read off the daemon's own construction call, so the harness serves what the
 // daemon serves rather than holding a second opinion about it.
-func commandArgs(file *ast.File, types map[string]string, constructor string) wiring {
+func commandArgs(body *ast.BlockStmt, types map[string]string, constructor string) wiring {
 	var out wiring
-	body := initAppWithBody(file)
 	if body == nil {
 		return out
 	}
@@ -191,11 +317,11 @@ func (w *wiring) assign(name, kind string) {
 	case strings.Contains(elem, "Interceptor"):
 		w.Interceptors = getter
 	case strings.Contains(elem, "ServiceHandler"):
-		w.Handlers = getter
+		w.Handlers, w.handlers = getter, name
 	case strings.HasSuffix(elem, "Mux"):
 		w.Mux = getter
 	// Only as a collection: a single Router left unassigned reaches read(),
-	// which refuses it by name rather than scaffolding a broken serve.go.
+	// which refuses it by name rather than scaffolding a broken serve.
 	case strings.HasSuffix(elem, "Router") && collection:
 		w.Routers = getter
 	case strings.HasSuffix(elem, "Global"):
@@ -233,6 +359,68 @@ func initAppWithBody(file *ast.File) *ast.BlockStmt {
 	return nil
 }
 
+// container.x = replacements.X
+func prologueAssignment(stmt ast.Stmt) (field, seam string, ok bool) {
+	assign, ok := stmt.(*ast.AssignStmt)
+	if !ok || assign.Tok != token.ASSIGN || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
+		return "", "", false
+	}
+	field, ok = qualifiedBy(assign.Lhs[0], "container")
+	if !ok {
+		return "", "", false
+	}
+	seam, ok = qualifiedBy(assign.Rhs[0], "replacements")
+	if !ok {
+		return "", "", false
+	}
+	return field, seam, true
+}
+
+func guardedFields(cond ast.Expr) []string {
+	binary, ok := cond.(*ast.BinaryExpr)
+	if !ok {
+		return nil
+	}
+	switch binary.Op {
+	case token.LAND, token.LOR:
+		return append(guardedFields(binary.X), guardedFields(binary.Y)...)
+	case token.EQL:
+		if ident, ok := binary.Y.(*ast.Ident); !ok || ident.Name != "nil" {
+			return nil
+		}
+		if field, ok := qualifiedBy(binary.X, "container"); ok {
+			return []string{field}
+		}
+	}
+	return nil
+}
+
+// An assignment target is a write, and the closers slice is bookkeeping the
+// generator adds to every seam alike.
+func containerReads(block *ast.BlockStmt) map[string]bool {
+	written := map[ast.Expr]bool{}
+	ast.Inspect(block, func(n ast.Node) bool {
+		if assign, ok := n.(*ast.AssignStmt); ok {
+			for _, lhs := range assign.Lhs {
+				written[lhs] = true
+			}
+		}
+		return true
+	})
+	out := map[string]bool{}
+	ast.Inspect(block, func(n ast.Node) bool {
+		expr, ok := n.(ast.Expr)
+		if !ok || written[expr] {
+			return true
+		}
+		if field, ok := qualifiedBy(expr, "container"); ok && field != "closers" {
+			out[field] = true
+		}
+		return true
+	})
+	return out
+}
+
 // An empty qualifier matches any package: the container imports the tool under
 // whatever alias diogen picked.
 func qualifiedBy(expr ast.Expr, ident string) (string, bool) {
@@ -245,4 +433,20 @@ func qualifiedBy(expr ast.Expr, ident string) (string, bool) {
 		return "", false
 	}
 	return selector.Sel.Name, true
+}
+
+func importAliases(file *ast.File) map[string]string {
+	out := make(map[string]string, len(file.Imports))
+	for _, imp := range file.Imports {
+		p, err := strconv.Unquote(imp.Path.Value)
+		if err != nil {
+			continue
+		}
+		name := path.Base(p)
+		if imp.Name != nil {
+			name = imp.Name.Name
+		}
+		out[name] = p
+	}
+	return out
 }

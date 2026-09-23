@@ -25,9 +25,7 @@ func run(ctx context.Context, db *dbSql.DB, sources []fs.FS, dialect, command st
 	return nil
 }
 
-// Order is the caller's: goose takes one source at a time, and a table hanging on
-// another domain's trigger has to come after it. Postgres and not the service's
-// DB_DRIVER, because sqltest speaks nothing else.
+// Postgres and not the service's DB_DRIVER, because sqltest speaks nothing else.
 func Up(sources ...fs.FS) func(ctx context.Context, handle *dbSql.DB) error {
 	return func(ctx context.Context, handle *dbSql.DB) error {
 		goose.SetLogger(goose.NopLogger())

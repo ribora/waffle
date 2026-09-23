@@ -25,7 +25,7 @@ go install gitlab.com/gorib/waffle/cmd/waffle@latest
 | `waffle make:domain:command <domain> <command>` | Add a CLI subcommand scoped to a domain, registered as `<domain>:<command>` |
 | `waffle make:converter <path>` | Scaffold a goverter convert.go at the given path |
 | `waffle make:outbox --driver <id>` | Enable the transactional outbox: the table, its migration runner, the module and the named broker driver under `config/tools/outbox`. See [tools/outbox](../tools/outbox.md) |
-| `waffle tests:harness [init]` | Report the component harness, and write what is missing with `init` ([details](../conventions/component-harness.md)) |
+| `waffle tests:harness` | Regenerate the component harness from the container; the first run also scaffolds the suite ([details](../conventions/component-harness.md)) |
 | `waffle tests:replacements [check] [--container=<path>]` | List everything the containers expose and what `replacements.allow` grants; `check` fails if a test replaces a field the list does not name |
 | `waffle agents` | Regenerate `AGENTS.md` after a waffle upgrade ([details](agents.md)) |
 
@@ -120,7 +120,8 @@ Some commands run additional steps after writing files:
 
 `make:domain:migrate`, `make:domain:migration`, `make:converter`,
 `tests:harness` and `agents` write files and stop; run `make generate` yourself
-afterwards.
+afterwards. `make generate` also runs `tests:harness` again, through the
+`go:generate` line in the harness package.
 
 The `make generate` step re-runs code generators (DI container, stored struct mappers) so the project compiles immediately after scaffolding. It is idempotent — a run with nothing to do prints `diogen: skipped, no changes detected` — so running it again after any command costs nothing and settles the question.
 
@@ -170,37 +171,44 @@ afterwards — and what each produces is described where the produced thing is:
 | `make:domain:command` | [core/commands](../core/commands.md#writing-a-custom-command), and [Command names](#command-names) above |
 | `make:converter` | [conventions/dto-conversion](../conventions/dto-conversion.md#cli-scaffolding) |
 | `make:outbox` | [tools/outbox](../tools/outbox.md#setup) |
-| `tests:harness` | [conventions/component-harness](../conventions/component-harness.md#scaffolding-it) |
+| `tests:harness` | [conventions/component-harness](../conventions/component-harness.md#the-generated-file-and-yours) |
 | `tests:replacements` | [below](#testsreplacements), and [di/overview](../di/overview.md#testing-with-the-container) for the mechanics |
 
-`tests:harness` takes one optional operand: a bare run reports which of the
-harness files are there, and `init` writes the rest, leaving an existing file
-alone. Which files those are, and why they sit where they do, is
-[conventions/component-harness](../conventions/component-harness.md#scaffolding-it).
+`tests:harness` takes no operands. Every run rewrites
+`tests/internal/harness/harness_gen.go` from the container, and the first run —
+the one that finds no `harness.go` beside it — also scaffolds the suite. It
+works from the module root or from anywhere below it, so the `go:generate` line
+in `harness.go` runs it after diogen on every `make generate`. Which files those
+are, and what goes in the one you write, is
+[conventions/component-harness](../conventions/component-harness.md#the-generated-file-and-yours).
 
-Four things come from the container rather than from a flag, because a flag would
-close a set the container already knows:
+Everything in the generated file comes from the container rather than from a
+flag, because a flag would close a set the container already knows:
 
 - **the systems.** A seam of type `gitlab.com/gorib/sql.Db` means postgres, and
-  the harness gets `sqltest` plus every `domain/*/cmd/migrate` it finds; a
-  `gitlab.com/gorib/redis.Db` seam means `redistest`. Without either — an API
-  gateway, a proxy — the set is `resource.New()`, whose `Up`, `Reset` and `Down`
-  do nothing. Adding a resource later is editing that literal.
+  the harness gets `sqltest` plus every `domain/*/cmd/migrate` it finds, in name
+  order; a `gitlab.com/gorib/redis.Db` seam means `redistest`. Without either —
+  an API gateway, a proxy — the set is `resource.New()`, whose `Up`, `Reset` and
+  `Down` do nothing.
 - **the transports.** `NewGrpcCommand` in the container gives an in-process gRPC
   server, `NewHttpCommand` gives `waffleHttp.Serve` over the container's own mux,
   global chain and router collection, and a service that has both gets both
   behind one `Clients`. A container still passing a single `server.Router`, or
   none of the `http.Global` the chain now arrives as, is refused with the fix
   rather than read as a service that serves no HTTP.
-- **the handlers and the interceptor order**, copied out of the daemon's own
-  construction call, so the server a scenario talks to is chained like the
-  daemon's.
+- **the handlers, their clients and the interceptor order**, read off the
+  daemon's own construction call; a handler's `Start` names the service it
+  registers, and the typed client is the constructor protoc-gen-go-grpc puts
+  beside it.
 - **the dead connections.** Every `grpc.ClientConnInterface` seam becomes
-  `grpcClient.Dead(...)`, because replacing a typed client does not stop the
-  connection under it from being built.
+  `grpcClient.Dead(...)`, labelled with the clients built on it and the
+  variables it reads.
+- **the environment.** A typed field of `Variables` for every variable read
+  through `gitlab.com/gorib/env`, unless `Boot` replaces the constructor that
+  reads it: a placeholder for a `Need*` read, the fallback for the rest.
 
-What it cannot know — a second resource, extra environment, which typed client
-belongs to which handler — it leaves as a named gap rather than a guess.
+A handler whose registration it cannot find is reported by name rather than
+guessed at.
 
 ### tests:replacements
 

@@ -4,23 +4,31 @@
 
 A component test boots the **real container** over **real infrastructure** and replaces only the leaves. It is the executable form of the specification Rule #11 asks for: a caller drives the service the way production does — a proto request over a real connection, an event through the real consumer, a cron command as the app runs it — down through the real management and the real repositories.
 
-`waffle tests:harness init` writes the files, and each one carries the reason for its own lines. So this page is what those comments cannot hold: the decisions nobody can make for you, the mechanisms behind the generated code, and what goes wrong at run time.
+`waffle tests:harness` generates the harness from the container and regenerates it on every `make generate`. So this page is what the generated code cannot hold: the decisions nobody can make for you, the mechanisms behind it, and what goes wrong at run time.
 
-## Scaffolding it
+## The generated file and yours
 
-`waffle tests:harness` reports which of these files are there; `init` writes the rest and leaves an existing one alone.
+`tests/internal/harness/` holds two kinds of file, and they change for different reasons.
+
+| file | owner | what it holds |
+|---|---|---|
+| `harness_gen.go` | waffle, rewritten on every run | the resources and the migrations, `Up`/`Reset`/`Down`, `Env`, `Main`, `CheckMigrations`, `App` and `Boot`, `Clients` and `Serve` |
+| `harness.go` | the service | the `go:generate` line, and the hooks — only those the service needs |
+| anything else | the service | recorders of its own, `Deliver` helpers, whatever a scenario calls that the container does not describe |
+
+The first run — the one that finds no `harness.go` — also writes the suite around it, once:
 
 | file | what it holds |
 |---|---|
-| `tests/internal/harness/resources.go` | the resource list, `Up`/`Reset`/`Down`, `Env` |
-| `tests/internal/harness/boot.go` | `App` and `Boot` — the cut that is a condition of booting |
-| `tests/internal/harness/serve.go` | `Serve` and `Clients`, only if the container serves a transport |
-| `tests/suite_test.go` | `TestMain` — `Env` before, `Down` after |
+| `tests/suite_test.go` | `TestMain`, which is `harness.Main(m)` |
 | `tests/boot_test.go` | the boot smoke test, written before any case |
+| `tests/migrations_test.go` | `CheckMigrations` as an ordinary test, for a service with a database |
 | `config/diogen/replacements_test.go` | `replacements.Check()` as an ordinary test |
 | `config/diogen/boundaries_test.go` | `boundaries.Check()` as an ordinary test |
 
-Go beside Go in `tests/`, and `tests/feature/` left for the `.feature` files alone — only one of the two is a specification, and it is read by someone who does not read the other. The registry and the cut are separate files because they change for different reasons: one when a system appears, one when a seam does.
+A scaffold deleted on purpose stays deleted; `harness_gen.go` is the only file a later run touches.
+
+Go beside Go in `tests/`, and `tests/feature/` left for the `.feature` files alone — only one of the two is a specification, and it is read by someone who does not read the other.
 
 From a scenario the whole thing is two calls:
 
@@ -29,9 +37,42 @@ app, err := harness.Boot(ctx, diogen.Replacements{ /* the cut */ })
 clients, err := app.Serve()
 ```
 
-What goes into the files is read off the generated container: a `gitlab.com/gorib/sql.Db` seam means postgres and every `domain/*/cmd/migrate` it finds, a `gitlab.com/gorib/redis.Db` seam means redis; `NewGrpcCommand` and `NewHttpCommand` decide the transports and hand over the handler, interceptor and router lists the daemon itself uses; every `grpc.ClientConnInterface` seam becomes a `grpcClient.Dead(...)` line.
+### What is read off the container
 
-No `--with=postgres,elastic`, and there never will be: a flag closes the set, and elastic 7 against elastic 8 is not even a different system, just a different class for the same one. What the container cannot say — a second resource, extra environment, which typed client belongs to which handler — is left as a named gap.
+- **The systems.** A `gitlab.com/gorib/sql.Db` seam means postgres and every `domain/*/cmd/migrate`, in name order; a `gitlab.com/gorib/redis.Db` seam means redis.
+- **The recorders.** A seam of `pry.Logger`, `hilton.Provider`, `scribus.Consumer` or `amqp.Publisher` gets the recording implementation, handed back on `App`. A `di.Tags` collection of one of these types is left alone: one recorder is not a list.
+- **The dead connections.** Every `grpc.ClientConnInterface` seam becomes `grpcClient.Dead(...)`, labelled with the typed clients built on it and the variables its constructor reads: `customer.AccountServiceClient, customer.CustomersServiceClient (AUSWEIS_HOST, AUSWEIS_PORT)`. Both halves are facts of the container; nothing is inferred from how a service names its variables.
+- **The environment.** Every variable the service reads through `gitlab.com/gorib/env` is a field of `Variables`, named as the variable and typed as the read — unless `Boot` fills the seam above the constructor that reads it, so it never runs. The container's reads come from `di_gen.go`, the modules' included; a read anywhere else in `config/`, `domain/` or `cmd/` is a field too. A `Need*` read holds a placeholder that parses as its type: a string names its own key — `bladerunner-host.harness.invalid` — so a call that reaches it says which variable it came from; a number is `0`, JSON `null`. A read with a fallback holds that fallback, copied from the call, and a fallback that names a declaration of its own file is left out. `Env` always sets a `Need*` variable, and a fallback only when the `env` hook changed it: the fallback is the container's own answer, and writing it back does not always round-trip — `[]string{}` comes back from the environment as `[""]`.
+- **The transports and the clients.** `NewGrpcCommand` and `NewHttpCommand` hand over the handler, interceptor and router lists the daemon itself uses. A handler registers its service in `Start` with `proto.RegisterXServer`, and protoc-gen-go-grpc puts `NewXClient` beside it, so every handler in the module gets its typed client on `Clients`: the field is `X` without `Service`, prefixed with the package when two packages register a service of one name — `NotificationTemplate`, `DocumentTemplate`. A handler whose registration is not found is reported by name.
+
+No `--with=postgres,elastic`, and there never will be: a flag closes the set, and elastic 7 against elastic 8 is not even a different system, just a different class for the same one.
+
+### Hooks
+
+What the container cannot say goes into `harness.go` as a hook. The generated file calls one only when the package declares it, and finds it by name; the compiler checks the signature against the call.
+
+| hook | called | for |
+|---|---|---|
+| `func env(v *Variables)` | by `Env`, over the placeholders and fallbacks | a value with a meaning — a URL with a scheme, a key pair. A misspelt key or a wrong type does not compile, and the developer's environment still wins. `v.Custom` takes a key with no field of its own |
+| `func setup() error` | by `Main`, first | what the developer's environment must not override: a time zone, a window the scenarios are written against |
+| `func resources() []resource.Resource` | once, appended to the set | a system the container does not name — elasticsearch, a working directory the service writes into |
+| `func (a *App) boot(ctx context.Context, cut *diogen.Replacements) error` | by `Boot`, before its own fills | a recorder of the service's own. Guard it with `if cut.X == nil` like the rest |
+| `type extra struct{ … }` | embedded in `App` | the handles `boot` hands back: `app.Drivers` |
+
+```go
+func env(v *Variables) {
+	// Unroutable rather than absent: an unset URL means the acquirer's production API.
+	v.YOO_URL = "https://yookassa.harness.invalid/"
+}
+```
+
+**`Custom` is the way out, not a way around.** It is for a key nothing reads through `gitlab.com/gorib/env` — `os.Getenv`, a library of someone else's, a variable the next change starts reading. A key that has a field is refused there at the start of the run, naming the field: two places to set one variable would disagree sooner or later, and the typed one is the one that compiles. When code starts reading a `Custom` key through `env`, the next `make generate` gives it a field and the refusal says to move it.
+
+`Variables` is also the answer to "does anything read this": a value set for a variable no field names is set for nothing. A log level for the container's logger is one — `Boot` installs `pry.Recorder()`, so the constructor that reads `LOGLEVEL` never runs.
+
+A hook is found in any file of the package, but keep the hooks in `harness.go` and what they are built from in a file named for its subject — `storage.go`, `keys.go`, `drivers.go`. Then `harness.go` is the list of what the service adds, and each topic is read in one place.
+
+A service whose container says everything has a `harness.go` of one line. A hand-written harness from before the generated one declares `App`, `Boot` or `Up` itself; the run refuses it and names each file and declaration to move into a hook or delete.
 
 ## Three layers, and only two are shared
 
@@ -41,13 +82,13 @@ No `--with=postgres,elastic`, and there never will be: a flag closes the set, an
 | the implementations | `<pkg>/<pkg>test` — [`sql/sqltest`](#postgres), [`redis/redistest`](#redis), [`elastic/elastictest`](#elasticsearch) | they move with what they describe, in the same commit and the same version |
 | `Boot`, `Env`, the resource list | the service, in `tests/internal/harness/` | `Boot` imports the service's generated `config/diogen`, and a library cannot depend on a service |
 
-The third row is the reason there is no catalogue of systems in `waffle.yaml`. `init` writes the third row's files, but it never holds the list. **The registry is a literal in the service's own code:**
+The third row is the reason there is no catalogue of systems in `waffle.yaml`. The generator writes what the container names; **anything else is a literal in the service's own code:**
 
 ```go
-var resources = resource.New(postgres, kafkatest.New(...))
+func resources() []resource.Resource { return []resource.Resource{kafkatest.New(...)} }
 ```
 
-Typed, checked by the compiler, failing at build time. Adding a system is editing that line, and waffle needs no change for it; swapping the whole stack — for a core team's own implementations, say — is swapping the import block, and that line does not change. waffle knows the contract, never the list.
+Typed, checked by the compiler, failing at build time. Adding a system is editing that line, and waffle needs no change for it. waffle knows the contract, never the list.
 
 ## The seam
 
@@ -69,9 +110,20 @@ Three methods, and two optional halves discovered by assertion: `Named` (its nam
 
 ## Postgres
 
-`gitlab.com/gorib/sql/sqltest` works from a DSN, because `gorib/sql` exposes neither `create database` nor migrations. `init` writes the `sqltest.New(...)` literal and the goose call under it.
+`gitlab.com/gorib/sql/sqltest` works from a DSN, because `gorib/sql` exposes neither `create database` nor migrations. The generated file writes the `sqltest.New(...)` literal and the goose call under it.
 
 **Migration is a function you pass**, not something driven from inside. That keeps goose — or atlas, or tern, or hand-written statements — out of this module's dependency graph, which every service carries.
+
+### Migrations of one domain do not depend on another's
+
+The sources run in name order, and nothing lets a service change it: the daemon's own migrate command takes them from a `di.Tags` collection, which is an unordered set, so an order the harness pinned would hold only in the tests. What holds instead is that no order can matter, and `CheckMigrations` — `tests/migrations_test.go` — checks it two ways:
+
+- **every domain applies alone to an empty database** of its own, `<name>_test_<domain>` beside the run's. A table whose trigger calls another domain's function fails here, naming the domain.
+- **a version two domains ship is the same file.** The sources share one bookkeeping table, so goose applies whichever copy runs first and skips the other without a word; `waffleMigrate.CheckShared` refuses two different files under one version.
+
+Together they are the fix as well: a domain that needs a function another domain creates ships its own byte-identical copy of that migration, under the same version. A database that already has it skips the copy; an empty one gets it from whichever domain comes first.
+
+`Suffix(name)` is what gives the check its own database when the address is a DSN — `Database` is ignored there, and the check would otherwise land in the run's database and drop it.
 
 ### The address chain
 
@@ -112,7 +164,7 @@ It also means the name in a DSN is not the name that gets used — `warehouse_te
 | its comment is this package's mark | the mark carries the creation time — `pg_database` records none — so a database somebody else documented is never a candidate |
 | nothing is connected **and** the mark is over an hour old | the drop is forced, so a single condition would be enough to kill a run that is merely slow |
 
-`Down` must be called **once per process**, from `TestMain` — the database is shared by every test in the package, and dropping it between two of them would leave the second without a schema. That is what `tests/suite_test.go` is, and it is the only place `Down` belongs.
+`Down` must be called **once per process**, from `TestMain` — the database is shared by every test in the package, and dropping it between two of them would leave the second without a schema. `harness.Main` is that call, and it is the only place `Down` belongs.
 
 The drop uses `with (force)` — **postgres 13 or later**: our own pool is closed first, but a leaked connection would otherwise leave the schema behind.
 
@@ -200,7 +252,7 @@ replacements:
 
 What it does not name may not be replaced, in any form.
 `TestReplacementsStayInsideTheList`, scaffolded beside the container by `waffle
-tests:harness init`, reads the `Replacements` literals in the tests and fails
+tests:harness`, reads the `Replacements` literals in the tests and fails
 naming the field and the interface — so a cut nobody granted stops being a
 question of whether a reviewer noticed, and shows up in `go test ./...` rather
 than only when someone runs a command. `waffle tests:replacements check` is the
@@ -243,7 +295,7 @@ constructor does take the connection out of the container, which is exactly why
 it is not a leaf. Substitute both levels, for two different reasons: the typed
 client because that is the surface worth faking, and the connection with
 `grpcClient.Dead` so the boot stops reading the neighbour's host out of the
-environment — and that second line is one `init` already wrote. This shape
+environment — and that second line is one the generated `Boot` already has. This shape
 recurs wherever a service adapts one transport to another — an http-to-grpc
 adapter looks the same.
 
@@ -266,21 +318,21 @@ adapter looks the same.
 
 ## Replacing the leaves
 
-`Boot` fills the cut: everything that is a condition of booting rather than a choice the test makes belongs in `boot.go`, not in the scenario. It supplies the database, installs the recorders and hands them back on `App` — a recorder the scenario had to construct would be a seam the scenario had to be granted, for something the harness owns either way.
+`Boot` fills the cut: everything that is a condition of booting rather than a choice the test makes belongs in `Boot`, not in the scenario. It supplies the database, installs the recorders and hands them back on `App` — a recorder the scenario had to construct would be a seam the scenario had to be granted, for something the harness owns either way.
 
-`Dead` is the one line worth reading twice, because it is what people undo. **`init` writes it for you** — one line per `grpc.ClientConnInterface` seam it finds — so this is a line to leave alone rather than a stub to build.
+`Dead` is there because **replacing a seam does not prune what feeds it**: `InitAppWith` is a flat eager sequence that skips a node only if that node itself was supplied, so the connection under a replaced typed client is still built and still reads its neighbour's host out of the environment. Reaching a dead connection panics with its label, which says which replacement did not take louder than a silent call to a real neighbour.
 
-It is there because **replacing a seam does not prune what feeds it**: `InitAppWith` is a flat eager sequence that skips a node only if that node itself was supplied, so the connection under a replaced typed client is still built and still reads its neighbour's host out of the environment. Reaching a dead connection panics, which says "the replacement did not take" louder than a silent call to a real neighbour.
+It covers only a transport that is a container field of its own. A client that builds its connection inside its own constructor — `http/client.New(url)` in an adapter, a device opened from a path — has no seam under it to fill; replacing the adapter is the cut, and the placeholder in its variable is what a call that slipped through reaches: `bladerunner-host.harness.invalid`, an error rather than a panic.
 
-**Guard every fill with `if cut.X == nil`.** That is the seam by which a scenario overrides what `Boot` installs — a live fake instead of a dead connection, a hand-built double instead of the harness recorder — without `Boot` having to know which scenarios want one. Assigning unconditionally takes that away, and the scenario's own `Replacements` literal is silently discarded.
+**Every fill is guarded with `if cut.X == nil`,** and a `boot` hook guards its own the same way. That is the seam by which a scenario overrides what `Boot` installs — a live fake instead of a dead connection, a hand-built double instead of the harness recorder — without `Boot` having to know which scenarios want one. A recorder goes onto `App` only where it went into the container, so a scenario that brought its own and then reads `app.Logger` gets a nil, not a recorder nobody wrote to.
 
-One consequence of `di.For` worth expecting: it groups the consumers that share a connection, so the container has one field per *connection* rather than one per client, and that field is named after the first consumer of it. Four `Dead` lines can cover eight typed clients.
+One consequence of `di.For` worth expecting: it groups the consumers that share a connection, so the container has one field per *connection* rather than one per client, and that field is named after the first consumer of it. Four `Dead` lines can cover eight typed clients, and the label lists all of them.
 
 ### `Noop()` is a recorder nobody queries
 
 That is the rule that decides which to use. A silent stand-in is fine where the scenario asserts nothing about that leaf — and dangerous where it does. A silent consumer swallows `Apply` and `Bind`, so a typo in a handler's subject stays green forever while production receives nothing.
 
-The scaffold therefore writes the recording one and leaves the choice on one line: whether anything is ever asserted about the logger is not knowable at `init` time, and a recorder nobody queries costs a slice, while a `Noop()` somebody needed costs a debugging session.
+The generated `Boot` therefore installs the recording one: whether anything is ever asserted about the logger is not knowable from the container, and a recorder nobody queries costs a slice, while a `Noop()` somebody needed costs a debugging session. A scenario that wants silence supplies `pry.Noop()` in its own `Replacements`.
 
 | Interface | Silent | Recording |
 |---|---|---|
@@ -333,7 +385,7 @@ err = w.app.Consumer.Deliver(ctx, delivery)   // nil settled, error requeued
 
 ## The in-process server
 
-`Serve` is a method on `App`, and it answers with one `Clients` however many transports the service serves — a service can serve both, and a file per transport could not coexist: each would declare `Clients` and `Serve` in the same package. What `init` leaves for you is the typed clients: `proto.NewFacilityServiceClient(grpc.Conn())` per handler, because which client belongs to which handler is not in the container.
+`Serve` is a method on `App`, and it answers with one `Clients` however many transports the service serves. The typed clients on it are read off the handlers — [above](#what-is-read-off-the-container) — so a handler added by `di.Tag` gets its client on the next `make generate`.
 
 `waffleGrpc.Serve` runs the handlers over `bufconn` and chains the interceptors with **`UnaryChain`, the exact function the daemon uses**. That is the point of it being exported: interceptor order has caused a real production bug (see [tools/grpc](../tools/grpc.md)), and a harness that sorted its own copy would be checking its copy of the order rather than the service's.
 

@@ -2,9 +2,9 @@
 
 [Docs](README.md)
 
-From `waffle tests:harness init` to one green scenario and one red one. The
-scaffold gets you as far as "the container boots"; this page is the rest of the
-way.
+From `waffle tests:harness` to one green scenario and one red one. The
+generated harness gets you as far as "the container boots"; this page is the
+rest of the way.
 
 **Who this is for.** Setting the harness up is a platform job, done once per
 service, and by a person — under Rule #11 an agent may not touch
@@ -26,34 +26,30 @@ it links into it at each step.
 
 Nothing has to be running. That is the point of the address chain.
 
-## 1. Scaffold it
+## 1. Generate it
 
 ```sh
-waffle tests:harness init
+waffle tests:harness
 ```
 
 ```
-  + tests/internal/harness/resources.go
-  + tests/internal/harness/boot.go
-  + tests/internal/harness/serve.go
-  + tests/suite_test.go
-  + tests/boot_test.go
-  + config/diogen/replacements_test.go
   + config/diogen/boundaries_test.go
+  + config/diogen/replacements_test.go
+  + tests/boot_test.go
+  + tests/internal/harness/harness.go
+  + tests/migrations_test.go
+  + tests/suite_test.go
+  + generated tests/internal/harness/harness_gen.go
 ```
 
-What went into those files was read off your generated container — the database,
-the transports, the connections that must be dead. The
-[file-by-file table](conventions/component-harness.md#scaffolding-it) says which
-holds what; the two that matter now are:
-
-- **`resources.go`** — the registry. `resource.New(postgres, …)`, plus `Up`,
-  `Reset`, `Down` and `Env`. Adding a system later is editing that one literal.
-- **`boot.go`** — `Boot(ctx, cut)`, which fills in what is a *condition of
-  booting* rather than a choice a scenario makes: the real database, the
-  recorders, a `grpcClient.Dead(…)` per connection under a replaced client.
-
-Re-running `init` is safe. It writes what is missing and leaves what is there.
+Everything in `harness_gen.go` was read off your generated container — the
+database and its migrations, the transports and a typed client per handler, the
+connections that must be dead, a placeholder for every variable the boot reads.
+It is rewritten on every `make generate`, through the `go:generate` line in
+`harness.go`, so a new domain, handler or neighbour reaches the suite with no
+edit. `harness.go` is yours, and on most services it stays one line. The
+[tables](conventions/component-harness.md#the-generated-file-and-yours) say
+which file holds what.
 
 ## 2. Run the smoke test
 
@@ -72,43 +68,45 @@ Three failures are the common ones, and they are all at this step by design:
 
 | It says | What to do |
 |---|---|
-| a `NeedValue` variable is missing | the seam reading it is not replaced and not supplied. Add it to the map in `Env()` — that function exists for exactly this |
+| a constructor refuses `…harness.invalid` | the placeholder parses as its type but means nothing — a URL without a scheme, a key that is not a key. Give it a real value in the `env` hook |
+| a variable is missing | it is read without `gitlab.com/gorib/env` — `os.Getenv` — so it has no field. Put it in `v.Custom` in the `env` hook |
 | `interface conversion: interface is nil` | a seam the boot needs is neither built nor replaced. The panic names the type |
-| dialing some neighbour's host | a `grpc.ClientConnInterface` the scaffold did not find. Add a `Dead(…)` line beside the ones it wrote |
 
 Green here means the whole graph constructs over a real database. That is the
 expensive part, and it is now done.
 
-## 3. Close the named gaps
+## 3. Add what the container cannot say
 
-The scaffold leaves gaps rather than guesses, and says so in place. Two are
-normal.
+Everything else goes into `harness.go` as a hook, and only when the service
+needs one — [the table](conventions/component-harness.md#hooks) lists all five.
+The two you are most likely to meet:
 
-**A typed gRPC client per handler.** `serve.go` hands you the connection; which
-client belongs to which handler is not in the container.
+**A value with a meaning.**
 
 ```go
-// tests/internal/harness/serve.go
-type Clients struct {
-	*waffleHttp.InProcess            // URL and an ordinary *http.Client
-	grpc *waffleGrpc.InProcess
-
-	Products proto.ProductServiceClient   // ← yours
+// tests/internal/harness/harness.go
+func env(v *Variables) {
+	// Unroutable rather than absent: unset means the acquirer's production API.
+	v.ACQUIRER_URL = "https://acquirer.harness.invalid/"
 }
 ```
 
-```go
-clients.Products = proto.NewProductServiceClient(grpc.Conn())
-```
+`Variables` has a field per variable the service reads, typed as it is read, so
+a misspelt key does not compile.
 
 **A second resource.** Elasticsearch, Kafka, anything not read off the
-container. It goes in the `resource.New(…)` literal and nowhere else — see
-[writing a resource](conventions/component-harness.md#writing-a-resource) for
-the three methods and where the package belongs.
+container:
 
-Leave the rest alone. The `Dead(…)` lines in particular are the ones people
-delete and then spend an afternoon on: replacing a typed client does not stop
-the connection under it from being built.
+```go
+func resources() []resource.Resource {
+	return []resource.Resource{search}
+}
+```
+
+See [writing a resource](conventions/component-harness.md#writing-a-resource)
+for the three methods and where the package belongs.
+
+`harness_gen.go` is not edited: the next `make generate` puts it back.
 
 ## 4. Decide what a test may replace
 
@@ -296,15 +294,18 @@ case was written with the wrong polarity — both have happened.
 
 ## 7. Wire it into the suite
 
-Nothing special: `go test ./...` runs all of it, and the two scaffolded checks
-run with it —
+Nothing special: `go test ./...` runs all of it, and the scaffolded checks run
+with it —
 
 - `TestReplacementsStayInsideTheList` fails on a seam `waffle.yaml` does not
   grant, naming the field and the interface;
 - `TestDomainsStayBehindTheirAdapters` fails on a cross-domain import or
-  registration the [boundary rule](architectures.md#the-boundary-rule) forbids.
+  registration the [boundary rule](architectures.md#the-boundary-rule) forbids;
+- `TestMigrationsAreIndependent` fails on a domain whose migrations do not apply
+  to an empty database on their own, or a version two domains ship differently
+  ([why](conventions/component-harness.md#migrations-of-one-domain-do-not-depend-on-anothers)).
 
-Both are ordinary tests on purpose: they ride in the suite a pipeline runs
+All three are ordinary tests on purpose: they ride in the suite a pipeline runs
 anyway, rather than each needing a step of its own. `make test` is that suite,
 and it is **not** part of `make` — the component tests boot real
 infrastructure, which is too slow for the loop that runs after every edit. So a

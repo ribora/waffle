@@ -302,9 +302,11 @@ workflow that gets abandoned at the first step that does not work.
 
 **Available:**
 
-- `waffle tests:harness init` scaffolds the harness, the suite's `TestMain`, the
-  boot smoke test and `TestReplacementsStayInsideTheList`, reading the container
-  for the database, the transport and the connections that must be dead.
+- `waffle tests:harness` generates the harness from the container — the
+  database, the transport and its clients, the connections that must be dead,
+  the environment — and regenerates it on every `make generate`. Its first run
+  scaffolds the suite's `TestMain`, the boot smoke test, the migrations check
+  and `TestReplacementsStayInsideTheList`.
 - `replacements.Check()`, scaffolded as a test beside the container, enforces
   `replacements.allow` — what a test may replace is a decision someone made, not
   a habit — and `waffle tests:replacements` prints everything the containers

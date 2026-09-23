@@ -27,7 +27,7 @@ up for.
 - [Introduction](introduction.md) — What waffle is, ecosystem map, architecture overview
 - [Recommended architectures](architectures.md) — Single service, modular monolith, service fleet, and what it takes to change your mind
 - [Getting Started](getting-started.md) — Install the CLI, scaffold a service, first route answering `curl`
-- [Your first component test](first-component-test.md) — From `tests:harness init` to one green scenario and one red one
+- [Your first component test](first-component-test.md) — From `tests:harness` to one green scenario and one red one
 - [What is optional](opting-out.md) — What each tool replaces, the mandatory core, and the cost of skipping
 
 ## Core
