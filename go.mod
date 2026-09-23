@@ -19,7 +19,7 @@ require (
 	gitlab.com/gorib/pry v1.4.1
 	gitlab.com/gorib/redis v1.3.0
 	gitlab.com/gorib/session v1.2.0
-	gitlab.com/gorib/sql v1.8.1
+	gitlab.com/gorib/sql v1.9.1
 	gitlab.com/gorib/whisk v1.3.2
 	golang.org/x/mod v0.40.0
 	golang.org/x/tools v0.49.0
