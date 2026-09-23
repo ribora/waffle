@@ -6,7 +6,7 @@ import (
     "gitlab.com/gorib/di"
 )
 
-var {{ camel .Domain }}ManagementInstance any
+var {{ camel .Domain }}ManagementInstance di.Handle
 
 func Init{{ title .Domain }}Domain() {
     {{ camel .Domain }}ManagementInstance = di.Define(service.New{{ title .Domain }}Management)

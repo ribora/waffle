@@ -40,7 +40,7 @@ gets from the file next door.
 
 ```go
 // config/di/di_user_domain.go
-var userManagementInstance any
+var userManagementInstance di.Handle
 
 func InitUserDomain() {
     userManagementInstance = di.Define(userService.NewUserManagement)

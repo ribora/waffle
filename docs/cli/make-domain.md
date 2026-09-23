@@ -273,7 +273,7 @@ registered, so nothing has to be merged into a file you are also editing:
 **`config/di/di_user_domain.go`** — the management.
 
 ```go
-var userManagementInstance any
+var userManagementInstance di.Handle
 
 func InitUserDomain() {
     userManagementInstance = di.Define(service.NewUserManagement)
