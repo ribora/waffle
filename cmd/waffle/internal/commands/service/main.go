@@ -60,7 +60,7 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 	if err := os.Chmod("waffle", 0755); err != nil {
 		return fmt.Errorf("failed to chmod waffle: %w", err)
 	}
-	if err := agents.Generate(projectName); err != nil {
+	if _, err := agents.Generate(projectName, false); err != nil {
 		return err
 	}
 	if err := c.EnsureTool("gitlab.com/gorib/di/cmd/diogen"); err != nil {

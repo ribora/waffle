@@ -7,12 +7,15 @@ instructions (framework conventions, anti-patterns, command cookbook) plus
 auto-detected service context (module path, domains, modules, env vars).
 
 ```
-waffle agents
+waffle agents [-q]
 ```
 
 Also (re)creates symlinks `CLAUDE.md → AGENTS.md` and `.cursorrules → AGENTS.md`
 so any major AI tool finds its expected file. Real files (not symlinks) are
-never overwritten.
+never overwritten. A file already current is not rewritten, and is reported as
+`= … — up to date`; `-q` leaves those lines out, which is how the scaffolded
+`make generate` runs it on every build — it prints only when a waffle upgrade or
+a new domain actually changes something.
 
 ## What is in the file
 
@@ -77,6 +80,69 @@ commit the diff. It's part of the upgrade workflow, not a separate task.
 
 Everything else (conventions, cookbooks, anti-patterns) is identical across
 services — comes from the waffle template.
+
+## Modes, areas and grants
+
+Rule #11 works in modes — `spec`, `steps`, `redgreen`, `platform`, and `none`
+when no mode is on — and each allows editing a fixed set of paths. Only the human
+switches the mode, and one mode holds for every service a task names. The mode
+table covers the layout waffle scaffolds and lives in waffle; it is rendered into
+`AGENTS.md`, so the file an agent reads and the check a tool runs are the same
+table at the same version.
+
+**Areas** are for everything else. An area is a named set of paths that takes
+itself out of the mode table and decides alone: open in its `modes`, or open in
+one of its `grant` modes once the human grants it by name, until the mode
+changes. waffle ships two, and `waffle.yaml` replaces either by naming it, or
+declares more:
+
+```yaml
+agents:
+  areas:
+    model:                      # waffle's default
+      paths: [domain/*/model/]
+      modes: [none, redgreen, platform]
+      grant: [steps]            # a field a step needs; filling it is redgreen's
+    gomod:                      # waffle's default
+      paths: [go.mod, go.sum]
+      modes: [platform]
+      grant: [redgreen]         # a dependency the feature needs
+    events:                     # a monorepo's shared contract
+      paths: [../../shared/api/events/]
+      modes: [spec, platform]
+    shared:
+      paths: [../../shared/pkg/]
+      modes: [platform]
+```
+
+Paths are relative to the service and may leave it; a trailing slash means
+everything below, and `*` matches one directory. A contract another service
+reads belongs in spec mode, because changing it is part of what gets approved. A
+path outside the service that no area names is not this service's to decide.
+
+```
+waffle agents:guard <mode> <path> [--grant <name>]
+waffle agents:mode <mode>
+waffle agents:grant <mode> [name]
+```
+
+`agents:guard` exits 0 when the mode — with the grants passed — allows editing
+the path, and 1 otherwise, naming the mode or grant that would. A path outside
+the service that no area names prints `unclaimed` and exits 0. It is the check a
+tool runs before an edit; it keeps no state and switches nothing, so which mode
+is on and what was granted is the tool's to track.
+
+`agents:mode` prints what a mode allows and which part of Rule #11 it follows —
+the text a tool shows the agent when the human switches. `agents:grant` lists
+the areas a mode takes as grants, or checks a named one and says what it opens.
+
+**When nothing fits.** If the work needs a path no mode and no grant opens the
+way it needs, the agent is told to stop and quote the `agents.areas` entry that
+would allow it. Adding it is the platform owner's, in platform mode — the file
+is theirs, and the quote lets them decide in one read.
+
+Without a tool that calls these commands, nothing changes: the agent reads the
+same tables in `AGENTS.md` and holds the boundary itself.
 
 ## CI integration (optional)
 

@@ -8,6 +8,7 @@
 package agents
 
 import (
+	"bytes"
 	"embed"
 	"fmt"
 	"go/ast"
@@ -28,22 +29,35 @@ var templates embed.FS
 
 // Generate writes AGENTS.md in the current working directory, auto-detecting
 // the service context (domains, active waffle modules, env vars). projectName
-// is the module path. Overwrites existing AGENTS.md.
-func Generate(projectName string) error {
-	ctx := scanContext(projectName)
-
+// is the module path. quiet leaves out the files that were already current. It
+// reports whether anything on disk changed.
+func Generate(projectName string, quiet bool) (bool, error) {
 	c := command.New("agents-internal", "", templates, nil)
-	sources := map[string]string{
-		filepath.Join("templates", "AGENTS.md.tpl"): "AGENTS.md",
+	cfg, err := c.ProjectConfig(projectName)
+	if err != nil {
+		return false, err
+	}
+	areas, err := Areas(cfg.Agents)
+	if err != nil {
+		return false, err
+	}
+	out, err := c.Render(filepath.Join("templates", "AGENTS.md.tpl"), scanContext(projectName, areas))
+	if err != nil {
+		return false, err
 	}
 
-	// Force regeneration: AGENTS.md is fully waffle-managed.
-	_ = os.Remove("AGENTS.md")
-
-	if err := c.Write(sources, ctx); err != nil {
-		return err
+	changed := false
+	if current, err := os.ReadFile("AGENTS.md"); err != nil || !bytes.Equal(current, out) {
+		if err := os.WriteFile("AGENTS.md", out, 0644); err != nil {
+			return false, fmt.Errorf("write AGENTS.md: %w", err)
+		}
+		command.ReportCreated("AGENTS.md")
+		changed = true
+	} else if !quiet {
+		command.ReportUnchanged("AGENTS.md")
 	}
-	return ensureSymlinks()
+	linked, err := ensureSymlinks(quiet)
+	return changed || linked, err
 }
 
 type serviceContext struct {
@@ -52,9 +66,11 @@ type serviceContext struct {
 	Domains       []string
 	Modules       []string
 	EnvVars       []string
+	Modes         []Mode
+	Areas         []Area
 }
 
-func scanContext(projectName string) serviceContext {
+func scanContext(projectName string, areas []Area) serviceContext {
 	modules := scanModules()
 	return serviceContext{
 		ModulePath:    projectName,
@@ -62,6 +78,8 @@ func scanContext(projectName string) serviceContext {
 		Domains:       scanDomains(),
 		Modules:       modules,
 		EnvVars:       scanEnvVars(modules),
+		Modes:         modes,
+		Areas:         areas,
 	}
 }
 
@@ -203,18 +221,30 @@ func readEnvVars(file *ast.File, seen map[string]bool) {
 	})
 }
 
-func ensureSymlinks() error {
+func ensureSymlinks(quiet bool) (bool, error) {
+	changed := false
 	for _, name := range []string{"CLAUDE.md", ".cursorrules"} {
 		if info, err := os.Lstat(name); err == nil {
 			// Only replace existing symlinks; never overwrite real files.
 			if info.Mode()&os.ModeSymlink == 0 {
+				if !quiet {
+					command.ReportKept(name)
+				}
+				continue
+			}
+			if target, err := os.Readlink(name); err == nil && target == "AGENTS.md" {
+				if !quiet {
+					command.ReportUnchanged(name)
+				}
 				continue
 			}
 			_ = os.Remove(name)
 		}
 		if err := os.Symlink("AGENTS.md", name); err != nil {
-			return fmt.Errorf("symlink %s: %w", name, err)
+			return changed, fmt.Errorf("symlink %s: %w", name, err)
 		}
+		command.ReportCreated(name + " → AGENTS.md")
+		changed = true
 	}
-	return nil
+	return changed, nil
 }

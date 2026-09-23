@@ -3,7 +3,7 @@ package agents
 import (
 	"context"
 	"embed"
-	"fmt"
+	"slices"
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
 )
@@ -14,7 +14,9 @@ func New() *cmd {
 	return &cmd{
 		base: command.New("agents",
 			"Regenerate AGENTS.md with project conventions and auto-detected service context",
-			noTemplates, nil),
+			noTemplates, nil).
+			WithUsage("[-q]\n" +
+				"  -q reports only what changed; make generate runs it on every build"),
 	}
 }
 
@@ -27,6 +29,11 @@ func (c *cmd) Description() string { return c.base.Description() }
 func (c *cmd) Usage() string       { return c.base.Usage() }
 
 func (c *cmd) Run(ctx context.Context, args ...string) error {
+	quiet := false
+	if i := slices.Index(args, "-q"); i >= 0 {
+		quiet = true
+		args = slices.Delete(args, i, i+1)
+	}
 	if err := c.base.Operands(args, 0, 0); err != nil {
 		return err
 	}
@@ -34,10 +41,6 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 	if err != nil {
 		return err
 	}
-	if err := Generate(projectName); err != nil {
-		return err
-	}
-	fmt.Println("Wrote AGENTS.md (+ symlinks CLAUDE.md, .cursorrules).")
-	fmt.Println("Service-specific notes go in CONTRIBUTING.md.")
-	return nil
+	_, err = Generate(projectName, quiet)
+	return err
 }

@@ -18,6 +18,19 @@ type Config struct {
 	ProtoDir     string              `yaml:"proto_dir"`
 	Mapper       string              `yaml:"mapper"`
 	Replacements replacements.Config `yaml:"replacements"`
+	Agents       AgentsConfig        `yaml:"agents"`
+}
+
+type AgentsConfig struct {
+	Areas map[string]AreaConfig `yaml:"areas"`
+}
+
+// An area's paths are relative to the service and may leave it; a trailing
+// slash means everything below.
+type AreaConfig struct {
+	Paths []string `yaml:"paths"`
+	Modes []string `yaml:"modes"`
+	Grant []string `yaml:"grant"`
 }
 
 // ProjectConfig loads waffle.yaml; a missing file is identical to all-defaults.

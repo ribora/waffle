@@ -28,6 +28,7 @@ go install gitlab.com/gorib/waffle/cmd/waffle@latest
 | `waffle tests:harness` | Regenerate the component harness from the container; the first run also scaffolds the suite ([details](../conventions/component-harness.md)) |
 | `waffle tests:replacements [check] [--container=<path>]` | List everything the containers expose and what `replacements.allow` grants; `check` fails if a test replaces a field the list does not name |
 | `waffle agents` | Regenerate `AGENTS.md` after a waffle upgrade ([details](agents.md)) |
+| `waffle agents:guard <mode> <path>`, `waffle agents:mode <mode>`, `waffle agents:grant <mode>` | Rule #11's modes, areas and grants, for a tool that enforces them ([details](agents.md#modes-areas-and-grants)) |
 
 `--help` on any of them prints its description and operands. A failing command
 exits non-zero, so a `make` target that calls one stops.
@@ -145,6 +146,7 @@ Project-level conventions live in `waffle.yaml`, next to `go.mod`. `init:service
 | `proto_dir` | `api/proto` | Where `.proto` sources are written |
 | `mapper` | `"goverter"` | `"goverter"` scaffolds a goverter `convert/convert.go`; `"dto"` scaffolds nothing extra (hand-written conversions) |
 | `replacements.allow` | empty | Interfaces a test may supply on the container's `Replacements`, keyed by import path: `gitlab.com/gorib/sql: [Db]`. A permission list — an empty one allows nothing |
+| `agents.areas` | `model`, `gomod` | Named sets of paths that Rule #11's modes open, or that the human grants on top of a mode; paths may leave the service. See [agents](agents.md#modes-areas-and-grants) |
 
 `<service>` is the last path segment of the module name. A missing `waffle.yaml`, or one missing some keys, behaves exactly like a file containing only the defaults above — the two are indistinguishable to every command. An unknown key (e.g. a typo) is a hard error, and an invalid `mapper` value (anything other than `dto` or `goverter`) is a hard error.
 

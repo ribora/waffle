@@ -18,6 +18,18 @@ var (
 	missMark = color.New(color.FgRed).Sprint("-")
 )
 
+func ReportCreated(paths ...string) {
+	reportCreated(paths)
+}
+
+// For a file that is regenerated rather than scaffolded: "left alone" would claim
+// a choice, and this one was compared and found current.
+func ReportUnchanged(paths ...string) {
+	for _, path := range paths {
+		_, _ = fmt.Fprintf(output, "  %s %s — up to date\n", keepMark, path)
+	}
+}
+
 func ReportMissing(paths ...string) {
 	for _, path := range paths {
 		_, _ = fmt.Fprintf(output, "  %s %s — missing\n", missMark, path)

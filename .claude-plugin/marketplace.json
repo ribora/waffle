@@ -1,0 +1,13 @@
+{
+  "name": "gorib",
+  "owner": {
+    "name": "gorib"
+  },
+  "plugins": [
+    {
+      "name": "waffle",
+      "source": "./agents/claude",
+      "description": "Rule #11 modes for waffle services: the human switches the mode, a hook refuses the edits it does not allow"
+    }
+  ]
+}

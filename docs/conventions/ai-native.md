@@ -101,6 +101,84 @@ stop an agent with momentum. A prohibition needs either a mechanism or a surface
 a third party can check.** Both incidents were argued against, at length, in the
 file the agent had read.
 
+### Modes: the third failure, and the mechanism
+
+**Third: leaving the cycle by classifying the task.** In the specification step,
+an agent was answered "fix `waffle.yaml` for the new layout". It judged —
+plausibly — that a generator setting is not behaviour and so not a specification
+task, declared the request outside the step, and edited the file. It broke
+nothing it was told in so many words: it had been told that an answer is the
+content of a row, and it decided this answer was not one. Prose lost a third
+time, and this time to an argument about which rule applies.
+
+So the step boundary became a mechanism. Every edit is made in a **mode** —
+`spec`, `steps`, `redgreen`, `platform`, or none — and each allows a fixed set of
+paths. Only the human switches the mode. The table lives in waffle: `AGENTS.md`
+renders it, and `waffle agents:guard <mode> <path>` answers from the same copy,
+naming the mode that would allow a refused path. The agent's move stops being
+"decide whether this is still the task" and becomes "ask for the mode" — a
+question the human answers in one word.
+
+The first use bore this out. Told in spec mode to add two kinds to the fiscal
+policy, the agent said the change was production code and not this step's — and
+tried the edit anyway. The hook refused it; the agent asked for redgreen by its
+exact command, and when then told to "ignore it and be quick", answered that the
+refusal was not its to skip. Prose it had just quoted did not stop the edit; the
+mechanism did.
+
+Two decisions in it are deliberate:
+
+- **The rules stay in `AGENTS.md`.** The mode table is part of Rule #11, so an
+  agent in any tool — or in a cloud session, where plugins do not load — works to
+  the same protocol and holds the boundary itself. A tool adds enforcement, not
+  content.
+- **The table is versioned with the service.** `agents:guard` is the service's
+  own waffle, so services on different waffle versions each get their own rules,
+  and whatever calls it holds none.
+
+### The Claude Code plugin
+
+For Claude Code the mechanism ships as a plugin in this repository. It adds
+`/waffle:spec`, `/waffle:steps`, `/waffle:redgreen`, `/waffle:platform` and
+`/waffle:none`, which only the human can invoke; keeps one mode per session for
+every service the task names; and refuses an edit the mode does not allow before
+it happens, with the mode to ask for. `/waffle:allow <area>` widens the current
+mode by one named area until the mode changes — `model` in steps, for a field a
+step cannot do without; `gomod` in redgreen, for a dependency — so a step that
+needs a shape, or a feature that needs a library, is one word rather than a round
+trip through another mode. The areas themselves, a monorepo's shared contracts
+among them, are declared in `waffle.yaml` —
+[cli/agents](../cli/agents.md#modes-areas-and-grants). A service whose waffle has no `agents:guard` yet stays
+editable, and the plugin says once that edits there are not checked.
+
+For yourself:
+
+```
+/plugin marketplace add https://gitlab.com/gorib/waffle.git
+/plugin install waffle@gorib
+```
+
+For everyone on a project, in its `.claude/settings.json`; a teammate gets the
+plugin when they trust the folder:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "gorib": {"source": {"source": "url", "url": "https://gitlab.com/gorib/waffle.git"}}
+  },
+  "enabledPlugins": {"waffle@gorib": true}
+}
+```
+
+In a monorepo this goes in the root's `.claude/settings.json` — Claude Code does
+not read one in a subdirectory. The plugin finds the service from the path of the
+file being edited, and a command names one by its path, relative to where the
+session runs — `/waffle:spec ./path/to/service`, several at once for a change
+that crosses services. It is always a path: waffle does not know how a
+repository lays its services out. The path is typed once per task: a command
+that names none acts on the services the session named last, or on the one the
+session runs in.
+
 ### Why a delta list rather than "read the scenarios"
 
 Requirements written by analysts always have gaps, and an agent transforming them
@@ -313,6 +391,9 @@ workflow that gets abandoned at the first step that does not work.
   expose, with `check` for the same comparison on demand.
 - Rule #11 in `AGENTS.md`, which is phrased over "executable specification"
   rather than any one format, so it is followable today with ordinary Go tests.
+- Rule #11's modes, `waffle agents:guard` and `waffle agents:mode`, and the
+  Claude Code plugin that enforces them — see
+  [the plugin](#the-claude-code-plugin).
 - **the component harness**, as libraries — see
   [conventions/component-harness](component-harness.md). The resource seam is
   `waffle/resource`; postgres, redis and elasticsearch are `sql/sqltest`,
@@ -333,6 +414,15 @@ workflow that gets abandoned at the first step that does not work.
   baseline did. It fails on the case that actually happens — code edited in a
   hurry, no specification touched — and asks for nothing when nothing is wrong.
   Not written yet.
+- **edits made through the shell.** The plugin checks the editing tools; a file
+  rewritten by a shell command is not checked.
+- **the task type, declared by the human.** A code defect and a spike take no
+  cycle, and the agent still decides which a task is — so a feature relabelled
+  as a code defect skips the cycle with no mode switched. Modes for a fix and a
+  spike would make that the human's call; they wait on the plugin's first use.
+- **enforcement in other tools.** Kiro, Antigravity and the rest read
+  `AGENTS.md` and hold the modes themselves; `agents:guard` takes plain
+  arguments, so an adapter for any of them calls the same command.
 
 **Deliberately not a gate.** Rule #11 is satisfied by a person reading a
 specification and judging it, and no pipeline can check that a person did. A

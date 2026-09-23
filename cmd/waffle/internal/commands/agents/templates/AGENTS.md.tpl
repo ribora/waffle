@@ -11,8 +11,10 @@ are gone.
 
 **Read `CONTRIBUTING.md` first, if it exists.** It holds service-specific
 instructions — business rules, custom commands, known quirks — and it overrides
-this file wherever the two disagree. `waffle agents` never touches it, so
-service-specific notes go there and not here.
+this file wherever the two disagree, Rule #11 included. `waffle agents` never
+touches it, and it belongs to the humans who own the service: when you learn
+something that belongs there — a convention you had to infer, a quirk that cost
+you a wrong turn — quote what you would write, and do not write it.
 
 ## This service
 
@@ -36,7 +38,10 @@ Held in mind, all of it:
   steps → red-green, with the permission list read before any of them. Being
   asked for one step is not being asked for the next, and an answer you get
   inside a step is not the next step either.
-- **Three things you do not write.** `waffle.yaml` (the platform owner's),
+- **Every edit is made in a mode the human switched on.** An edit the mode does
+  not allow is a stop: name the mode that allows it and ask (Rule #11, Modes).
+- **Three things you do not write.** `waffle.yaml` (the platform owner's,
+  platform mode only),
   `CONTRIBUTING.md` (the humans'), and production code before the cases are
   approved. None of them appears in the diff of a specification task.
 - **One stop-and-report.** The cut is a given: when it does not fit the case,
@@ -103,6 +108,64 @@ when the scenarios are written. Neither is an answer you get *inside* a step the
 next step. Each stop is a place where a person can change the answer for the
 price of a conversation instead of the price of a rewrite.
 
+### Modes
+
+Every edit is made in a mode, and **only the human switches it** — by a command
+where the tool has one, otherwise by naming the mode in words: "spec mode",
+"platform mode". One mode holds for every service the task names; a service it
+stops naming is back to none. Where the tool enforces these tables, a refused
+edit names the mode that would allow it; where it does not, you hold the same
+boundary yourself.
+
+| mode | may be edited |
+|---|---|
+{{ range .Modes }}| {{ .Name }} | {{ .Allows }} |
+{{ end }}
+The platform's files are `waffle.yaml` and `tests/internal/`. `CONTRIBUTING.md`
+is edited in no mode.
+
+An **area** takes its paths out of that table and decides them itself: open in
+its modes, or in a grant mode once the human grants it by name — which lasts
+until the mode changes. The defaults are waffle's; `waffle.yaml` declares the
+rest under `agents.areas`, and the paths may leave the service — a monorepo's
+shared contracts are areas. This service has:
+
+| area | paths | open in | granted in |
+|---|---|---|---|
+{{ range .Areas }}| {{ .Name }} | {{ .PathList }} | {{ .ModeList }} | {{ .GrantList }} |
+{{ end }}
+`waffle agents:grant <mode>` lists the grants a mode takes. A grant covers exactly
+the area it names; needing a second one is a second question. A contract another
+service reads is changed in spec mode, because it is part of what gets approved.
+
+**When no mode and no grant fits the work,** say which path you need and in which
+mode, and quote the `agents.areas` entry for `waffle.yaml` that would allow it —
+its name, paths, and the modes it opens in or is granted in. Adding it is the
+platform owner's, in platform mode; the quote is what lets them decide in one
+read.
+
+**An edit the mode does not allow is a stop.** Name the mode or the grant that
+allows it — `waffle agents:guard <mode> <path>` answers — and ask the human. Do not
+decide on your own that the task has left the cycle: leaving it is the human's
+call, made by switching the mode. An answer to your question switches nothing,
+and neither does an imperative inside a step. `waffle agents:mode <mode>` prints
+what a mode allows and which part of this rule it follows; neither command
+switches anything.
+
+**Do not test the boundary with an edit.** Ask `waffle agents:guard` first: a
+refused edit is the same stop, reached later.
+
+**In Claude Code, the waffle plugin enforces these tables** — `/waffle:<mode>`
+switches, `/waffle:allow <area>` grants, and a hook refuses what the mode does
+not allow. When it is on, a line saying "waffle plugin active" is in your
+context. If it is not, say once, at the start of a Rule #11 task, that the human
+can install it, and do not repeat it:
+
+```
+/plugin marketplace add https://gitlab.com/gorib/waffle.git
+/plugin install waffle@gorib
+```
+
 ### 0. When the code came first
 
 This service has behaviour nobody wrote down, so the first change to touch it
@@ -131,9 +194,13 @@ in the present tense, and what it excludes. Not a log — no dated decision
 entries, no "fixed on <date>" lines. Three of those and the reader has a history
 to work through instead of a rule, and the prose stops being read; a rule that
 changes is **rewritten**, not appended to, because who decided it and when is in
-the history and in the ticket. A ✗ case is red, and its comment says what the
-service does today and that the case describes the behaviour that is wanted, so
-nobody reads that red as a broken test.
+the history and in the ticket.
+
+**A red case carries no status.** Its comment is the rule in the present tense,
+as if the service already kept it — a new feature and a known defect alike. That
+the service does not yet is what the red run says, and it goes in the hand-over,
+where the red cases are listed with why each is red; a status line in the file is
+wrong the day the case turns green.
 
 **Adjudication is the human's.** Deriving cases is the cheap half, and expect to
 be wrong about which are defects — a deliberate business rule reads exactly like
@@ -179,11 +246,16 @@ choice is the human's, not yours.
 **One specification per declared contract, not per service.** The
 `interface{ A; B; C }` entry that `waffle tests:replacements`
 reports for a shared container field *is* the list of contracts a domain owes —
-one constituent per caller, each a place a scenario binds. Measured: four
-callers with no overlap at all, so cases written against the gRPC operations
-alone would have covered one contract in four.
+one constituent per caller, each a place a scenario binds. Cases written
+against the gRPC operations alone cover one of them.
 
 ### Writing the cases
+
+**A case is verified against the requirements, not the code.** The code tells you
+whether a case is red and which names reach the wire; it is the thing under test,
+not the answer. A case that disagrees with the code is a red case to report,
+never one to align with it. With no requirements in the conversation, ask what
+the cases are to be verified against before reading the code for answers.
 
 **A case for a known defect asserts the behaviour you want, so it is red.**
 Writing what the code currently does turns a defect into a green regression
@@ -195,9 +267,7 @@ or a case is wrong.
 which implementation would also pass it and should not. If one exists, the case
 does not discriminate, and it needs variation — two facilities configured
 differently rather than one. Put the answer in the delta list: a reviewer can
-judge a named alternative, but not imagine the whole space of them. Measured:
-three such cases passed against an implementation holding one configuration for
-the whole process, because every one of them used the same single facility.
+judge a named alternative, but not imagine the whole space of them.
 
 **Fold duplicates along one axis only.** Same setup and same trigger, differing
 only in the expectation, is one case with a column added. Differing in the
@@ -247,7 +317,7 @@ translated: they are the names on the wire.
 
 **Say that the arithmetic was read, not run.** Every number in the cases came
 from reading the code, because the steps do not exist yet, and about one in a
-hundred will be wrong — measured. Saying so at the gate makes the correction
+hundred will be wrong. Saying so at the gate makes the correction
 after the first run an expected event, and tells the reviewer which part of the
 document carries the least confidence.
 
@@ -295,54 +365,30 @@ does not read the other.
 
 #### What may be replaced is given, not chosen
 
-`waffle.yaml` says what a test may supply itself, and it is **read-only for this
-task**:
+`replacements.allow` in `waffle.yaml` is a permission list: what it does not
+name may not be replaced, in any form — mock, spy, fake or no-op.
+`waffle tests:replacements` prints every seam, granted or not; it is a menu for
+the platform owner, not a licence.
 
-```yaml
-replacements:
-  allow:
-    <import path>: [<interface>]
-```
+**A missing or empty `replacements:` key grants nothing** — not "unrestricted",
+and not an oversight you may repair. Check it before writing cases: if the list
+and the contract do not meet, **stop there and say so**.
 
-A permission list, not a list of exceptions: what it does not name may not be
-replaced, in any form — mock, spy, fake or no-op. Do not add an entry to it.
-`waffle tests:replacements` prints everything the containers expose, granted or
-not; it is a menu for whoever owns the platform, not a licence.
+`TestReplacementsStayInsideTheList` fails in the ordinary suite on every field
+the list does not cover; `waffle tests:replacements check` prints the same —
+run it before handing over and paste what it said. **Its failure names the seams
+you need, not an edit to make:** the hand-over is the red output plus the seams
+you are asking for. Putting them into `waffle.yaml` turns the check into a
+formality that agrees with whatever you did.
 
-**A missing `replacements:` key, or an empty one, grants nothing.** It does not
-mean "unrestricted" and it is not an oversight you may repair: on a service
-where the list is absent, no test may supply anything, and a specification that
-needs a seam cannot be written until someone grants it. That is the common case
-on a service nobody has set up yet, and it is the first thing to check — before
-writing cases, not after. Read the list, decide what the contract needs, and if
-the two do not meet, **stop there and say so**. Inventing the fakes and letting
-the list catch up is the one move that destroys the point of having a list.
+`tests/internal/harness/` is read-only too. It supplies what is a condition of
+loading rather than a choice — the database, the logger, a dead connection under
+a replaced client. Do not change it, and do not move a replacement in there
+because a scenario was inconvenient.
 
-**The list is checked, not merely written down.** `TestReplacementsStayInsideTheList`
-sits beside the container and reads the `Replacements` literals out of every test
-in the module, failing with the name of each field the list does not cover — so
-an ungranted replacement is a red test in the ordinary suite, not something that
-depends on anyone remembering a command. `waffle tests:replacements check` runs
-the same comparison and prints it; run it before you hand anything over and paste
-what it said.
-
-**Its failure names the seams you need. It is not a list of edits to make.**
-There are two ways to turn that output green — take the replacement out of the
-test, or put the seam into `waffle.yaml` — and the second one is the forbidden
-move, not the obvious one. Editing the file to match what you already wrote
-turns the check into a formality that agrees with whatever you did, and destroys
-the only record of what a person actually permitted. If the run is red, the
-hand-over is the red output plus the list of seams you are asking for.
-
-**`waffle.yaml` never appears in the diff of a specification task.** If it does,
-the task is invalid whatever the tests say — that file is the other role's
-answer, and a task cannot supply its own permissions. This holds for a service
-where the key is missing entirely: absent is an answer, and the answer is no.
-
-`tests/internal/harness/` is read-only too. `Boot` supplies what is a condition
-of loading rather than a choice — the database, the logger, a dead connection
-under a replaced client. Do not change it, and do not move a replacement in
-there because a scenario was inconvenient.
+**A value one case depends on — an environment variable included — is set by
+that case's step, never in the harness.** The harness is suite-wide and the
+platform's; putting a case's decision there hides it from the reviewer.
 
 **The form of the replacement is yours**, because it follows from the assertion:
 
@@ -384,8 +430,8 @@ around it. The recognisable cases:
 `tests/internal/harness/harness_gen.go` from the container — the database and its
 migrations, the transport and a typed client per handler, the interceptor order,
 a dead connection for every `ClientConnInterface` seam, a typed field for every
-variable the boot reads — and `make generate` regenerates it. Never edit that
-file. A run needs no configuration either — with no DSN set, a postgres
+variable the boot reads — and `make generate` regenerates it, in any mode; that
+change is not a platform edit. Never edit that file. A run needs no configuration either — with no DSN set, a postgres
 container is started and the next run reuses it, so do not ask for one.
 `docs/conventions/component-harness.md` in waffle is the reference.
 
@@ -394,11 +440,21 @@ brings the resources up, boots on the given cut and asserts only that the caller
 are non-nil. One run then tells you what the cut is missing instead of an hour
 inside a half-written suite.
 
-What the container cannot say — a second resource, a value with a meaning — goes
-into hooks in `tests/internal/harness/harness.go`, which is the harness owner's
-file, not yours.
+What the container cannot say for the whole suite — a second resource, a value
+every case boots with, `Custom` for a key no code reads through
+`gitlab.com/gorib/env` — goes into hooks in `tests/internal/harness/harness.go`,
+which is the harness owner's file, not yours.
 
-Still no production code at this stage.
+**A case a step cannot express without a production shape is a stop.** A field or
+type the step needs to read is shape, not behaviour: name it, and ask for the
+`model` grant — or, where the shape is a contract another service reads, for a
+return to spec mode. Filling it is still red-green's.
+
+**The steps are done when every case is red for its own reason.** A case red
+because a step reads no column, or a suite that does not compile, is not that —
+the stop is not reached, and red-green is not yours to start.
+
+Still no production code at this stage, beyond the shape a grant opens.
 
 ### 4. Red-green
 
@@ -429,7 +485,7 @@ to open the file will take it for approved behaviour.
 list is as likely to be a step that does not send what the case says as a defect
 in the service — a column added to a table and not read, a value formatted for
 the wire the wrong way. Read the failure before believing it: a step defect that
-survives makes the case green while it tests nothing. Measured: one of sixteen.
+survives makes the case green while it tests nothing.
 
 ### Changing an approved specification
 
@@ -449,8 +505,8 @@ The **specification**, as a diff, and a **link to the ticket** where the delta
 list was argued. Approval itself is not machine-checkable: a pipeline can verify
 that a link is present, not that anybody read anything.
 
-**What the diff must not carry.** Two things a reviewer can check without
-reading anything else:
+**What the diff must not carry.** Files a reviewer can check without reading
+anything else:
 
 - **`waffle.yaml`.** Its presence means the task granted itself the permissions
   it was working under.
@@ -461,7 +517,7 @@ reading anything else:
   makes it the most valuable one to edit and the one nobody should find edited
   here.
 
-Both cost a glance at the file list, and neither depends on the author having
+Each costs a glance at the file list, and none depends on the author having
 followed any of the rules above — which is the point of having them here. Every
 other rule in this section is checkable only by someone who read the work.
 
@@ -476,24 +532,25 @@ For any scaffolding task, first check whether a `waffle` command does it. Only
 hand-write files when no command matches.
 
 Every command there is, so a gap in this table is a gap in the toolchain and not
-something to fill in by hand without saying so:
+something to fill in by hand without saying so. Operands and flags are in
+`waffle <command> --help`; a command that leaves work for you prints it:
 
 | Want to do | Command |
 |---|---|
-| New service | `waffle init:service` — no operands; the service name is the last segment of the module path in `go.mod`, which has to exist first |
+| New service | `waffle init:service` |
 | New domain (model + service + repository + migrations) | `waffle make:domain <domain>` |
 | Add inbound gRPC | `waffle make:domain:grpc <domain>` |
 | Add inbound HTTP | `waffle make:domain:http <domain>` |
-| Add event consumer | `waffle make:domain:scribus --driver <id> [--batch] <domain> <event> [subject]` — `--driver` names the broker module under `config/tools/scribus` (`amqp`); the subject defaults to `<event>`, pass it when it is dotted (`order_paid order.paid`), and `--batch` for a `BatchHandler` |
-| Add an entity to a domain | `waffle make:domain:entity <domain> <entity>` — the same set the domain's own entity gets, table included; an entity always gets a repository, and `--storage` only picks which adapter (`sql` by default) |
+| Add event consumer | `waffle make:domain:scribus --driver <id> <domain> <event>` |
+| Add an entity to a domain | `waffle make:domain:entity <domain> <entity>` |
 | Set up migrations for a domain that has none | `waffle make:domain:migrate <domain>` |
 | Add one migration to a domain that already has them | `waffle make:domain:migration <domain> <description>` |
-| Add CLI subcommand | `waffle make:domain:command <domain> <command>` — the name may be hyphenated (`sweep-otp`), and the command registers as `<domain>:<name>` so it cannot collide with `grpc`, `http`, `migrate`, `cron` or `scribus` |
-| Make published events survive a crash after the commit | `waffle make:outbox --driver amqp` — the driver is required, as it is for scribus; writes `domain/outbox/cmd/migrate` and enables the module; then add `Enqueue` to the publisher interface, change the call sites that need the guarantee, and run `./app outbox` as its own deployment |
-| Add DTO converter (any path) | `waffle make:converter <path>` — also creates `pkg/goverter/convert.go` if it is missing |
-| Put the component harness in place | `waffle tests:harness` reports what is there, `waffle tests:harness init` writes the rest (Rule #11 step 3) |
-| See what a test may replace | `waffle tests:replacements` — every seam, marked `# leaf` and `# allowed` |
-| Check what the tests replace | `waffle tests:replacements check` (Rule #11 step 3) |
+| Add CLI subcommand | `waffle make:domain:command <domain> <command>` |
+| Make published events survive a crash after the commit | `waffle make:outbox --driver amqp` |
+| Add DTO converter (any path) | `waffle make:converter <path>` |
+| Put the component harness in place | `waffle tests:harness` |
+| See what a test may replace | `waffle tests:replacements` |
+| Check what the tests replace | `waffle tests:replacements check` |
 | Refresh AGENTS.md | `waffle agents` |
 
 Outbound adapters are the hole: there is **no** command for a client of another
@@ -505,7 +562,7 @@ re-run any command safely.
 
 Project conventions (API import path, proto directory, DTO mapper) live in
 `waffle.yaml` at the project root — generators follow it instead of
-hardcoded paths. See `waffle/docs/cli/overview.md#waffleyaml`.
+hardcoded paths. See `docs/cli/overview.md` in waffle.
 
 ## Rule #2 — always run validation after edits
 
@@ -532,81 +589,28 @@ duplicate alias). Skipping it leaves the service in a broken state.
 
 ## Project layout
 
-```
-api/proto/<domain>/service.proto     Proto contract — edit this (path from waffle.yaml proto_dir)
-api/pb/<domain>/                     Generated stubs — never edit (import path from api_import)
-cmd/app/main.go                      Entry point (don't touch beyond init)
-config/
-  di/
-    modules.go                       Blank imports of waffle modules ONLY
-    di.go                            //go:generate diogen; InitDi() with service-specific wires
-  diogen/
-    di.go                            Hand-written adapter
-    di_gen.go                        GENERATED — never edit
-domain/<x>/
-  model/                             Domain types (no external deps)
-  service/                           Business logic + interfaces (depends on model only)
-  adapter/                           Outbound (postgres, gRPC clients, HTTP clients) — and the only door to another domain (Rule #12)
-    postgres/                        sql repository (uses stored<X> with Unwrap/Inserts)
-    <name>.go                        Other outbound adapters (flat files in adapter/)
-  cmd/
-    grpc/                            Inbound gRPC (flat package, one per domain)
-      service.go                     Handler: struct, Start(), RPC methods
-      errors.go                      ErrorMapper (domain error → codes.Code)
-      convert/                       goverter converter — only with mapper: goverter (see Rule #6)
-    http/                            Inbound HTTP
-      main.go                        Routes
-      convert/                       goverter converter — only with mapper: goverter
-    scribus/                         AMQP consumer (one file per event)
-      <event>.go                     Handler
-      model/<event>.go               Event payload
-      convert/                       goverter converter — only with mapper: goverter (shared across a domain's events)
-    migrate/                         Migrations source
-      main.go                        NewMigrations() — embeds *.sql
-      migrations/*.sql
-pkg/
-  goverter/convert.go                Project-wide conversion whitelist (see Rule #6) — imports no domain (Rule #12)
-```
+The scaffolds write it, so the shape is what `waffle make:domain` left in
+`domain/`. What the tree does not show:
 
-The `mapper` key in `waffle.yaml` decides conversions. Default `goverter`: each
-transport gets a `convert/` package as shown above. `dto`: no `convert/` package
-is scaffolded — write conversions by hand (inline in the handler, or a `dto.go`
-you add to its package).
+- `domain/<x>/model` depends on nothing, `service/` on `model/` only;
+  `adapter/` is outbound and the only door to another domain (Rule #12),
+  `cmd/` is inbound
+- `api/proto/` is edited; `api/pb/` and every `*_gen.go` are generated
+- `config/di/di.go` is yours; `config/diogen/di_gen.go` is diogen's
+- `mapper: dto` in `waffle.yaml` scaffolds no `convert/` package — conversions
+  are written by hand
 
 ## Rule #12 — a domain is reached only through an adapter
 
 `adapter/` is the one door out of a domain, and the neighbour's `model/` is the
-one thing behind it:
+one thing behind it. Only another domain's `adapter/**` (for `model/`), the
+composition root and `tests/` may import a domain — `pkg/` may not, and domain
+logic parked there is a boundary nobody can see. Inside a domain, `service/`
+never imports its own `adapter/`: it declares what it needs and DI answers it.
 
-- **Types.** Nothing outside a domain may import it. The exceptions are
-  `domain/<x>/adapter/**`, which may import `domain/<y>/model` and nothing else
-  of `<y>`; a composition root — whatever carries a `//go:generate diogen` line
-  and the container it writes, so a second binary's root and a domain that
-  registers itself both count, or a directory named by
-  `boundaries.Roots(...)` where there is no directive; and `tests/`, which boots
-  the real thing. `pkg/`, `lib/`, `api/` — anything else — may not reach a
-  domain at all.
-- **Behaviour.** A registration may answer `domain/<x>`'s interface with
-  `domain/<y>`'s package only when the interface is in `domain/<x>/adapter/**`
-  and the answer is `domain/<y>/service`. `config/di/` may *import* anything —
-  it is the composition root — but this is what it may *wire*.
-- **Layers, inside one domain.** `adapter/**` is imported only from another
-  adapter — not from `service/`, which declares what it needs and lets DI answer
-  it; naming an adapter is how a seam is lost. `cmd/**` is imported only from
-  inside `cmd/**` — a transport is private. `model/` is open to the whole
-  domain. `config/di/` is not in a domain and is bound by neither.
-
-`pkg/` is the one people reach for: it is plumbing every domain may import, so
-domain logic parked there is a boundary nobody can see. The rule is about being
-outside every domain, though, not about the directory's name.
-
-Both halves are needed, because a coupling can hide from either one. A borrowed
-method whose signature is all primitives (`Cancel(ctx, id) error`) can be
-declared in `rent/service` and wired to `invoice/service` with no import
-anywhere — which is why the check reads `di.Wire`, `di.Define` and `di.Alias`
-as well as import lines. A handle counts as its constructor: `di.Wire[X](h)`
-where `h = di.Define(otherDomain.NewY)` is the same crossing written in two
-files.
+The check reads `di.Wire`/`di.Define`/`di.Alias` as well as imports, so a
+cross-domain wiring with no import is caught too. The full rule set is
+`docs/architectures.md` in waffle.
 
 The legal shape: the adapter declares the interface it needs (Rule #3), imports
 the neighbour's model only for the types in that interface, and translates them
@@ -640,9 +644,7 @@ di.Define(invoiceService.NewInvoiceManagement,
 Behaviour crosses through the interface; types cross directly and stop at
 `toDomain`. Past that line the neighbour's model does not appear.
 
-`boundaries.Check()` runs as an ordinary test from
-`config/diogen/boundaries_test.go` — so a crossing shows up in `make test` and
-in CI, not in the three commands of Rule #2. Check it before you hand over.
+`boundaries.Check()` runs in `make test`, not in the three commands of Rule #2.
 There is no exceptions file: a crossing that would need one is a design
 question for the platform engineer, not a line of configuration.
 
@@ -666,162 +668,46 @@ These deviate from Go style guide but are project-wide. Don't "fix" them.
 
 ## Rule #4 — dependency injection (diogen)
 
-DI is **compile-time**. There is no runtime container. Read `config/di/di.go`
-carefully before touching it.
+DI is **compile-time**: `config/di/di.go` is read by diogen and turned into
+`di_gen.go`; there is no runtime container. The primitives and every generation
+error are in the diogen README — a mistake in wiring stops `make generate` with
+a message the README's Troubleshooting section explains.
 
-### Wiring primitives
+What generation does not stop, because it compiles and is wrong:
 
-```go
-di.Wire[Interface](constructor, ...opts)        // bind concrete to interface
-di.Define(constructor, ...opts)                  // bind without interface; answers with a handle
-di.Wire[Interface](handle)                       // bind a handle di.Define answered with
-di.Tag(SomeTag)                                  // mark for collection
-di.Tags(SomeTag)                                 // collect all values tagged; the parameter says as what
-di.List(handleA, handleB)                        // the same slice, in the order written
-di.For[Consumer]()                               // scope binding to one consumer
-di.Args(map[string]any{...})                     // override constructor args
-di.Alias[OtherInterface]()                       // expose same instance under multiple ifaces
-di.Fallback()                                    // low-priority default; dropped if a normal/Override provider exists
-di.Override()                                    // win over normal/Fallback providers for the slot
-```
-
-Provider priority per slot: `Fallback` < normal < `Override`. Two providers at
-the same tier for one slot (without `di.For` or mutually exclusive conditions)
-is a generation error, not last-wins.
-
-### Anti-patterns
-
-- ❌ Manually calling constructors anywhere outside `InitDi()` or its delegates
-- ❌ `func init()` for DI registration (use `di.Wire` in `InitDi()`)
-- ❌ Adding entries to `di.go` for waffle tools — use **blank import** in `modules.go`
-- ❌ Taking a tagged type as a plain constructor argument. A `di.Tag`
-  registration is a collection member and nothing else: it never fills a slot
-  and never answers a single-value dependency. Collect with `di.Tags(tag)`,
-  or drop the tag from the registration you meant to wire directly
-- ❌ `di.Wire[T](someVar)` where `someVar` is a local. Only the value returned by
-  `di.Define` is a handle — the generator cannot copy a local of `InitDi()` into
-  the container. Register the constructor, or bind a handle first:
-  `h := di.Define(NewT)`
-- ❌ Registering the same constructor twice while both registrations are built
-  (typically once with `di.Tag`, once without). Field names come from the type,
-  and the constructor is the last thing left to tell two registrations apart —
-  so there is no name for the second one
-
-Each of these is a **generation error**, not a lint. They exist because the
-output would otherwise compile and be wrong: a nil type assertion at startup, an
-arbitrary member of a collection passed as a single dependency, or a constructor
-run twice with the second value overwriting the first.
-
-### Component tests — `Replacements`
-
-How the seam is used, and what may go into it, is Rule #11 step 3. What belongs
-here is why a registration has no entry, and how *not* to substitute one:
-
-**A seam exists only when every type the registration is exposed as is an
-interface.** `di.Define(NewServer)` exposes the concrete `*Server` and gets no
-field. A `di.Tag` member gets no seam of its own either — membership is fixed at
-generation time, so replacing one member cannot change the set — but the
-collection its `di.Tags` consumer gathers does: a `Replacements` field of the slice
-type it asked for replaces the whole collection at once. A `di.List` behaves the
-same way, named after the consumer and the argument instead of after a tag.
-
-- ❌ `if env.Value("APP_ENV") == "test"` in `InitDi()` — that puts test knowledge
-  into production wiring
+- ❌ Calling constructors by hand outside `InitDi()` or its delegates
+- ❌ `func init()` for DI registration — registrations go in `InitDi()`
+- ❌ Registering a waffle module in `di.go` — it is a **blank import** in
+  `config/di/modules.go`, then `make generate`
+- ❌ `if env.Value("APP_ENV") == "test"` in `InitDi()` — test knowledge in
+  production wiring. A test substitutes through `Replacements` (Rule #11 step 3)
 - ❌ `di.Override()` to inject a mock — it is a build-time directive, so the mock
   would have to be importable from production code
 
-And the surprise worth knowing before you design a cut: **supplying a field does
-not prune what fed that constructor.** Anything eagerly built below it still gets
-built, so whatever touches the environment or the network has to be in the cut
-too. The one exception is a tagged member that feeds nothing but that one
-collection: replacing the collection skips its constructor entirely. A member
-feeding more than one collection always builds for real regardless of what you
-supply — `di_gen.go` says which case a given constructor is in, right above the
-call: `// skipped once <Field> is supplied` or `// always builds regardless of
+**Supplying a `Replacements` field does not prune what fed that constructor.**
+Whatever is eagerly built below it still gets built, environment and network
+included. `di_gen.go` says which case a constructor is in, right above the call:
+`// skipped once <Field> is supplied` or `// always builds regardless of
 replacements: ...`.
-
-### Adding a waffle module
-
-Edit `config/di/modules.go` only:
-
-```go
-import (
-    _ "gitlab.com/gorib/waffle/config/app"
-    _ "gitlab.com/gorib/waffle/config/tools/grpc"
-    _ "gitlab.com/gorib/waffle/config/tools/scribus/amqp"     // ← driver, and
-    _ "gitlab.com/gorib/waffle/config/tools/scribus/single"   // ← mode
-)
-```
-
-Then `make generate`. Don't `di.Include`. Don't touch `di.go` for waffle tools.
 
 ## Rule #5 — input parsing (whisk)
 
 Anything the service accepts — HTTP body, query, header, AMQP delivery, a file —
-is parsed by generated code. Put the tags on the struct, add one directive:
+is parsed by code whisk generates from struct tags (`//go:generate go tool whisk
+$GOFILE`). Tag syntax, custom validators and the hooks are in the whisk README.
 
-```go
-//go:generate go tool whisk $GOFILE
+**Before writing tags, run `go tool whisk tags`.** It prints every tag valid
+here, built-in and this project's own. An invented tag fails generation; the
+reverse — a check that already exists, written again by hand in a handler — is
+caught by nothing.
 
-type createOrder struct {
-    Currency string   `scan:"query=currency" validate:"required,currency"`
-    Email    string   `json:"email"          validate:"required,email"`
-    Items    []string `json:"items"          validate:"required,unique,dive,required"`
-}
-```
+- ❌ Reading `src.Body()` and unmarshalling by hand — `scan.Into[T](src)`, or
+  `server.Bind` to receive the parsed `*T`
+- ❌ `server.Handle` for a typed DTO — only a `Bind` route reaches the OpenAPI
+  document
 
-A field with a `scan` tag comes from that scope; a field without one comes from
-the body. Read it with `scan.Into[T](src)`, or register the handler with
-`server.Bind` to receive the parsed `*T` directly.
-
-### Custom validators are a convention, not configuration
-
-Write `Is` + the tag in PascalCase in any file under the storage directory — the
-lookup is by func name, not by file name, so nothing registers it:
-
-```go
-// pkg/validate/rules.go
-package validate
-
-func IsPasscode(value string, args ...string) bool { return len(value) == 6 }
-```
-
-A tag naming no such func **fails generation**, and the error names the tag, the
-first line that used it, the `Is<Tag>` it looked for and where it looked — so an
-invented tag cannot reach the wire. The reverse is not caught: a check that
-already exists, written again by hand in a handler because nobody knew it was
-there. So before writing tags:
-
-```sh
-go tool whisk tags
-```
-
-It prints every tag valid **here** — whisk's built-ins and this project's own
-together, grouped by which of them answers — and it names the storage directory
-it resolved, so do not go looking for that yourself. A custom tag shadowing a
-built-in wins, and is marked as doing so. The one thing the listing cannot see
-is a `-validate.storage` on an individual `//go:generate` line; a package whose
-directive carries one resolves against a different directory.
-
-### Escape hatches
-
-Sanctioned — reaching for one is not a failure of the generator:
-
-| When | Hatch |
-|---|---|
-| A rule tags can't express — cross-field, business state | `func (s T) validate() error` |
-| A field whisk can't convert, a derived value, a default | `func (s *T) parse(src scan.Source) error` |
-| A body format that isn't JSON or XML | `Unmarshal<Format>` in `pkg/scan`, with `-format=<name>` |
-
-Both hooks are lowercase methods you write by hand; whisk finds them.
-
-### Anti-patterns
-
-- ❌ Reading `src.Body()` and unmarshalling by hand in a handler
-- ❌ Validating in the handler what a `validate` tag already expresses
-- ❌ Registering a route with `server.Handle` when the DTO is typed — `Bind`
-  captures the request and response types, and that record is what the OpenAPI
-  generator reads; a `Handle` route stays out of the specification
+A rule tags cannot express goes in a hand-written `validate()` or `parse(src)`
+method on the DTO. That is the sanctioned hatch, not a failure of the generator.
 
 ## Rule #6 — DTO conversion
 
@@ -831,24 +717,13 @@ it cannot map, so a field added to a model cannot silently stop reaching the
 wire — a hand-written mapper compiles happily and drops it.
 
 `waffle make:converter <path>` writes the `convert.go` with its directives
-already on it — one method per type pair is all you add. The directive that
-matters is a **single wildcard extend** pointing at the project-wide whitelist;
-what follows is about editing one that exists.
+already on it — one method per type pair is all you add. Overrides and the
+whitelist are in `docs/conventions/dto-conversion.md` in waffle.
 
-### How extends resolve
-
-- `goverter:extend pkg:Name` treats `Name` as a regex. `.*` matches everything
-- `pkg/goverter/convert.go` re-exports gorib conversion helpers as package-level vars
-- Adding a project-wide helper = one line in `pkg/goverter/convert.go`
-- Per-converter override: extra `// goverter:extend pkg:Specific` below wildcard (last wins)
-- Per-field override: `// goverter:map FieldName FieldName | pkg.Func` on the method
-
-### Anti-patterns
-
-- ❌ Listing 7 `extend` lines instead of one wildcard
-- ❌ Putting `goverter:extend` directives in goverter `interface` body (only as doc comments above `type Convert interface`)
-- ❌ Trying to embed interfaces — goverter rejects `method must have one name`
-- ❌ Hand-written convert.go when struct has ≥5 fields or nested types
+- ❌ Listing `extend` lines one per helper — a single wildcard extend points at
+  the project-wide whitelist in `pkg/goverter/convert.go`, and a new helper is
+  one line there
+- ❌ A hand-written `convert.go` when the struct has ≥5 fields or nested types
 
 ## Rule #7 — errors
 
@@ -904,34 +779,21 @@ Rule #2 — `make generate && make audit && make`.
 
 - ❌ `protoc` directly — proto generation is driven by the project's proto step (in-module: `go generate ./api/...`; monorepo with `proto_dir` outside the module: a central step such as `make -C <api-dir>`)
 - ❌ Manual `go mod tidy` after every edit — `make .tidy` does it consistently
-- ❌ Add `replace` directives in `go.mod` — coordinate gorib version bumps instead
+- ❌ A `replace` in `go.mod` whose target is outside this repository — a local checkout of gorib or of anything else builds only on the machine it was written on. Release the module and bump the version instead; a `replace` onto another module of the same repository is fine
 - ❌ Touch `di_gen.go`, `*_goverter_gen.go`, `*_whisk_gen.go`, `stored_*_gen.go`, `*_mock*.go` — they're generated
 - ❌ Wrap stdlib types in custom abstractions inside `domain/<x>/model/` — model stays pure Go types
-- ❌ Import a domain from anywhere outside it but `config/` and `tests/` — only another domain's `adapter/` may, and only its `model/` (Rule #12)
-- ❌ Wire a neighbour's package to an interface that is not in your own `adapter/` — the registration crosses the boundary even though no import does (Rule #12)
-- ❌ Import `domain/<x>/adapter/**` from anywhere but another adapter, or `domain/<x>/cmd/**` from outside `cmd/` — `config/di` is what reaches them (Rule #12)
+- ❌ Reach another domain other than through `adapter/`, or import `domain/<x>/cmd/**` from outside `cmd/` (Rule #12)
 - ❌ Pass `context.Background()` deeper than the entrypoint — propagate ctx from caller
 - ❌ `panic(err)` anywhere past the entrypoint — return the error
 
 ## Reference
 
-{{ if .WaffleVersion }}- Waffle docs, the copy this service depends on: `$(go env GOMODCACHE)/gitlab.com/gorib/waffle@{{ .WaffleVersion }}/docs/`
+Read the copy this service depends on, not the one on `main` — conventions
+change between versions.
+
+{{ if .WaffleVersion }}- Waffle docs: `$(go env GOMODCACHE)/gitlab.com/gorib/waffle@{{ .WaffleVersion }}/docs/`
 {{ else }}- Waffle docs: `gitlab.com/gorib/waffle/-/blob/main/docs/`
 {{ end }}
-- gorib core libs: `gitlab.com/gorib/<package>/README.md`
-- DI overview: `gorib/di/README.md`
-- DTO pattern: `waffle/docs/conventions/dto-conversion.md`
+- Any other gorib module — diogen (`gitlab.com/gorib/di`), whisk, the core libs:
+  `README.md` in the directory `go list -m -f '{{"{{"}}.Dir{{"}}"}}' gitlab.com/gorib/<module>` prints
 
-## Service-specific notes
-
-`CONTRIBUTING.md` holds instructions specific to **this** service — business
-rules, custom commands, known quirks. `waffle agents` does not touch it, and a
-service where this file is enough does not need one at all.
-
-**It belongs to the humans who own the service. Do not create or edit it unless
-you were asked to.** When you learn something that belongs there — a convention
-you had to infer, a quirk that cost you a wrong turn — say so and quote what you
-would write. Whether it gets written is theirs to decide.
-
-That file overrides this one, including Rule #11 — how an agent is to work in
-someone's own project is theirs to state. Which is exactly why you do not write

@@ -7,6 +7,26 @@ import (
 	"testing"
 )
 
+// make generate runs this on every build, so a second run must report nothing.
+func TestGenerateReportsOnlyAChange(t *testing.T) {
+	service(t)
+	for i, want := range []bool{true, false} {
+		changed, err := Generate("example.com/svc", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if changed != want {
+			t.Errorf("run %d: changed=%v, want %v", i+1, changed, want)
+		}
+	}
+	if err := os.Remove(".cursorrules"); err != nil {
+		t.Fatal(err)
+	}
+	if changed, _ := Generate("example.com/svc", true); !changed {
+		t.Error("a missing symlink was restored without reporting it")
+	}
+}
+
 func TestScanModulesSkipsCommentedImports(t *testing.T) {
 	inModule(t, `package di
 

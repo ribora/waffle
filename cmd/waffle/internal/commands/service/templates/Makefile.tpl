@@ -16,7 +16,7 @@ test:
 
 generate:
 	@go generate ./...
-	@./waffle agents
+	@./waffle agents -q
 
 # Fails when a test replaces something waffle.yaml does not allow, and says what
 # it found. The same comparison runs inside go test; this target is the report.

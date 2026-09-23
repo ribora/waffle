@@ -83,6 +83,9 @@ func newCommands() commands {
 	cmds.Add(harness.New())
 	cmds.Add(replacements.New())
 	cmds.Add(agents.New())
+	cmds.Add(agents.NewGuard())
+	cmds.Add(agents.NewMode())
+	cmds.Add(agents.NewGrant())
 	return cmds
 }
 
