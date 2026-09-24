@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -32,7 +33,7 @@ func main() {
 	}
 	var in input
 	_ = json.NewDecoder(os.Stdin).Decode(&in)
-	h := hook{data: dataDir(), run: runWaffle}
+	h := hook{data: dataDir(), run: runWaffle, scratch: temporaryDirs()}
 
 	switch os.Args[1] {
 	case "session-start":
@@ -46,6 +47,20 @@ func main() {
 			_ = enc.Encode(out)
 		}
 	}
+}
+
+// On macOS /tmp is a link to /private/tmp and TMPDIR sits under /var, a link
+// to /private/var, so each is kept as written and as resolved.
+func temporaryDirs() []string {
+	var dirs []string
+	for _, d := range []string{os.TempDir(), "/tmp"} {
+		for _, form := range []string{filepath.Clean(d), resolve(d)} {
+			if !slices.Contains(dirs, form) {
+				dirs = append(dirs, form)
+			}
+		}
+	}
+	return dirs
 }
 
 func dataDir() string {

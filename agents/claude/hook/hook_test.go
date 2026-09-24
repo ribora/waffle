@@ -152,6 +152,27 @@ func TestAServiceOutsideTheTaskIsClosed(t *testing.T) {
 	}
 }
 
+// An agent staging a commit copies files, waffle.yaml among them, into its
+// scratchpad; that copy is not a service anyone reviews.
+func TestACopyInATemporaryDirectoryIsNotChecked(t *testing.T) {
+	f := newFixture(t, allowing)
+	scratch := t.TempDir()
+	copied := filepath.Join(scratch, "commit", "services", "dungeon")
+	if err := os.MkdirAll(copied, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(copied, "waffle.yaml"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f.h.scratch = []string{resolve(scratch)}
+	f.prompt("/waffle:steps ./services/kostej")
+	calls := len(f.calls)
+
+	if d := f.edit(filepath.Join(copied, "go.mod")); d != nil || len(f.calls) != calls {
+		t.Errorf("decision %+v, calls %v", d, f.calls[calls:])
+	}
+}
+
 func TestWithNoModeEveryServiceIsCheckedAsNone(t *testing.T) {
 	f := newFixture(t, allowing)
 	f.prompt("/waffle:spec ./services/kostej")

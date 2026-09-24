@@ -17,6 +17,20 @@ const none = "none"
 type hook struct {
 	data string
 	run  func(dir string, args ...string) (string, error)
+	// Temporary directories: a service copied into one is an agent's working
+	// copy — nobody reviews or commits it — so edits there are never checked.
+	scratch []string
+}
+
+func (h hook) inScratch(path string) bool {
+	for _, p := range []string{filepath.Clean(path), filepath.Join(resolve(filepath.Dir(path)), filepath.Base(path))} {
+		for _, root := range h.scratch {
+			if rel, err := filepath.Rel(root, p); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // One mode holds for every service the task names; a service it stops naming is
@@ -194,6 +208,9 @@ func (h hook) edit(in input) *decision {
 	}
 	if !filepath.IsAbs(path) {
 		path = filepath.Join(in.Cwd, path)
+	}
+	if h.inScratch(path) {
+		return nil
 	}
 	st := h.load(in.SessionID)
 
