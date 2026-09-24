@@ -62,9 +62,9 @@ func TestGrantBelongsToItsMode(t *testing.T) {
 	if err := NewGrant().Run(context.Background(), "redgreen", "gomod"); err != nil {
 		t.Errorf("gomod in redgreen: %v", err)
 	}
-	err := NewGrant().Run(context.Background(), "steps", "gomod")
-	if err == nil || !strings.Contains(err.Error(), "not granted in steps mode") {
-		t.Errorf("gomod in steps: %v", err)
+	err := NewGrant().Run(context.Background(), "spec", "gomod")
+	if err == nil || !strings.Contains(err.Error(), "not granted in spec mode") {
+		t.Errorf("gomod in spec: %v", err)
 	}
 }
 
@@ -80,7 +80,7 @@ func TestGuardLeavesAPathNoAreaNamesOutsideTheService(t *testing.T) {
 func TestAnAreaWithoutModesKeepsTheTable(t *testing.T) {
 	dir := service(t)
 	yaml := "agents:\n  areas:\n" +
-		"    fiscal:\n      paths: [domain/payment/fiscal/]\n      grant: [steps]\n" +
+		"    fiscal:\n      paths: [domain/payment/fiscal/]\n      grant: [spec]\n" +
 		"    frozen:\n      paths: [domain/payment/frozen/]\n      modes: []\n"
 	if err := os.WriteFile(filepath.Join(dir, "waffle.yaml"), []byte(yaml), 0644); err != nil {
 		t.Fatal(err)
@@ -92,8 +92,8 @@ func TestAnAreaWithoutModesKeepsTheTable(t *testing.T) {
 	}{
 		{[]string{"redgreen", fiscal}, true},
 		{[]string{NoMode, fiscal}, true},
-		{[]string{"steps", fiscal}, false},
-		{[]string{"steps", fiscal, "--grant", "fiscal"}, true},
+		{[]string{"spec", fiscal}, false},
+		{[]string{"spec", fiscal, "--grant", "fiscal"}, true},
 		{[]string{"redgreen", "domain/payment/frozen/x.go"}, false},
 		{[]string{"platform", "domain/payment/frozen/x.go"}, false},
 	}

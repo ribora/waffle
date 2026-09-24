@@ -11,7 +11,7 @@ job is to satisfy it without being able to move the goalposts.
 
 **The protocol itself is Rule #11 in `AGENTS.md`** — the generated file in the
 root of your own service, written for the agent that works to it: the roles,
-the four steps and the stop after each, what may not appear in the diff. This
+the three steps and the stop after each, what may not appear in the diff. This
 page is the other half — why the cycle is shaped that way, what the framework
 gives you, and, honestly, what is not built yet. Read this to decide; read Rule
 #11 to follow. [cli/agents](../cli/agents.md#what-is-in-the-file) describes the
@@ -20,9 +20,9 @@ file and how to keep it current.
 ## The cycle
 
 ```
-requirements ──▶ specification + delta list ──▶ approval ──▶ steps ──▶ red-green
-                          ▲                                              │
-                          └──────────── conflict or constraint ──────────┘
+requirements ──▶ specification + delta list ──▶ approval ──▶ red-green
+                          ▲                                       │
+                          └─────── conflict or constraint ────────┘
 ```
 
 1. **Requirements in, specification out.** The agent produces an executable
@@ -30,8 +30,9 @@ requirements ──▶ specification + delta list ──▶ approval ──▶ s
    the source document does not, plus what was deliberately left out of scope.
 2. **Verification, then approval.** A human reads the source document and the
    delta, and corrects or approves. No production code before approval.
-3. **Steps and fixtures**, bound to the real container. Still no production code.
-4. **Red-green**, changing production code only. The specification is frozen.
+3. **Red-green.** The specification is frozen. Steps bound to the real container
+   run every case red for its own reason before any behaviour is written; then
+   production code until they pass.
 
 Anything that cannot be built without changing the specification goes back to
 step 2 through the person who approved it. The agent never edits an approved
@@ -112,7 +113,7 @@ content of a row, and it decided this answer was not one. Prose lost a third
 time, and this time to an argument about which rule applies.
 
 So the step boundary became a mechanism. Every edit is made in a **mode** —
-`spec`, `steps`, `redgreen`, `platform`, or none — and each allows a fixed set of
+`spec`, `redgreen`, `platform`, or none — and each allows a fixed set of
 paths. Only the human switches the mode. The table lives in waffle: `AGENTS.md`
 renders it, and `waffle agents:guard <mode> <path>` answers from the same copy,
 naming the mode that would allow a refused path. The agent's move stops being
@@ -125,6 +126,18 @@ tried the edit anyway. The hook refused it; the agent asked for redgreen by its
 exact command, and when then told to "ignore it and be quick", answered that the
 refusal was not its to skip. Prose it had just quoted did not stop the edit; the
 mechanism did.
+
+**Then the switching was measured, and one boundary went.** Twenty-five sessions
+from before the mechanism were set against four with it. The violations a mode
+would refuse had cost about 3% of the human's messages; in the four, about a
+third of the messages were mode commands, and one refusal in the repository
+stopped a real mistake. The class worth a mechanism is production code before the
+specification is approved — the costliest one a mode catches. The boundary
+between steps and red-green caught nothing that had cost a message, and produced
+failures of its own: a step that needed a shape it could not add, and an agent
+steering towards whichever mode opened its next edit. So they are one mode now.
+The cases stay frozen, the red run still comes before any behaviour, and a step
+changed after it is named at hand-over.
 
 Two decisions in it are deliberate:
 
@@ -139,14 +152,13 @@ Two decisions in it are deliberate:
 ### The Claude Code plugin
 
 For Claude Code the mechanism ships as a plugin in this repository. It adds
-`/waffle:spec`, `/waffle:steps`, `/waffle:redgreen`, `/waffle:platform` and
-`/waffle:none`, which only the human can invoke; keeps one mode per session for
-every service the task names; and refuses an edit the mode does not allow before
-it happens, with the mode to ask for. `/waffle:allow <area>` widens the current
-mode by one named area until the mode changes — `model` in steps, for a field a
-step cannot do without; `gomod` in redgreen, for a dependency — so a step that
-needs a shape, or a feature that needs a library, is one word rather than a round
-trip through another mode. The areas themselves, a monorepo's shared contracts
+`/waffle:spec`, `/waffle:redgreen`, `/waffle:platform` and `/waffle:none`, which
+only the human can invoke; keeps one mode per session for every service the task
+names; and refuses an edit the mode does not allow before it happens, with the
+mode to ask for. `/waffle:allow <area>` widens the current mode by one named area
+until the mode changes — `gomod` in redgreen, for a dependency — so a feature
+that needs a library is one word rather than a round trip through platform mode.
+The areas themselves, a monorepo's shared contracts
 among them, are declared in `waffle.yaml` —
 [cli/agents](../cli/agents.md#modes-areas-and-grants). A service whose waffle has no `agents:guard` yet stays
 editable, and the plugin says once that edits there are not checked.

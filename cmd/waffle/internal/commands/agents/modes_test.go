@@ -43,10 +43,9 @@ func TestModesAndAreasAllow(t *testing.T) {
 		"../../shared/api/proto/price/service.proto",
 	}
 	want := map[string][]bool{
-		NoMode:     {true, false, false, true, true, false, false, true, false, false, false, false},
+		NoMode:     {true, false, false, false, true, false, false, true, false, false, false, false},
 		"spec":     {false, false, false, true, false, false, false, false, true, false, false, true},
-		"steps":    {false, false, false, false, true, false, false, false, false, false, false, false},
-		"redgreen": {true, false, false, false, false, false, false, true, false, false, false, false},
+		"redgreen": {true, false, false, false, true, false, false, true, false, false, false, false},
 		"platform": {true, true, true, false, false, false, true, true, true, true, false, true},
 	}
 	if len(want) != len(modes) {
@@ -73,17 +72,15 @@ func TestAGrantOpensItsAreaOnlyInItsModes(t *testing.T) {
 		mode, grant, path string
 		want              bool
 	}{
-		{"steps", "model", "domain/payment/model/receipt.go", true},
-		{"steps", "model", "domain/payment/service/payment.go", false},
 		{"redgreen", "gomod", "go.mod", true},
 		{"redgreen", "gomod", "go.sum", true},
-		{"steps", "gomod", "go.mod", false},
+		{"spec", "gomod", "go.mod", false},
 		{"redgreen", "gomod", "waffle.yaml", false},
-		{"steps", "events", "../../shared/api/events/price.go", false},
+		{"redgreen", "events", "../../shared/api/events/price.go", false},
 		{"platform", "steps", "tests/steps_test.go", true},
 		{"platform", "steps", "tests/feature/quote.feature", false},
 		{"platform", "steps", "tests/internal/fakes/fakes_test.go", true},
-		{"redgreen", "steps", "tests/steps_test.go", false},
+		{"spec", "steps", "tests/steps_test.go", false},
 	}
 	for _, c := range cases {
 		mode, _ := LookupMode(c.mode)
@@ -105,10 +102,11 @@ func TestAPathNoAreaNamesOutsideTheServiceIsUnclaimed(t *testing.T) {
 func TestRefusalNamesWhatWouldAllow(t *testing.T) {
 	cases := map[string]struct{ mode, path, names string }{
 		"platform file with no mode":   {NoMode, "waffle.yaml", "platform mode"},
+		"a case with no mode":          {NoMode, "tests/feature/quote.feature", "edited only in spec mode"},
 		"production code in spec mode": {"spec", "domain/price/service/quote.go", "redgreen mode, or platform mode"},
-		"a case in steps mode":         {"steps", "tests/feature/quote.feature", "spec mode"},
+		"a case in redgreen mode":      {"redgreen", "tests/feature/quote.feature", "spec mode"},
+		"the harness in redgreen":      {"redgreen", "tests/internal/harness/harness.go", "; platform mode"},
 		"go.mod in redgreen":           {"redgreen", "go.mod", "platform mode, or the gomod grant in redgreen mode"},
-		"a model in steps":             {"steps", "domain/price/model/quote.go", "; redgreen mode, or platform mode, or the model grant in steps mode"},
 		"a shared event in redgreen":   {"redgreen", "../../shared/api/events/price.go", "spec mode, or platform mode"},
 		"generated code":               {"platform", "../../shared/api/pb/price/service.pb.go", "no mode opens"},
 	}

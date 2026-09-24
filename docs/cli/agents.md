@@ -23,7 +23,7 @@ Twelve numbered rules, and they are not one kind of thing. The file says so in
 its own opening: **Rule #11 is a protocol** and the other eleven are reference.
 
 **Rule #11 is where the specification-first workflow actually lives.** The two
-roles and what each owns, the four steps with a stop after every one, the
+roles and what each owns, the three steps with a stop after every one, the
 verdicts a baseline carries when the code came first, why an answer to your own
 question is not a new task, what may not appear in the diff of a specification
 task. It is the longest thing in the file by a wide margin, and it is the
@@ -83,7 +83,7 @@ services — comes from the waffle template.
 
 ## Modes, areas and grants
 
-Rule #11 works in modes — `spec`, `steps`, `redgreen`, `platform`, and `none`
+Rule #11 works in modes — `spec`, `redgreen`, `platform`, and `none`
 when no mode is on — and each allows editing a fixed set of paths. Only the human
 switches the mode, and one mode holds for every service a task names; while it
 is on, a service the task does not name is closed whole. The mode
@@ -107,16 +107,15 @@ grant in Y mode" for each grant.
 
 The two exist side by side because they answer different questions. `modes` is
 whose work this normally is; `grant` is the exception a human allows knowingly.
-A step sometimes needs a field in a production type to express a case — shape,
-not behaviour — so `model` is granted in steps rather than opened there, where it
-would let the step change the model's logic too, unseen.
+`go.mod` is the platform's, so `gomod` is open in platform mode; a feature that
+needs a dependency gets it in red-green when the human grants it, not merely
+because red-green is on.
 
-waffle ships four areas, and `waffle.yaml` replaces any of them by naming it, or
+waffle ships three areas, and `waffle.yaml` replaces any of them by naming it, or
 declares more:
 
 | default | paths | open in | granted in | for |
 |---|---|---|---|---|
-| `model` | `domain/*/model/` | as the table says | steps | a field a step needs; filling it is redgreen's |
 | `gomod` | `go.mod`, `go.sum` | platform | redgreen | a dependency the feature needs |
 | `steps` | `tests/*_test.go` | as the table says | platform | steps that follow a harness change — the case verdicts before and after must match |
 | `proto` | `proto_dir` | spec, platform | — | the contract; in a monorepo `proto_dir` already points at the shared one |
@@ -124,9 +123,6 @@ declares more:
 ```yaml
 agents:
   areas:
-    fiscal:                     # a service's own types a step may need a field in
-      paths: [domain/payment/fiscal/]
-      grant: [steps]
     events:                     # a monorepo's shared contract
       paths: [../../shared/api/events/]
       modes: [spec, platform]
@@ -134,12 +130,6 @@ agents:
       paths: [../../shared/pkg/]
       modes: [platform]
 ```
-
-| `fiscal` above, in | `domain/payment/fiscal/` |
-|---|---|
-| none, redgreen, platform | open — the table opens production code there |
-| steps | closed until `/waffle:allow fiscal` |
-| spec | closed |
 
 Paths are relative to the service and may leave it; a trailing slash means
 everything below, and `*` matches one directory. Outside the service the mode

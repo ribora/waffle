@@ -34,8 +34,8 @@ identifiers, not a reading order.
 
 Held in mind, all of it:
 
-- **Four steps, and you stop after each one.** Cases → *hand over and wait* →
-  steps → red-green, with the permission list read before any of them. Being
+- **Three steps, and you stop after each one.** Cases → *hand over and wait* →
+  red-green, with the permission list read before any of them. Being
   asked for one step is not being asked for the next, and an answer you get
   inside a step is not the next step either.
 - **Every edit is made in a mode the human switched on.** An edit the mode does
@@ -100,9 +100,9 @@ whole suite's meaning is fixed.
 | a **code defect** at the level of a function — code that broke, not behaviour that was contradictory | a table test where the defect is, then the fix. None of the cycle below |
 | a **spike** — the requirements are a sketch and the point is to find out what is possible | exempt from the cycle, but its output is a specification, not merged code. The spike's code is thrown away and rewritten through the cycle |
 
-**The cycle has four steps and you stop after each one.** Read `waffle.yaml`
+**The cycle has three steps and you stop after each one.** Read `waffle.yaml`
 first and check that the list covers what the contract needs; write the cases;
-hand them over and wait; only then the steps, and only then red-green. Being
+hand them over and wait; only then red-green — the steps, then the code. Being
 asked for one step is not being asked for the next: "write the scenarios" ends
 when the scenarios are written. Neither is an answer you get *inside* a step the
 next step. Each stop is a place where a person can change the answer for the
@@ -348,7 +348,11 @@ still has to be written, handed over and approved. This is how the gate gets
 skipped in practice — not by deciding to ignore it, but by losing count of which
 step you are on.
 
-### 3. Steps and fixtures
+### 3. Red-green
+
+The specification is **frozen** at approval. Red-green has two halves in one
+order: bind the cases and run them red, then change production code until they
+are green.
 
 **Bind at the declared contract** — the operation: a handler in `cmd`, a
 consumer command, a cron command. Not the management interface below it: one
@@ -428,8 +432,8 @@ around it. The recognisable cases:
 - **a case needs a seam that does not exist** — controlled time is the usual
   one. Where the code compares a fixture's date against `time.Now()`, set the
   fixture relative to now (`now.AddDate(-1, 0, 0)` for "already started") and no
-  seam is needed. A case that needs time to *move* does need one, and adding it
-  is production code, which this step does not permit.
+  seam is needed. A case that needs time to *move* does need one, and a new seam
+  is the platform owner's, in platform mode.
 - **the cut removes what the case was meant to exercise** — a repository
   replaced by a mock makes the test check the mock's SQL, not the schema's.
 
@@ -452,25 +456,25 @@ every case boots with, `Custom` for a key no code reads through
 `gitlab.com/gorib/env` — goes into hooks in `tests/internal/harness/harness.go`,
 which is the harness owner's file, not yours.
 
-**A case a step cannot express without a production shape is a stop.** A field or
-type the step needs to read is shape, not behaviour: name it, and ask for the
-`model` grant — or, where the shape is a contract another service reads, for a
-return to spec mode. Filling it is still red-green's.
+**A field or type a step reads is shape, and the first production code you
+write.** Add it empty, with no behaviour behind it, so the suite builds and the
+case fails on the value rather than on the compiler. A shape another service
+reads is a contract, and it is not yours: that is a return to spec mode.
 
-**The steps are done when every case is red for its own reason.** A case red
-because a step reads no column, or a suite that does not compile, is not that —
-the stop is not reached, and red-green is not yours to start.
+**The red half is done when every case is red for its own reason.** A case red
+because a step reads no column, or a suite that does not compile, is not that.
+**No behaviour before that run** — it is the one moment every case is seen to
+fail, and code written earlier takes it away.
 
-Still no production code at this stage, beyond the shape a grant opens.
+#### Green
 
-### 4. Red-green
-
-The specification and the steps are **frozen** at approval. The loop changes
-production code and nothing else.
+The loop changes production code. The cases stay as approved, and **a step
+changed after the red run is named at hand-over**, with which cases were red and
+which green before the change and after it.
 
 Never reach green by weakening an assertion, widening a matcher, deleting a case
 or relaxing a fixture. If the test cannot go green without touching the
-specification or the steps, stop — that is the next section, not a licence.
+specification, stop — that is the next section, not a licence.
 
 **A case that was never red has not been shown to fail.** It happens when the
 fix and the case land together — a value moved into configuration with the new

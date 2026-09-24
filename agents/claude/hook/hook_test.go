@@ -94,9 +94,9 @@ func TestACommandWithoutAPathActsOnTheServicesNamedBefore(t *testing.T) {
 	f := newFixture(t, allowing)
 	f.prompt("/waffle:spec ./services/kostej ./services/shark")
 	f.prompt("/waffle:none")
-	f.prompt("/waffle:steps")
+	f.prompt("/waffle:redgreen")
 	st := f.h.load("s1")
-	if st.modeOf(f.svc) != "steps" || st.modeOf(f.other) != "steps" {
+	if st.modeOf(f.svc) != "redgreen" || st.modeOf(f.other) != "redgreen" {
 		t.Errorf("state %+v", st)
 	}
 }
@@ -104,9 +104,9 @@ func TestACommandWithoutAPathActsOnTheServicesNamedBefore(t *testing.T) {
 func TestNamingFewerServicesResetsTheRest(t *testing.T) {
 	f := newFixture(t, allowing)
 	f.prompt("/waffle:spec ./services/kostej ./services/shark")
-	f.prompt("/waffle:steps ./services/kostej")
+	f.prompt("/waffle:redgreen ./services/kostej")
 	st := f.h.load("s1")
-	if st.modeOf(f.svc) != "steps" || st.modeOf(f.other) != none {
+	if st.modeOf(f.svc) != "redgreen" || st.modeOf(f.other) != none {
 		t.Errorf("state %+v", st)
 	}
 }
@@ -139,10 +139,10 @@ func TestEditIsCheckedInTheSessionsMode(t *testing.T) {
 func TestAServiceOutsideTheTaskIsClosed(t *testing.T) {
 	f := newFixture(t, allowing)
 	f.prompt("/waffle:platform ./services/kostej")
-	f.prompt("/waffle:allow model")
+	f.prompt("/waffle:allow gomod")
 	calls := len(f.calls)
 
-	d := f.edit(filepath.Join(f.other, "domain", "payment", "model", "cart.go"))
+	d := f.edit(filepath.Join(f.other, "go.mod"))
 
 	if d == nil || d.HookSpecificOutput == nil || !strings.Contains(d.HookSpecificOutput.PermissionDecisionReason, "services/shark is not in this task") {
 		t.Fatalf("decision = %+v", d)
@@ -165,7 +165,7 @@ func TestACopyInATemporaryDirectoryIsNotChecked(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.h.scratch = []string{resolve(scratch)}
-	f.prompt("/waffle:steps ./services/kostej")
+	f.prompt("/waffle:redgreen ./services/kostej")
 	calls := len(f.calls)
 
 	if d := f.edit(filepath.Join(copied, "go.mod")); d != nil || len(f.calls) != calls {
@@ -223,7 +223,7 @@ func TestAGrantReachesTheGuardUntilTheModeChanges(t *testing.T) {
 		t.Errorf("the guard was asked %q", f.last())
 	}
 
-	f.prompt("/waffle:steps")
+	f.prompt("/waffle:spec")
 	f.edit(filepath.Join(f.svc, "go.mod"))
 	if strings.Contains(f.last(), "--grant") {
 		t.Errorf("a grant outlived its mode: %q", f.last())
@@ -233,11 +233,11 @@ func TestAGrantReachesTheGuardUntilTheModeChanges(t *testing.T) {
 func TestAGrantTheWaffleRejectsIsNotKept(t *testing.T) {
 	f := newFixture(t, func(args []string) (string, error) {
 		if args[0] == "agents:grant" {
-			return "Error: the gomod area is not granted in steps mode", errors.New("exit status 1")
+			return "Error: the gomod area is not granted in spec mode", errors.New("exit status 1")
 		}
 		return allowing(args)
 	})
-	f.prompt("/waffle:steps ./services/kostej")
+	f.prompt("/waffle:spec ./services/kostej")
 	f.prompt("/waffle:allow gomod")
 	if granted := f.h.load("s1").Granted; len(granted) != 0 {
 		t.Errorf("granted %v", granted)
@@ -295,7 +295,7 @@ func TestAnOldWaffleIsWarnedAboutOnceAndNeverBlocks(t *testing.T) {
 
 func TestASessionFromBeforeOneModeIsCarriedOver(t *testing.T) {
 	f := newFixture(t, allowing)
-	old := `{"modes":{"` + f.svc + `":"steps"},"grants":{"` + f.svc + `":["model"]}}`
+	old := `{"modes":{"` + f.svc + `":"redgreen"},"grants":{"` + f.svc + `":["gomod"]}}`
 	path := f.h.file("s1")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
@@ -304,16 +304,16 @@ func TestASessionFromBeforeOneModeIsCarriedOver(t *testing.T) {
 		t.Fatal(err)
 	}
 	st := f.h.load("s1")
-	if st.modeOf(f.svc) != "steps" || len(st.Granted) != 1 || st.Granted[0] != "model" {
+	if st.modeOf(f.svc) != "redgreen" || len(st.Granted) != 1 || st.Granted[0] != "gomod" {
 		t.Errorf("state %+v", st)
 	}
 }
 
 func TestSessionStartAnnouncesThePluginAndTheMode(t *testing.T) {
 	f := newFixture(t, allowing)
-	f.prompt("/waffle:steps ./services/kostej")
+	f.prompt("/waffle:redgreen ./services/kostej")
 	out := f.h.sessionStart(input{SessionID: "s1", Cwd: f.root})
-	if !strings.Contains(out, "waffle plugin active") || !strings.Contains(out, "steps, for services/kostej") {
+	if !strings.Contains(out, "waffle plugin active") || !strings.Contains(out, "redgreen, for services/kostej") {
 		t.Errorf("context:\n%s", out)
 	}
 }

@@ -1,5 +1,5 @@
 ---
-description: Return a waffle service to no mode — everything but the platform's files
+description: Return a waffle service to no mode — everything but the cases and the platform's files
 disable-model-invocation: true
 argument-hint: "[./path/to/service… or ./...]"
 ---

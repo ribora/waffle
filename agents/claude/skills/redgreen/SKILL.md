@@ -1,5 +1,5 @@
 ---
-description: Switch a waffle service to Rule #11 redgreen mode — production code until the frozen cases pass
+description: Switch a waffle service to Rule #11 redgreen mode — steps until the frozen cases are red, then production code until they pass
 disable-model-invocation: true
 argument-hint: "[./path/to/service… or ./...]"
 ---
@@ -10,4 +10,6 @@ switched, tell the human why and stop.
 
 Arguments: $ARGUMENTS
 
-Work as AGENTS.md Rule #11 step 4 says, and stop at the hand-over.
+Switching to redgreen mode from spec mode is the approval of the specification
+handed over there, and freezes it. Work as AGENTS.md Rule #11 step 3 says, and
+stop at the hand-over.

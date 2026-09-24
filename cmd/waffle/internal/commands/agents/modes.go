@@ -26,9 +26,10 @@ const NoMode = "none"
 var modes = []Mode{
 	{
 		Name:   NoMode,
-		Allows: "anything but the platform's files",
-		Brief:  "No mode is on. Everything but the platform's files may be edited; a Rule #11 task has not started.",
-		allow:  func(rel string) bool { return !platform(rel) },
+		Allows: "anything but the cases and the platform's files",
+		Brief: "No mode is on. Everything but the cases and the platform's files may be edited; " +
+			"a Rule #11 task has not started, and a case changes only in spec mode.",
+		allow: func(rel string) bool { return !feature(rel) && !platform(rel) },
 	},
 	{
 		Name:   "spec",
@@ -39,18 +40,12 @@ var modes = []Mode{
 		allow: feature,
 	},
 	{
-		Name:   "steps",
-		Allows: "`tests/**` except `tests/internal/` and `tests/feature/` — the specification is frozen",
-		Brief: "Rule #11 step 3: \"Steps and fixtures\". The specification was approved by switching to this mode " +
-			"and is frozen: a correction to a case is a return to spec mode. Bind the cases, run them red, stop.",
-		allow: func(rel string) bool { return under(rel, "tests") && !feature(rel) && !platform(rel) },
-	},
-	{
 		Name:   "redgreen",
-		Allows: "production code — anything outside `tests/` but the platform's files",
-		Brief: "Rule #11 step 4: \"Red-green\" and \"Changing an approved specification\". " +
-			"The specification and the steps are frozen. Make the cases green, stop.",
-		allow: func(rel string) bool { return !under(rel, "tests") && !platform(rel) },
+		Allows: "the steps and production code — anything but the cases and the platform's files",
+		Brief: "Rule #11 step 3: \"Red-green\" and \"Changing an approved specification\". The specification was " +
+			"approved by switching to this mode and is frozen: a correction to a case is a return to spec mode. " +
+			"Bind the cases and run them red, then make them green, stop.",
+		allow: func(rel string) bool { return !feature(rel) && !platform(rel) },
 	},
 	{
 		Name:   "platform",
@@ -77,7 +72,6 @@ type Area struct {
 // on the shared contracts by itself.
 func defaultAreas(protoDir string) []Area {
 	return []Area{
-		{Name: "model", Paths: []string{"domain/*/model/"}, Grant: []string{"steps"}},
 		{Name: "gomod", Paths: []string{"go.mod", "go.sum"}, Modes: []string{"platform"}, Grant: []string{"redgreen"}},
 		{Name: "steps", Paths: []string{"tests/*_test.go"}, Grant: []string{"platform"}},
 		{Name: "proto", Paths: []string{strings.TrimSuffix(protoDir, "/") + "/"}, Modes: []string{"spec", "platform"}},
