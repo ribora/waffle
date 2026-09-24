@@ -75,6 +75,35 @@ func TestGuardLeavesAPathNoAreaNamesOutsideTheService(t *testing.T) {
 	}
 }
 
+// An area naming no modes only adds a grant; `modes: []` closes it. The two are
+// told apart by whether the key is there, so this goes through real YAML.
+func TestAnAreaWithoutModesKeepsTheTable(t *testing.T) {
+	dir := service(t)
+	yaml := "agents:\n  areas:\n" +
+		"    fiscal:\n      paths: [domain/payment/fiscal/]\n      grant: [steps]\n" +
+		"    frozen:\n      paths: [domain/payment/frozen/]\n      modes: []\n"
+	if err := os.WriteFile(filepath.Join(dir, "waffle.yaml"), []byte(yaml), 0644); err != nil {
+		t.Fatal(err)
+	}
+	fiscal := "domain/payment/fiscal/fiscal.go"
+	cases := []struct {
+		args []string
+		ok   bool
+	}{
+		{[]string{"redgreen", fiscal}, true},
+		{[]string{NoMode, fiscal}, true},
+		{[]string{"steps", fiscal}, false},
+		{[]string{"steps", fiscal, "--grant", "fiscal"}, true},
+		{[]string{"redgreen", "domain/payment/frozen/x.go"}, false},
+		{[]string{"platform", "domain/payment/frozen/x.go"}, false},
+	}
+	for _, c := range cases {
+		if err := NewGuard().Run(context.Background(), c.args...); (err == nil) != c.ok {
+			t.Errorf("%v: %v, want allowed=%v", c.args, err, c.ok)
+		}
+	}
+}
+
 func TestGuardReadsAreasFromWaffleYaml(t *testing.T) {
 	dir := service(t)
 	yaml := "agents:\n  areas:\n    events:\n      paths: [../events/]\n      modes: [spec]\n"

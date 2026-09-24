@@ -61,8 +61,10 @@ var modes = []Mode{
 	},
 }
 
-// An Area carves paths out of the mode table and decides them itself: open in
-// Modes, or on the human's word in Grant.
+// An Area is a named set of paths. Grant names the modes the human may open it
+// in by name. Modes, when set, takes the paths out of the mode table: they are
+// open in exactly those modes, and in none if it is empty. Nil Modes leaves the
+// table in charge, so a grant only adds.
 type Area struct {
 	Name  string
 	Paths []string
@@ -73,13 +75,18 @@ type Area struct {
 // Defaults, so a service works without configuring anything; waffle.yaml
 // replaces one by naming it.
 var defaultAreas = []Area{
-	{Name: "model", Paths: []string{"domain/*/model/"}, Modes: []string{NoMode, "redgreen", "platform"}, Grant: []string{"steps"}},
+	{Name: "model", Paths: []string{"domain/*/model/"}, Grant: []string{"steps"}},
 	{Name: "gomod", Paths: []string{"go.mod", "go.sum"}, Modes: []string{"platform"}, Grant: []string{"redgreen"}},
 }
 
 // For the table in AGENTS.md.
 func (a Area) PathList() string { return "`" + strings.Join(a.Paths, "`, `") + "`" }
-func (a Area) ModeList() string { return orNone(a.Modes) }
+func (a Area) ModeList() string {
+	if a.Modes == nil {
+		return "as the table says"
+	}
+	return orNone(a.Modes)
+}
 func (a Area) GrantList() string {
 	if len(a.Grant) == 0 {
 		return "—"
@@ -154,36 +161,42 @@ func (r Rules) Check(mode Mode, abs string, granted []string) (Verdict, string) 
 		shown = abs
 	}
 
-	if a, ok := r.area(abs); ok {
-		if slices.Contains(a.Modes, mode.Name) || (slices.Contains(a.Grant, mode.Name) && slices.Contains(granted, a.Name)) {
+	a, claimed := r.area(abs)
+	if !claimed && !inside {
+		return Unclaimed, ""
+	}
+	if claimed && slices.Contains(a.Grant, mode.Name) && slices.Contains(granted, a.Name) {
+		return Allowed, ""
+	}
+
+	var ways []string
+	switch {
+	case claimed && a.Modes != nil:
+		if slices.Contains(a.Modes, mode.Name) {
 			return Allowed, ""
 		}
-		var ways []string
 		for _, m := range a.Modes {
 			if m != mode.Name && m != NoMode {
 				ways = append(ways, m+" mode")
 			}
 		}
+	case inside:
+		if mode.allow(rel) {
+			return Allowed, ""
+		}
+		for _, other := range modes {
+			if other.Name != NoMode && other.Name != mode.Name && other.allow(rel) {
+				ways = append(ways, other.Name+" mode")
+			}
+		}
+	}
+	if claimed {
 		for _, m := range a.Grant {
 			ways = append(ways, fmt.Sprintf("the %s grant in %s mode", a.Name, m))
 		}
-		if len(ways) == 0 {
-			return Refused, fmt.Sprintf("%s is in the %s area, which no mode opens", shown, a.Name)
-		}
-		return Refused, refusal(mode, shown, ways)
 	}
-	if !inside {
-		return Unclaimed, ""
-	}
-
-	if mode.allow(rel) {
-		return Allowed, ""
-	}
-	var ways []string
-	for _, other := range modes {
-		if other.Name != NoMode && other.Name != mode.Name && other.allow(rel) {
-			ways = append(ways, other.Name+" mode")
-		}
+	if len(ways) == 0 {
+		return Refused, fmt.Sprintf("%s is in the %s area, which no mode opens", shown, a.Name)
 	}
 	return Refused, refusal(mode, shown, ways)
 }

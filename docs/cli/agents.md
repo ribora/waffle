@@ -90,23 +90,42 @@ table covers the layout waffle scaffolds and lives in waffle; it is rendered int
 `AGENTS.md`, so the file an agent reads and the check a tool runs are the same
 table at the same version.
 
-**Areas** are for everything else. An area is a named set of paths that takes
-itself out of the mode table and decides alone: open in its `modes`, or open in
-one of its `grant` modes once the human grants it by name, until the mode
-changes. waffle ships two, and `waffle.yaml` replaces either by naming it, or
+**Areas** are for everything else: a named set of paths, with two fields that
+both list modes and mean different things.
+
+- **`grant`** — the modes in which the human can open the area by name,
+  `/waffle:allow <name>` in the plugin. Until then it is closed there. A grant
+  lasts until the mode changes, and opens that area and nothing more.
+- **`modes`** — the modes the area is open in by itself. Leave it out and the
+  mode table decides as it would for any path, so `grant` only adds to it. Set
+  it, and the area takes its paths out of the table and is open in exactly those
+  modes; `modes: []` closes it in every mode.
+
+A refused edit names every way to it: the modes that open the path, and "the X
+grant in Y mode" for each grant.
+
+The two exist side by side because they answer different questions. `modes` is
+whose work this normally is; `grant` is the exception a human allows knowingly.
+A step sometimes needs a field in a production type to express a case — shape,
+not behaviour — so `model` is granted in steps rather than opened there, where it
+would let the step change the model's logic too, unseen.
+
+waffle ships two areas, and `waffle.yaml` replaces either by naming it, or
 declares more:
 
 ```yaml
 agents:
   areas:
-    model:                      # waffle's default
+    model:                      # waffle's default: the table decides, steps may be granted
       paths: [domain/*/model/]
-      modes: [none, redgreen, platform]
-      grant: [steps]            # a field a step needs; filling it is redgreen's
-    gomod:                      # waffle's default
+      grant: [steps]
+    gomod:                      # waffle's default: narrower than the table
       paths: [go.mod, go.sum]
       modes: [platform]
       grant: [redgreen]         # a dependency the feature needs
+    fiscal:                     # a service's own types a step may need a field in
+      paths: [domain/payment/fiscal/]
+      grant: [steps]
     events:                     # a monorepo's shared contract
       paths: [../../shared/api/events/]
       modes: [spec, platform]
@@ -115,10 +134,18 @@ agents:
       modes: [platform]
 ```
 
+| `fiscal` above, in | `domain/payment/fiscal/` |
+|---|---|
+| none, redgreen, platform | open — the table opens production code there |
+| steps | closed until `/waffle:allow fiscal` |
+| spec | closed |
+
 Paths are relative to the service and may leave it; a trailing slash means
-everything below, and `*` matches one directory. A contract another service
-reads belongs in spec mode, because changing it is part of what gets approved. A
-path outside the service that no area names is not this service's to decide.
+everything below, and `*` matches one directory. Outside the service the mode
+table does not apply, so an area there needs `modes` to be open anywhere. A
+contract another service reads belongs in spec mode, because changing it is part
+of what gets approved. A path outside the service that no area names is not this
+service's to decide.
 
 ```
 waffle agents:guard <mode> <path> [--grant <name>]

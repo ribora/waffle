@@ -124,11 +124,12 @@ boundary yourself.
 The platform's files are `waffle.yaml` and `tests/internal/`. `CONTRIBUTING.md`
 is edited in no mode.
 
-An **area** takes its paths out of that table and decides them itself: open in
-its modes, or in a grant mode once the human grants it by name — which lasts
-until the mode changes. The defaults are waffle's; `waffle.yaml` declares the
-rest under `agents.areas`, and the paths may leave the service — a monorepo's
-shared contracts are areas. This service has:
+An **area** is a named set of paths. In its grant modes the human can open it by
+name, until the mode changes. An area with its own modes takes its paths out of
+that table and is open in exactly those; one without follows the table, and its
+grant only adds. The defaults are waffle's; `waffle.yaml` declares the rest under
+`agents.areas`, and the paths may leave the service — a monorepo's shared
+contracts are areas. This service has:
 
 | area | paths | open in | granted in |
 |---|---|---|---|
