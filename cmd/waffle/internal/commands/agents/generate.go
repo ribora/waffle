@@ -37,7 +37,7 @@ func Generate(projectName string, quiet bool) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	areas, err := Areas(cfg.Agents)
+	areas, err := Areas(cfg)
 	if err != nil {
 		return false, err
 	}

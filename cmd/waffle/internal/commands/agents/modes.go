@@ -73,10 +73,15 @@ type Area struct {
 }
 
 // Defaults, so a service works without configuring anything; waffle.yaml
-// replaces one by naming it.
-var defaultAreas = []Area{
-	{Name: "model", Paths: []string{"domain/*/model/"}, Grant: []string{"steps"}},
-	{Name: "gomod", Paths: []string{"go.mod", "go.sum"}, Modes: []string{"platform"}, Grant: []string{"redgreen"}},
+// replaces one by naming it. proto follows proto_dir, so in a monorepo it lands
+// on the shared contracts by itself.
+func defaultAreas(protoDir string) []Area {
+	return []Area{
+		{Name: "model", Paths: []string{"domain/*/model/"}, Grant: []string{"steps"}},
+		{Name: "gomod", Paths: []string{"go.mod", "go.sum"}, Modes: []string{"platform"}, Grant: []string{"redgreen"}},
+		{Name: "steps", Paths: []string{"tests/*_test.go"}, Grant: []string{"platform"}},
+		{Name: "proto", Paths: []string{strings.TrimSuffix(protoDir, "/") + "/"}, Modes: []string{"spec", "platform"}},
+	}
 }
 
 // For the table in AGENTS.md.
@@ -112,12 +117,12 @@ func modeNames() []string {
 }
 
 // Areas merges waffle.yaml over the defaults, sorted by name.
-func Areas(cfg command.AgentsConfig) ([]Area, error) {
+func Areas(cfg command.Config) ([]Area, error) {
 	byName := map[string]Area{}
-	for _, a := range defaultAreas {
+	for _, a := range defaultAreas(cfg.ProtoDir) {
 		byName[a.Name] = a
 	}
-	for name, a := range cfg.Areas {
+	for name, a := range cfg.Agents.Areas {
 		if len(a.Paths) == 0 {
 			return nil, fmt.Errorf("waffle.yaml: agents.areas.%s names no paths", name)
 		}

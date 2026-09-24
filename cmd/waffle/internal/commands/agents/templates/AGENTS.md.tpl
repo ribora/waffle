@@ -137,7 +137,12 @@ contracts are areas. This service has:
 {{ range .Areas }}| {{ .Name }} | {{ .PathList }} | {{ .ModeList }} | {{ .GrantList }} |
 {{ end }}
 `waffle agents:grant <mode>` lists the grants a mode takes. A grant covers exactly
-the area it names; needing a second one is a second question. A contract another
+the area it names; needing a second one is a second question.
+
+**A step edited on the `steps` grant follows a platform change and nothing else.**
+Hand over which cases were red and which green before the change and after it:
+they match. A case that changed colour means the edit was not a migration, and it
+goes back to the human as a change to what the case checks. A contract another
 service reads is changed in spec mode, because it is part of what gets approved.
 
 **When no mode and no grant fits the work,** say which path you need and in which

@@ -84,7 +84,7 @@ func serviceRules(c *command.Command) (Rules, error) {
 	if err != nil {
 		return Rules{}, err
 	}
-	areas, err := Areas(cfg.Agents)
+	areas, err := Areas(cfg)
 	if err != nil {
 		return Rules{}, err
 	}

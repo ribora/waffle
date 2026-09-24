@@ -127,7 +127,11 @@ func (h hook) prompt(in input) string {
 	}
 	st.Mode, st.Services, st.Granted = command, services, nil
 	h.save(in.SessionID, st)
-	return fmt.Sprintf("The human switched to %s mode, for %s; every other service is in none, "+
+	if command == none {
+		return fmt.Sprintf("The human switched off the mode: every service is in none, and nothing is granted.\n\n%s",
+			b.String())
+	}
+	return fmt.Sprintf("The human switched to %s mode, for %s; every other service is closed while it is on, "+
 		"and nothing is granted.\n\n%s", command, h.names(in.Cwd, services), b.String())
 }
 

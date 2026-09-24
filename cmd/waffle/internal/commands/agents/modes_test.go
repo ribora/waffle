@@ -8,15 +8,19 @@ import (
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
 )
 
-// A monorepo service at /repo/services/svc whose waffle.yaml declares the
-// shared contracts and library as areas.
+func config(protoDir string, areas map[string]command.AreaConfig) command.Config {
+	return command.Config{ProtoDir: protoDir, Agents: command.AgentsConfig{Areas: areas}}
+}
+
+// A monorepo service at /repo/services/svc: proto_dir points at the shared
+// contracts, and waffle.yaml declares the rest of shared/ as areas.
 func monorepoRules(t *testing.T) Rules {
 	t.Helper()
-	areas, err := Areas(command.AgentsConfig{Areas: map[string]command.AreaConfig{
+	areas, err := Areas(config("../../shared/api/proto", map[string]command.AreaConfig{
 		"events": {Paths: []string{"../../shared/api/events/"}, Modes: []string{"spec", "platform"}},
 		"shared": {Paths: []string{"../../shared/pkg/"}, Modes: []string{"platform"}},
-		"pb":     {Paths: []string{"../../shared/api/pb/"}},
-	}})
+		"pb":     {Paths: []string{"../../shared/api/pb/"}, Modes: []string{}},
+	}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,13 +40,14 @@ func TestModesAndAreasAllow(t *testing.T) {
 		"../../shared/api/events/price.go",
 		"../../shared/pkg/money/money.go",
 		"../../shared/api/pb/price/service.pb.go",
+		"../../shared/api/proto/price/service.proto",
 	}
 	want := map[string][]bool{
-		NoMode:     {true, false, false, true, true, false, false, true, false, false, false},
-		"spec":     {false, false, false, true, false, false, false, false, true, false, false},
-		"steps":    {false, false, false, false, true, false, false, false, false, false, false},
-		"redgreen": {true, false, false, false, false, false, false, true, false, false, false},
-		"platform": {true, true, true, false, false, false, true, true, true, true, false},
+		NoMode:     {true, false, false, true, true, false, false, true, false, false, false, false},
+		"spec":     {false, false, false, true, false, false, false, false, true, false, false, true},
+		"steps":    {false, false, false, false, true, false, false, false, false, false, false, false},
+		"redgreen": {true, false, false, false, false, false, false, true, false, false, false, false},
+		"platform": {true, true, true, false, false, false, true, true, true, true, false, true},
 	}
 	if len(want) != len(modes) {
 		t.Fatalf("the table covers %d modes, the code has %d", len(want), len(modes))
@@ -75,6 +80,10 @@ func TestAGrantOpensItsAreaOnlyInItsModes(t *testing.T) {
 		{"steps", "gomod", "go.mod", false},
 		{"redgreen", "gomod", "waffle.yaml", false},
 		{"steps", "events", "../../shared/api/events/price.go", false},
+		{"platform", "steps", "tests/steps_test.go", true},
+		{"platform", "steps", "tests/feature/quote.feature", false},
+		{"platform", "steps", "tests/internal/fakes/fakes_test.go", true},
+		{"redgreen", "steps", "tests/steps_test.go", false},
 	}
 	for _, c := range cases {
 		mode, _ := LookupMode(c.mode)
@@ -115,10 +124,29 @@ func TestRefusalNamesWhatWouldAllow(t *testing.T) {
 	}
 }
 
+// Inside a single service proto_dir is api/proto, and the contract is still
+// spec's to change.
+func TestProtoFollowsProtoDir(t *testing.T) {
+	areas, err := Areas(config("api/proto", nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := Rules{Root: "/svc", Areas: areas}
+	for _, c := range []struct {
+		mode string
+		want bool
+	}{{"spec", true}, {"platform", true}, {"redgreen", false}, {NoMode, false}} {
+		mode, _ := LookupMode(c.mode)
+		if v, _ := r.Check(mode, "/svc/api/proto/price/service.proto", nil); (v == Allowed) != c.want {
+			t.Errorf("%s mode: verdict %v, want allowed=%v", c.mode, v, c.want)
+		}
+	}
+}
+
 func TestWaffleYamlReplacesADefaultArea(t *testing.T) {
-	areas, err := Areas(command.AgentsConfig{Areas: map[string]command.AreaConfig{
+	areas, err := Areas(config("api/proto", map[string]command.AreaConfig{
 		"gomod": {Paths: []string{"go.mod", "go.sum"}, Modes: []string{"redgreen", "platform"}},
-	}})
+	}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,9 +157,9 @@ func TestWaffleYamlReplacesADefaultArea(t *testing.T) {
 }
 
 func TestAreasRejectAnUnknownMode(t *testing.T) {
-	_, err := Areas(command.AgentsConfig{Areas: map[string]command.AreaConfig{
+	_, err := Areas(config("api/proto", map[string]command.AreaConfig{
 		"events": {Paths: []string{"../events/"}, Modes: []string{"review"}},
-	}})
+	}))
 	if err == nil || !strings.Contains(err.Error(), "agents.areas.events") {
 		t.Errorf("got %v", err)
 	}

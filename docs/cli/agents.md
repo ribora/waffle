@@ -111,19 +111,19 @@ A step sometimes needs a field in a production type to express a case — shape,
 not behaviour — so `model` is granted in steps rather than opened there, where it
 would let the step change the model's logic too, unseen.
 
-waffle ships two areas, and `waffle.yaml` replaces either by naming it, or
+waffle ships four areas, and `waffle.yaml` replaces any of them by naming it, or
 declares more:
+
+| default | paths | open in | granted in | for |
+|---|---|---|---|---|
+| `model` | `domain/*/model/` | as the table says | steps | a field a step needs; filling it is redgreen's |
+| `gomod` | `go.mod`, `go.sum` | platform | redgreen | a dependency the feature needs |
+| `steps` | `tests/*_test.go` | as the table says | platform | steps that follow a harness change — the case verdicts before and after must match |
+| `proto` | `proto_dir` | spec, platform | — | the contract; in a monorepo `proto_dir` already points at the shared one |
 
 ```yaml
 agents:
   areas:
-    model:                      # waffle's default: the table decides, steps may be granted
-      paths: [domain/*/model/]
-      grant: [steps]
-    gomod:                      # waffle's default: narrower than the table
-      paths: [go.mod, go.sum]
-      modes: [platform]
-      grant: [redgreen]         # a dependency the feature needs
     fiscal:                     # a service's own types a step may need a field in
       paths: [domain/payment/fiscal/]
       grant: [steps]
