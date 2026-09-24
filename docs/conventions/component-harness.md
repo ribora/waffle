@@ -54,7 +54,7 @@ What the container cannot say goes into `harness.go` as a hook. The generated fi
 | hook | called | for |
 |---|---|---|
 | `func env(v *Variables)` | by `Env`, over the placeholders and fallbacks | a value with a meaning — a URL with a scheme, a key pair. A misspelt key or a wrong type does not compile, and the developer's environment still wins. `v.Custom` takes a key with no field of its own |
-| `func setup() error` | by `Main`, first | what the developer's environment must not override: a time zone, a window the scenarios are written against |
+| `func setup() error` | by `Main`, first | what a step cannot set and the developer's environment must not override: `TZ` — Go reads it once per process, so a step that sets it comes too late |
 | `func resources() []resource.Resource` | once, appended to the set | a system the container does not name — elasticsearch, a working directory the service writes into |
 | `func (a *App) boot(ctx context.Context, cut *diogen.Replacements) error` | by `Boot`, before its own fills | a recorder of the service's own. Guard it with `if cut.X == nil` like the rest |
 | `type extra struct{ … }` | embedded in `App` | the handles `boot` hands back: `app.Drivers` |
@@ -374,11 +374,10 @@ out of everyone else's import graph.
 `scribus.Recorder()` keeps the wiring the command asked for and delivers through **the handler the container installed** — so a scenario exercises the subject dispatch and the middlewares, not a bare `Run`:
 
 ```go
-delivery, err := harness.Delivery("contracts.updated", payload)
-if err != nil {
-    return err
-}
-err = w.app.Consumer.Deliver(ctx, delivery)   // nil settled, error requeued
+err := w.app.Consumer.Deliver(amqp.Delivery{
+	RoutingKey: "contracts.updated",
+	Body:       payload,
+}.Source(ctx)) // nil settled, error requeued
 ```
 
 `amqp.Delivery{...}.Source(ctx)` builds the message. It exists because the real constructor is unexported: without it every suite writes its own `Source`, and each one gets the lookup scopes slightly differently.

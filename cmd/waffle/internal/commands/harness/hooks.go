@@ -15,7 +15,7 @@ import (
 // Found by name alone: the compiler checks the signature against the call the
 // generated file makes.
 type hooks struct {
-	Env       bool // func env() map[string]string
+	Env       bool // func env(v *Variables)
 	Setup     bool // func setup() error
 	Resources bool // func resources() []resource.Resource
 	Boot      bool // func (a *App) boot(ctx context.Context, cut *<container>.Replacements) error
