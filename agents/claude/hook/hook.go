@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -63,13 +64,26 @@ func (h hook) prompt(in input) string {
 	}
 	command := strings.TrimPrefix(fields[0], "/waffle:")
 
-	var named, rest []string
+	var named, rest, empty []string
 	for _, arg := range fields[1:] {
-		if svc := resolveService(in.Cwd, arg); svc != "" {
+		if found, ok := servicesBelow(in.Cwd, arg); ok {
+			if len(found) == 0 {
+				empty = append(empty, arg)
+			}
+			for _, svc := range found {
+				if !slices.Contains(named, svc) {
+					named = append(named, svc)
+				}
+			}
+		} else if svc := resolveService(in.Cwd, arg); svc != "" {
 			named = append(named, svc)
 		} else {
 			rest = append(rest, arg)
 		}
+	}
+	if len(empty) > 0 {
+		return fmt.Sprintf("Nothing was switched: %s names no waffle service below %s.\n",
+			strings.Join(empty, ", "), in.Cwd)
 	}
 	st := h.load(in.SessionID)
 	services := named
@@ -179,10 +193,20 @@ func (h hook) edit(in input) *decision {
 	}
 	st := h.load(in.SessionID)
 
-	// Inside a service, that service decides. Outside every service, each one the
-	// task names is asked whether one of its areas claims the path.
+	// Inside a service, that service decides — unless a task is on and does not
+	// name it. Outside every service, each one the task names is asked whether one
+	// of its areas claims the path.
 	asked := st.Services
 	if svc := serviceOf(filepath.Dir(path)); svc != "" {
+		if st.Mode != "" && st.Mode != none && !slices.Contains(st.Services, svc) {
+			return &decision{HookSpecificOutput: &denial{
+				HookEventName:      "PreToolUse",
+				PermissionDecision: "deny",
+				PermissionDecisionReason: fmt.Sprintf("%s is not in this task, which is %s mode for %s — "+
+					"stop and ask the human to add it: /waffle:%s with every service the task needs, "+
+					"or ./... for all below a directory.", display(in.Cwd, svc), st.Mode, h.names(in.Cwd, st.Services), st.Mode),
+			}}
+		}
 		asked = []string{svc}
 	}
 	var warn []string
@@ -299,6 +323,35 @@ func serviceOf(dir string) string {
 		}
 		d = parent
 	}
+}
+
+// `dir/...` names every service below dir, as `go test ./...` names packages:
+// still a path, so no layout is assumed. The second result says whether arg had
+// that form at all.
+func servicesBelow(cwd, arg string) ([]string, bool) {
+	base, ok := strings.CutSuffix(filepath.ToSlash(arg), "...")
+	if !ok || (base != "" && !strings.HasSuffix(base, "/")) {
+		return nil, false
+	}
+	root := filepath.FromSlash(base)
+	if !filepath.IsAbs(root) {
+		root = filepath.Join(cwd, root)
+	}
+	var found []string
+	_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		switch {
+		case err != nil || !d.IsDir():
+			return nil
+		case p != root && (strings.HasPrefix(d.Name(), ".") || d.Name() == "vendor" || d.Name() == "node_modules"):
+			return filepath.SkipDir
+		}
+		if _, err := os.Stat(filepath.Join(p, "waffle.yaml")); err == nil {
+			found = append(found, resolve(p))
+			return filepath.SkipDir
+		}
+		return nil
+	})
+	return found, true
 }
 
 // An argument names a service only by its path: waffle does not know how a

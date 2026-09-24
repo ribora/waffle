@@ -112,8 +112,9 @@ price of a conversation instead of the price of a rewrite.
 
 Every edit is made in a mode, and **only the human switches it** — by a command
 where the tool has one, otherwise by naming the mode in words: "spec mode",
-"platform mode". One mode holds for every service the task names; a service it
-stops naming is back to none. Where the tool enforces these tables, a refused
+"platform mode". One mode holds for every service the task names. While a mode is
+on, a service the task does not name is closed whole — a mode or a grant for one
+service reaches no other; with no mode on, every service is in none. Where the tool enforces these tables, a refused
 edit names the mode that would allow it; where it does not, you hold the same
 boundary yourself.
 

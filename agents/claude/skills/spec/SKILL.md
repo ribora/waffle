@@ -1,7 +1,7 @@
 ---
 description: Switch a waffle service to Rule #11 spec mode — the cases and the delta list
 disable-model-invocation: true
-argument-hint: "[./path/to/service…] [task]"
+argument-hint: "[./path/to/service… or ./...] [task]"
 ---
 
 The waffle hook has answered this command in this turn's context: which services

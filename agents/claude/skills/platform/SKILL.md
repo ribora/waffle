@@ -1,7 +1,7 @@
 ---
 description: Switch a waffle service to platform mode — waffle.yaml, the harness, a missing seam
 disable-model-invocation: true
-argument-hint: "[./path/to/service…] [task]"
+argument-hint: "[./path/to/service… or ./...] [task]"
 ---
 
 The waffle hook has answered this command in this turn's context: which services

@@ -1,7 +1,7 @@
 ---
 description: Return a waffle service to no mode — everything but the platform's files
 disable-model-invocation: true
-argument-hint: "[./path/to/service…]"
+argument-hint: "[./path/to/service… or ./...]"
 ---
 
 The waffle hook has answered this command in this turn's context. With no path,

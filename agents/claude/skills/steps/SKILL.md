@@ -1,7 +1,7 @@
 ---
 description: Switch a waffle service to Rule #11 steps mode — approves the cases, freezes them, binds them
 disable-model-invocation: true
-argument-hint: "[./path/to/service…]"
+argument-hint: "[./path/to/service… or ./...]"
 ---
 
 The waffle hook has answered this command in this turn's context: which services

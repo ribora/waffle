@@ -85,7 +85,8 @@ services — comes from the waffle template.
 
 Rule #11 works in modes — `spec`, `steps`, `redgreen`, `platform`, and `none`
 when no mode is on — and each allows editing a fixed set of paths. Only the human
-switches the mode, and one mode holds for every service a task names. The mode
+switches the mode, and one mode holds for every service a task names; while it
+is on, a service the task does not name is closed whole. The mode
 table covers the layout waffle scaffolds and lives in waffle; it is rendered into
 `AGENTS.md`, so the file an agent reads and the check a tool runs are the same
 table at the same version.

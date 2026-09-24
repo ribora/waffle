@@ -174,10 +174,13 @@ In a monorepo this goes in the root's `.claude/settings.json` — Claude Code do
 not read one in a subdirectory. The plugin finds the service from the path of the
 file being edited, and a command names one by its path, relative to where the
 session runs — `/waffle:spec ./path/to/service`, several at once for a change
-that crosses services. It is always a path: waffle does not know how a
+that crosses services, or `./...` for every service below a directory, as
+`go test ./...` names packages. It is always a path: waffle does not know how a
 repository lays its services out. The path is typed once per task: a command
 that names none acts on the services the session named last, or on the one the
-session runs in.
+session runs in. While a mode is on, a service the task does not name is closed
+whole, so platform mode for one service cannot touch another; a fix across the
+fleet is `/waffle:platform ./...`.
 
 ### Why a delta list rather than "read the scenarios"
 

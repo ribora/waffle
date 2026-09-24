@@ -134,13 +134,58 @@ func TestEditIsCheckedInTheSessionsMode(t *testing.T) {
 	}
 }
 
-func TestAServiceTheTaskDoesNotNameIsCheckedAsNone(t *testing.T) {
+// While a task is on, a service it does not name is closed whole — a grant or a
+// platform mode for one service reaches no other.
+func TestAServiceOutsideTheTaskIsClosed(t *testing.T) {
 	f := newFixture(t, allowing)
-	f.prompt("/waffle:redgreen ./services/kostej")
-	f.prompt("/waffle:allow gomod")
+	f.prompt("/waffle:platform ./services/kostej")
+	f.prompt("/waffle:allow model")
+	calls := len(f.calls)
+
+	d := f.edit(filepath.Join(f.other, "domain", "payment", "model", "cart.go"))
+
+	if d == nil || d.HookSpecificOutput == nil || !strings.Contains(d.HookSpecificOutput.PermissionDecisionReason, "services/shark is not in this task") {
+		t.Fatalf("decision = %+v", d)
+	}
+	if len(f.calls) != calls {
+		t.Errorf("waffle was asked about a service outside the task: %v", f.calls[calls:])
+	}
+}
+
+func TestWithNoModeEveryServiceIsCheckedAsNone(t *testing.T) {
+	f := newFixture(t, allowing)
+	f.prompt("/waffle:spec ./services/kostej")
+	f.prompt("/waffle:none")
 	f.edit(filepath.Join(f.other, "go.mod"))
 	if want := f.other + " agents:guard none " + filepath.Join(f.other, "go.mod"); f.last() != want {
 		t.Errorf("asked %q, want %q", f.last(), want)
+	}
+}
+
+func TestDotDotDotNamesEveryServiceBelow(t *testing.T) {
+	for _, arg := range []string{"./...", "./services/...", "services/..."} {
+		t.Run(arg, func(t *testing.T) {
+			f := newFixture(t, allowing)
+			f.prompt("/waffle:platform " + arg)
+			st := f.h.load("s1")
+			if st.modeOf(f.svc) != "platform" || st.modeOf(f.other) != "platform" {
+				t.Errorf("state %+v", st)
+			}
+		})
+	}
+}
+
+// Even with a task already on, a selection that finds nothing says so rather than
+// falling back to the task's services.
+func TestDotDotDotBelowNoServiceSwitchesNothing(t *testing.T) {
+	f := newFixture(t, allowing)
+	f.prompt("/waffle:spec ./services/kostej")
+	if err := os.MkdirAll(filepath.Join(f.root, "docs"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	out := f.prompt("/waffle:platform ./docs/...")
+	if !strings.Contains(out, "names no waffle service") || f.h.load("s1").Mode != "spec" {
+		t.Errorf("context %q, state %+v", out, f.h.load("s1"))
 	}
 }
 
