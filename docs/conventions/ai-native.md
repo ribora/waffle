@@ -47,10 +47,14 @@ passing. The check that catches it is arithmetic: the number of red cases has to
 equal the number of known defects, and a mismatch means either a defect got
 frozen or a case is wrong.
 
-### The review surface, and the two failures that shaped it
+### Why it holds
 
-What makes Rule #11 enforceable is not its wording. It is a **review surface that
-does not depend on the author's compliance**, and it costs two glances:
+Three things, and none was designed up front: each came out of an agent breaking
+the rule with the rule in front of it. The incidents are in the
+[field notes](ai-native-field-notes.md); what they left behind is here.
+
+**A review surface that does not depend on the author's compliance.** It costs
+two glances:
 
 - `waffle.yaml`, production files and `CONTRIBUTING.md` do not appear in the diff
   of a specification task — one look at the file list;
@@ -58,86 +62,18 @@ does not depend on the author's compliance**, and it costs two glances:
   production file in the diff is named by a case that went red — two numbers and
   a list.
 
-Neither was designed up front. Each came out of an incident where an agent broke
-the rule with the rule in front of it, and the second incident refutes the fix
-everyone reaches for first.
+**Prose describing a state does not stop an agent with momentum.** A prohibition
+needs either a mechanism or a surface a third party can check. Every incident was
+argued against, at length, in the file the agent had read — the third time it
+lost to an argument about which rule applies.
 
-**First: crossing into the platform's zone.** A session told only "build the
-scenarios per Rule #11" wrote the cases, went straight on to the harness and the
-steps, and edited `waffle.yaml` to grant itself the nine seams its hand-written
-fakes needed. The prohibition was in the file, in three places.
-
-**Second: the right lane, the wrong order.** A later session stayed inside its
-own zone and wrote production code across two domains before any case existed.
-Its own diagnosis was exact: it had read the short mid-work imperatives that
-settle a design question — "add it", "forbid it", "do B" — as authorisation to
-implement. The rule said what a *task* is not; it never said what an *answer to
-your own question* is, and every such answer resets an agent's sense of having
-just been handed a job.
-
-The expensive part was not the order. The change pinned nothing: the
-specification said the same thing before and after, and the suite would have
-been exactly as green without it. Worse, it could not be pinned at that cut —
-telling the two designs apart needs a failure *inside* the transaction at the
-declared-contract level, and no seam offers one. So the correct move had been to
-stop and report a gap, which the rule does say.
-
-**Prose was tried first, and one line of it made things worse.** After the first
-failure the fix was a paragraph of argument, and in it "run the check before you
-hand anything over" turns a red check into a list of the exact lines that would
-make it green. The file-list surface is what actually holds — it does not depend
-on the agent reading the paragraph the right way round. The second failure is
-what extended it to production files and to `CONTRIBUTING.md`, and what added
-the red-count check's mirror.
-
-The line itself stayed, because running the check *is* right; what it needed was
-the sentence after it. Rule #11 now says "its failure names the seams you need,
-it is not a list of edits to make", and names the forbidden one of the two ways
-to turn the output green. Worth noting as a pattern: the fix for prose that
-points the wrong way is usually the next sentence, not deleting it — but neither
-is what makes the rule hold.
-
-The generalisation, now with two data points: **prose describing a state does not
-stop an agent with momentum. A prohibition needs either a mechanism or a surface
-a third party can check.** Both incidents were argued against, at length, in the
-file the agent had read.
-
-### Modes: the third failure, and the mechanism
-
-**Third: leaving the cycle by classifying the task.** In the specification step,
-an agent was answered "fix `waffle.yaml` for the new layout". It judged —
-plausibly — that a generator setting is not behaviour and so not a specification
-task, declared the request outside the step, and edited the file. It broke
-nothing it was told in so many words: it had been told that an answer is the
-content of a row, and it decided this answer was not one. Prose lost a third
-time, and this time to an argument about which rule applies.
-
-So the step boundary became a mechanism. Every edit is made in a **mode** —
+So the step boundary is a mechanism. Every edit is made in a **mode** —
 `spec`, `redgreen`, `platform`, or none — and each allows a fixed set of
 paths. Only the human switches the mode. The table lives in waffle: `AGENTS.md`
 renders it, and `waffle agents:guard <mode> <path>` answers from the same copy,
 naming the mode that would allow a refused path. The agent's move stops being
 "decide whether this is still the task" and becomes "ask for the mode" — a
 question the human answers in one word.
-
-The first use bore this out. Told in spec mode to add two kinds to the fiscal
-policy, the agent said the change was production code and not this step's — and
-tried the edit anyway. The hook refused it; the agent asked for redgreen by its
-exact command, and when then told to "ignore it and be quick", answered that the
-refusal was not its to skip. Prose it had just quoted did not stop the edit; the
-mechanism did.
-
-**Then the switching was measured, and one boundary went.** Twenty-five sessions
-from before the mechanism were set against four with it. The violations a mode
-would refuse had cost about 3% of the human's messages; in the four, about a
-third of the messages were mode commands, and one refusal in the repository
-stopped a real mistake. The class worth a mechanism is production code before the
-specification is approved — the costliest one a mode catches. The boundary
-between steps and red-green caught nothing that had cost a message, and produced
-failures of its own: a step that needed a shape it could not add, and an agent
-steering towards whichever mode opened its next edit. So they are one mode now.
-The cases stay frozen, the red run still comes before any behaviour, and a step
-changed after it is named at hand-over.
 
 Two decisions in it are deliberate:
 
@@ -149,50 +85,17 @@ Two decisions in it are deliberate:
   own waffle, so services on different waffle versions each get their own rules,
   and whatever calls it holds none.
 
-### The Claude Code plugin
+In Claude Code a plugin in this repository enforces the table —
+[cli/agents](../cli/agents.md#the-claude-code-plugin) has how to install and use
+it.
 
-For Claude Code the mechanism ships as a plugin in this repository. It adds
-`/waffle:spec`, `/waffle:redgreen`, `/waffle:platform` and `/waffle:none`, which
-only the human can invoke; keeps one mode per session for every service the task
-names; and refuses an edit the mode does not allow before it happens, with the
-mode to ask for. `/waffle:allow <area>` widens the current mode by one named area
-until the mode changes — `gomod` in redgreen, for a dependency — so a feature
-that needs a library is one word rather than a round trip through platform mode.
-The areas themselves, a monorepo's shared contracts
-among them, are declared in `waffle.yaml` —
-[cli/agents](../cli/agents.md#modes-areas-and-grants). A service whose waffle has no `agents:guard` yet stays
-editable, and the plugin says once that edits there are not checked.
-
-For yourself:
-
-```
-/plugin marketplace add https://gitlab.com/gorib/waffle.git
-/plugin install waffle@gorib
-```
-
-For everyone on a project, in its `.claude/settings.json`; a teammate gets the
-plugin when they trust the folder:
-
-```json
-{
-  "extraKnownMarketplaces": {
-    "gorib": {"source": {"source": "url", "url": "https://gitlab.com/gorib/waffle.git"}}
-  },
-  "enabledPlugins": {"waffle@gorib": true}
-}
-```
-
-In a monorepo this goes in the root's `.claude/settings.json` — Claude Code does
-not read one in a subdirectory. The plugin finds the service from the path of the
-file being edited, and a command names one by its path, relative to where the
-session runs — `/waffle:spec ./path/to/service`, several at once for a change
-that crosses services, or `./...` for every service below a directory, as
-`go test ./...` names packages. It is always a path: waffle does not know how a
-repository lays its services out. The path is typed once per task: a command
-that names none acts on the services the session named last, or on the one the
-session runs in. While a mode is on, a service the task does not name is closed
-whole, so platform mode for one service cannot touch another; a fix across the
-fleet is `/waffle:platform ./...`.
+**Two boundaries pay for a switch.** Measured on the first sessions with the
+modes: the costliest mistake a mode catches is production code before the
+specification is approved, and the one that goes unnoticed is a case changed to
+fit the code. So spec mode is the only mode closed to production code and the
+only place a case changes, and after approval the steps and the code are one
+mode, with the cases frozen. A boundary that catches nothing costs the human a
+command every time it is crossed.
 
 ### Why a delta list rather than "read the scenarios"
 
@@ -408,7 +311,7 @@ workflow that gets abandoned at the first step that does not work.
   rather than any one format, so it is followable today with ordinary Go tests.
 - Rule #11's modes, `waffle agents:guard` and `waffle agents:mode`, and the
   Claude Code plugin that enforces them — see
-  [the plugin](#the-claude-code-plugin).
+  [cli/agents](../cli/agents.md#the-claude-code-plugin).
 - **the component harness**, as libraries — see
   [conventions/component-harness](component-harness.md). The resource seam is
   `waffle/resource`; postgres, redis and elasticsearch are `sql/sqltest`,
@@ -429,12 +332,10 @@ workflow that gets abandoned at the first step that does not work.
   baseline did. It fails on the case that actually happens — code edited in a
   hurry, no specification touched — and asks for nothing when nothing is wrong.
   Not written yet.
-- **edits made through the shell.** The plugin checks the editing tools; a file
-  rewritten by a shell command is not checked.
 - **the task type, declared by the human.** A code defect and a spike take no
   cycle, and the agent still decides which a task is — so a feature relabelled
-  as a code defect skips the cycle with no mode switched. Modes for a fix and a
-  spike would make that the human's call; they wait on the plugin's first use.
+  as a code defect reaches production code with no mode switched. It no longer
+  reaches the specification: with no mode on, the cases are closed.
 - **enforcement in other tools.** Kiro, Antigravity and the rest read
   `AGENTS.md` and hold the modes themselves; `agents:guard` takes plain
   arguments, so an adapter for any of them calls the same command.
@@ -447,6 +348,12 @@ nothing: it trains everyone to paste a link, and then the merge request carries 
 inside a session; what has to survive the session is the specification itself, in
 the repository, and a link to the ticket where the delta was argued. Only the
 first of those is worth a machine check, and the bullet above is its honest form.
+
+**Deliberately unchecked: writes through the shell.** The plugin checks the
+editing tools, and a file rewritten by a shell command passes it. Comparing the
+tree before and after each command would catch the write only after it happened,
+and a parallel session in another mode writes to the same tree legitimately — the
+check would report on correct work as often as on a violation.
 
 What the first services through this showed, worth knowing before yours: the
 expensive parts were not the runner but the decisions around it — binding at the

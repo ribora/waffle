@@ -70,6 +70,7 @@ Each tool is a `Command` pulled in by one blank import in `config/di/modules.go`
 - [Input Parsing](conventions/input-parsing.md) — Binding and validation by codegen, custom tags, escape hatches
 - [DTO Conversion](conventions/dto-conversion.md) — goverter pattern, project-wide whitelist of conversion helpers
 - [AI-native development](conventions/ai-native.md) — Specification before code, the component-test cut, and what is not built yet
+- [AI-native field notes](conventions/ai-native-field-notes.md) — The incidents behind Rule #11 and its modes, dated
 - [Component harness](conventions/component-harness.md) — The resource seam, real postgres and elasticsearch, recorders instead of silent stand-ins
 
 ## Reference

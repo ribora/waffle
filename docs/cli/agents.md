@@ -162,6 +162,62 @@ is theirs, and the quote lets them decide in one read.
 Without a tool that calls these commands, nothing changes: the agent reads the
 same tables in `AGENTS.md` and holds the boundary itself.
 
+## The Claude Code plugin
+
+For Claude Code the tables are enforced by a plugin in the waffle repository. It
+adds `/waffle:spec`, `/waffle:redgreen`, `/waffle:platform` and `/waffle:none`,
+which only the human can invoke; keeps one mode per session for every service the
+task names; and refuses an edit the mode does not allow before it happens, with
+the mode to ask for. `/waffle:allow <area>` widens the current mode by one named
+area until the mode changes — `gomod` in redgreen, for a dependency — so a
+feature that needs a library is one word rather than a round trip through
+platform mode. A service whose waffle has no `agents:guard` yet stays editable,
+and the plugin says once that edits there are not checked.
+
+For yourself:
+
+```
+/plugin marketplace add https://gitlab.com/gorib/waffle.git
+/plugin install waffle@gorib
+```
+
+For everyone on a project, in its `.claude/settings.json`; a teammate gets the
+plugin when they trust the folder:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "gorib": {"source": {"source": "url", "url": "https://gitlab.com/gorib/waffle.git"}}
+  },
+  "enabledPlugins": {"waffle@gorib": true}
+}
+```
+
+In a monorepo this goes in the root's `.claude/settings.json` — Claude Code does
+not read one in a subdirectory. The plugin finds the service from the path of the
+file being edited, and a command names one by its path, relative to where the
+session runs — `/waffle:spec ./path/to/service`, several at once for a change
+that crosses services, or `./...` for every service below a directory, as
+`go test ./...` names packages. It is always a path: waffle does not know how a
+repository lays its services out. The path is typed once per task: a command
+that names none acts on the services the session named last, or on the one the
+session runs in. While a mode is on, a service the task does not name is closed
+whole, so platform mode for one service cannot touch another; a fix across the
+fleet is `/waffle:platform ./...`.
+
+**Updating.** A marketplace added by URL is not updated automatically. After a
+waffle release, bump waffle in the services first — the plugin asks each
+service's own waffle, so a newer plugin over an older waffle meets the older
+table — then:
+
+```
+claude plugin marketplace update gorib
+claude plugin update waffle@gorib --scope project
+```
+
+`--scope user` for a plugin installed for yourself. A running session keeps the
+plugin it started with; the next one gets the update.
+
 ## CI integration (optional)
 
 Add a check to your pipeline that `waffle agents` produces no diff:
