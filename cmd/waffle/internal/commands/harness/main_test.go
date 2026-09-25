@@ -311,6 +311,46 @@ func InitAppWith(replacements Replacements) (*Application, error) {
 }
 `
 
+const paramsContainer = `package diogen
+
+import (
+	"context"
+
+	di "example.test/shop/config/di"
+	client "example.test/shop/client"
+	pry "gitlab.com/gorib/pry"
+)
+
+type Limits struct{}
+
+type Replacements struct {
+	PryLogger pry.Logger
+}
+
+type Application struct{}
+
+func InitAppWith(ctx context.Context, app *di.App, clientOpts *client.Options, limits Limits, onClose func(name string) error, replacements Replacements) (*Application, error) {
+	return container, nil
+}
+`
+
+const contextContainer = `package diogen
+
+import "context"
+
+type Replacements struct{}
+
+type Application struct{}
+
+func InitAppWith(ctx context.Context, replacements Replacements) (*Application, error) {
+	return container, nil
+}
+`
+
+const paramsHook = "package harness\n\n" +
+	"func (a *App) params(ctx context.Context) (app *di.App, clientOpts *client.Options, limits diogen.Limits, onClose func(string) error, err error) {\n" +
+	"\treturn nil, nil, diogen.Limits{}, nil, nil\n}\n"
+
 func module(t *testing.T, container string, extra map[string]string) {
 	t.Helper()
 	t.Chdir(t.TempDir())
@@ -388,7 +428,7 @@ func TestFirstRunScaffoldsTheSuiteAndGeneratesTheHarness(t *testing.T) {
 
 	contains(t, "harness.go", written(t, "tests/internal/harness/harness.go"), "//go:generate go tool waffle tests:harness")
 	contains(t, "suite_test.go", written(t, "tests/suite_test.go"), "harness.Main(m)")
-	contains(t, "boot_test.go", written(t, "tests/boot_test.go"), "harness.Boot(")
+	contains(t, "boot_test.go", written(t, "tests/boot_test.go"), "harness.Boot(", "app.Serve()")
 	contains(t, "migrations_test.go", written(t, "tests/migrations_test.go"), "harness.CheckMigrations(")
 	contains(t, "replacements_test.go", written(t, "config/diogen/replacements_test.go"), "replacements.Check()")
 	contains(t, "boundaries_test.go", written(t, "config/diogen/boundaries_test.go"), "boundaries.Check()")
@@ -746,6 +786,69 @@ func TestHooksAreCalledWhenThePackageDeclaresThem(t *testing.T) {
 		"\textra\n",
 		"if err := app.boot(ctx, &cut); err != nil {",
 	)
+}
+
+// Serve exists only for a container that has a transport to serve.
+func TestTheBootTestServesOnlyWhatTheContainerHas(t *testing.T) {
+	module(t, cacheContainer, nil)
+
+	run(t)
+
+	body := written(t, "tests/boot_test.go")
+	contains(t, "boot_test.go", body, "harness.Boot(ctx, diogen.Replacements{})")
+	lacks(t, "boot_test.go", body, "Serve()")
+	lacks(t, "harness_gen.go", generatedFile(t), "func (a *App) Serve()")
+}
+
+// The context is Boot's own, so a container that takes nothing else needs no hook.
+func TestTheContextParameterIsBootsOwn(t *testing.T) {
+	module(t, contextContainer, nil)
+
+	run(t)
+
+	body := generatedFile(t)
+	contains(t, "harness_gen.go", body, "diogen.InitAppWith(ctx, cut)")
+	lacks(t, "harness_gen.go", body, "app.params(")
+}
+
+// In the container's order, and a name Boot uses itself or a package it imports
+// is suffixed. The types are the hook's to spell, so their packages are not
+// imported here: they would be unused.
+func TestParametersComeFromTheParamsHook(t *testing.T) {
+	module(t, paramsContainer, map[string]string{"tests/internal/harness/harness.go": paramsHook})
+
+	run(t)
+
+	body := generatedFile(t)
+	contains(t, "harness_gen.go", body,
+		"appParam, clientOpts, limits, onClose, err := app.params(ctx)\n\tif err != nil {\n\t\treturn nil, err\n\t}",
+		"diogen.InitAppWith(ctx, appParam, clientOpts, limits, onClose, cut)",
+	)
+	lacks(t, "harness_gen.go", body, `"example.test/shop/client"`, `"example.test/shop/config/di"`)
+}
+
+func TestAMissingParamsHookIsRefusedWithItsSignature(t *testing.T) {
+	module(t, paramsContainer, nil)
+
+	err := New().Run(t.Context())
+
+	if err == nil {
+		t.Fatal("a container with parameters was accepted without the hook that supplies them")
+	}
+	for _, want := range []string{
+		"func (a *App) params(ctx context.Context) (app *di.App, clientOpts *client.Options, limits diogen.Limits, onClose func(name string) error, err error)",
+		`client "example.test/shop/client"`,
+		`diogen "example.test/shop/config/diogen"`,
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the error does not hold %q: %v", want, err)
+		}
+	}
+	// The hook goes into harness.go, and a harness.go that exists stops the scaffold.
+	contains(t, "boot_test.go", written(t, "tests/boot_test.go"), "harness.Boot(")
+	if _, err := os.Stat(filepath.FromSlash("tests/internal/harness/harness_gen.go")); err == nil {
+		t.Error("a harness_gen.go that cannot compile was written")
+	}
 }
 
 func TestNoHookIsCalledWhenNoneIsDeclared(t *testing.T) {

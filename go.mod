@@ -9,7 +9,7 @@ require (
 	github.com/pressly/goose/v3 v3.27.3
 	gitlab.com/gorib/amqp v1.9.1
 	gitlab.com/gorib/criteria v1.1.0
-	gitlab.com/gorib/di v1.9.2
+	gitlab.com/gorib/di v1.10.0
 	gitlab.com/gorib/elastic v1.4.0
 	gitlab.com/gorib/env v1.0.1
 	gitlab.com/gorib/failure v1.3.1

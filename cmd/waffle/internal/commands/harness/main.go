@@ -65,6 +65,16 @@ func (c *cmd) Run(_ context.Context, args ...string) error {
 			return err
 		}
 	}
+	// After the scaffold: the hook goes into harness.go, and a harness.go that
+	// exists is what stops the suite from being written.
+	if len(found.hooked()) > 0 && !own.Params {
+		return fmt.Errorf("the container takes parameters only the caller has, and Boot asks a hook for them: "+
+			"declare in %s\n\t%s\nBoot passes its own ctx as the context — see waffle/docs/conventions/component-harness.md",
+			filepath.Join(harnessDir, "harness.go"), strings.ReplaceAll(found.paramsHook(), "\n", "\n\t"))
+	}
+	if len(found.hooked()) == 0 && own.Params {
+		command.ReportWarning("App.params is declared, but the container takes no parameter it would supply: delete it")
+	}
 
 	rendered, err := c.Render(tpl(generated+".tpl"), params)
 	if err != nil {
@@ -133,7 +143,7 @@ func (c *cmd) plan(root string, own hooks) (map[string]any, found, error) {
 	if err != nil {
 		return nil, found{}, err
 	}
-	s, err := read(container, seams)
+	s, err := read(container, importPath, seams)
 	if err != nil {
 		return nil, found{}, err
 	}
@@ -141,6 +151,8 @@ func (c *cmd) plan(root string, own hooks) (map[string]any, found, error) {
 
 	service := path.Base(module)
 	migrations := migrations(module)
+	imported := imports(s, own, migrations, importPath, container.Package)
+	s.nameLocals(bootLocals(imported))
 	p := map[string]any{
 		"Module":           module,
 		"Service":          service,
@@ -148,7 +160,9 @@ func (c *cmd) plan(root string, own hooks) (map[string]any, found, error) {
 		"Container":        importPath,
 		"ContainerDir":     container.Dir,
 		"Package":          container.Package,
-		"Imports":          imports(s, own, migrations, importPath, container.Package),
+		"Imports":          imported,
+		"Hooked":           locals(s.hooked()),
+		"InitArgs":         locals(s.Params),
 		"Resources":        registry(s),
 		"Migrations":       migrations,
 		"Postgres":         s.Postgres,
@@ -279,6 +293,25 @@ func imports(s shape, own hooks, migrations []map[string]string, container, pkg 
 	}
 	out = append(out, map[string]string{"Alias": "", "Path": ""}) // the blank line between the groups
 	return append(out, rest...)
+}
+
+func importName(alias, p string) string {
+	if alias != "" {
+		return alias
+	}
+	return path.Base(p)
+}
+
+// What a parameter's local in Boot must not shadow.
+func bootLocals(imported []map[string]string) map[string]bool {
+	out := map[string]bool{"ctx": true, "cut": true, "app": true, "err": true, "application": true,
+		"logger": true, "telemetry": true, "consumer": true, "publisher": true}
+	for _, imp := range imported {
+		if imp["Path"] != "" {
+			out[importName(imp["Alias"], imp["Path"])] = true
+		}
+	}
+	return out
 }
 
 // The literal resource.New is given, in the order the systems are declared

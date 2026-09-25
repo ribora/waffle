@@ -447,8 +447,8 @@ container is started and the next run reuses it, so do not ask for one.
 `docs/conventions/component-harness.md` in waffle is the reference.
 
 **The boot smoke test comes before any case**, and the first run writes it: it
-brings the resources up, boots on the given cut and asserts only that the callers
-are non-nil. One run then tells you what the cut is missing instead of an hour
+brings the resources up, boots on an empty cut and, where the service has a
+transport, serves it; it asserts nothing about behaviour. One run then tells you what the cut is missing instead of an hour
 inside a half-written suite.
 
 What the container cannot say for the whole suite — a second resource, a value

@@ -124,7 +124,7 @@ Some commands run additional steps after writing files:
 afterwards. `make generate` also runs `tests:harness` again, through the
 `go:generate` line in the harness package.
 
-The `make generate` step re-runs code generators (DI container, stored struct mappers) so the project compiles immediately after scaffolding. It is idempotent — a run with nothing to do prints `diogen: skipped, no changes detected` — so running it again after any command costs nothing and settles the question.
+The `make generate` step re-runs code generators (DI container, stored struct mappers) so the project compiles immediately after scaffolding. It is idempotent — diogen regenerates on every run and rewrites a file only when its content changed — so running it again after any command settles the question.
 
 ### Template functions
 

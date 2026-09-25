@@ -38,8 +38,11 @@ type shape struct {
 	Http      wiring
 	Variables []variable
 	Clients   []client
+	Params    []param
 	Imports   map[string]string // alias -> path, as the container file spells them
 	file      *ast.File
+
+	paramImports map[string]string // alias -> path the params hook's result types need
 }
 
 // Each field is one container getter, not a list of members: the collection is
@@ -62,7 +65,7 @@ type conn struct {
 	Label string
 }
 
-func read(container replacements.Container, seams []replacements.Seam) (shape, error) {
+func read(container replacements.Container, importPath string, seams []replacements.Seam) (shape, error) {
 	file, err := parser.ParseFile(token.NewFileSet(), container.File, nil, parser.SkipObjectResolution)
 	if err != nil {
 		return shape{}, err
@@ -92,6 +95,11 @@ func read(container replacements.Container, seams []replacements.Seam) (shape, e
 		case grpcConn:
 			out.Dead = append(out.Dead, conn{Field: seam.Field})
 		}
+	}
+
+	out.Params, out.paramImports, err = parameters(initAppWith(file), out.Imports, container.Package, importPath)
+	if err != nil {
+		return shape{}, fmt.Errorf("%s: %w", container.File, err)
 	}
 
 	body := initAppWithBody(file)
@@ -349,12 +357,19 @@ func typeName(expr ast.Expr) string {
 	return ""
 }
 
-func initAppWithBody(file *ast.File) *ast.BlockStmt {
+func initAppWith(file *ast.File) *ast.FuncDecl {
 	for _, decl := range file.Decls {
 		fn, ok := decl.(*ast.FuncDecl)
 		if ok && fn.Recv == nil && fn.Name.Name == "InitAppWith" {
-			return fn.Body
+			return fn
 		}
+	}
+	return nil
+}
+
+func initAppWithBody(file *ast.File) *ast.BlockStmt {
+	if fn := initAppWith(file); fn != nil {
+		return fn.Body
 	}
 	return nil
 }

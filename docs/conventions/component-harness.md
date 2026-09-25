@@ -12,7 +12,7 @@ A component test boots the **real container** over **real infrastructure** and r
 
 | file | owner | what it holds |
 |---|---|---|
-| `harness_gen.go` | waffle, rewritten on every run | the resources and the migrations, `Up`/`Reset`/`Down`, `Env`, `Main`, `CheckMigrations`, `App` and `Boot`, `Clients` and `Serve` |
+| `harness_gen.go` | waffle, rewritten on every run | the resources and the migrations, `Up`/`Reset`/`Down`, `Env`, `Main`, `CheckMigrations`, `App` and `Boot`, and `Clients` and `Serve` for a service with a gRPC or HTTP transport |
 | `harness.go` | the service | the `go:generate` line, and the hooks — only those the service needs |
 | anything else | the service | recorders of its own, `Deliver` helpers, whatever a scenario calls that the container does not describe |
 
@@ -21,7 +21,7 @@ The first run — the one that finds no `harness.go` — also writes the suite a
 | file | what it holds |
 |---|---|
 | `tests/suite_test.go` | `TestMain`, which is `harness.Main(m)` |
-| `tests/boot_test.go` | the boot smoke test, written before any case |
+| `tests/boot_test.go` | the boot smoke test, written before any case: `Boot`, and `Serve` where there is a transport |
 | `tests/migrations_test.go` | `CheckMigrations` as an ordinary test, for a service with a database |
 | `config/diogen/replacements_test.go` | `replacements.Check()` as an ordinary test |
 | `config/diogen/boundaries_test.go` | `boundaries.Check()` as an ordinary test |
@@ -56,6 +56,7 @@ What the container cannot say goes into `harness.go` as a hook. The generated fi
 | `func env(v *Variables)` | by `Env`, over the placeholders and fallbacks | a value with a meaning — a URL with a scheme, a key pair. A misspelt key or a wrong type does not compile, and the developer's environment still wins. `v.Custom` takes a key with no field of its own |
 | `func setup() error` | by `Main`, first | what a step cannot set and the developer's environment must not override: `TZ` — Go reads it once per process, so a step that sets it comes too late |
 | `func resources() []resource.Resource` | once, appended to the set | a system the container does not name — elasticsearch, a working directory the service writes into |
+| `func (a *App) params(ctx context.Context) (cfg *di.Config, err error)` | by `Boot`, after `Up` and before `boot` | the container's parameters other than the context, in the order `InitAppWith` takes them — see below |
 | `func (a *App) boot(ctx context.Context, cut *diogen.Replacements) error` | by `Boot`, before its own fills | a recorder of the service's own. Guard it with `if cut.X == nil` like the rest |
 | `type extra struct{ … }` | embedded in `App` | the handles `boot` hands back: `app.Drivers` |
 
@@ -67,6 +68,8 @@ func env(v *Variables) {
 ```
 
 **`Custom` is the way out, not a way around.** It is for a key nothing reads through `gitlab.com/gorib/env` — `os.Getenv`, a library of someone else's, a variable the next change starts reading. A key that has a field is refused there at the start of the run, naming the field: two places to set one variable would disagree sooner or later, and the typed one is the one that compiles. When code starts reading a `Custom` key through `env`, the next `make generate` gives it a field and the refusal says to move it.
+
+**Parameters are the caller's, and the harness is a caller.** A [parameter](https://gitlab.com/gorib/di/-/blob/main/README.md#parameters) of a markup function becomes one of `InitAppWith`. `Boot` passes its own `ctx` for the context; anything else is what the service fetches before the container exists, and nothing in the container says how, so `Boot` asks `params` for it. A container with such a parameter and no `params` hook stops the run, which prints the signature to declare. Its results follow `InitAppWith`, and diogen gives each parameter a type of its own, so results in the wrong order do not compile.
 
 `Variables` is also the answer to "does anything read this": a value set for a variable no field names is set for nothing. A log level for the container's logger is one — `Boot` installs `pry.Recorder()`, so the constructor that reads `LOGLEVEL` never runs.
 
@@ -320,13 +323,13 @@ adapter looks the same.
 
 `Boot` fills the cut: everything that is a condition of booting rather than a choice the test makes belongs in `Boot`, not in the scenario. It supplies the database, installs the recorders and hands them back on `App` — a recorder the scenario had to construct would be a seam the scenario had to be granted, for something the harness owns either way.
 
-`Dead` is there because **replacing a seam does not prune what feeds it**: `InitAppWith` is a flat eager sequence that skips a node only if that node itself was supplied, so the connection under a replaced typed client is still built and still reads its neighbour's host out of the environment. Reaching a dead connection panics with its label, which says which replacement did not take louder than a silent call to a real neighbour.
+`Dead` is there because **replacing a seam does not prune what feeds it**: `InitAppWith` is a flat eager sequence that skips a node only if that node itself was supplied, or a collection it alone feeds was, so the connection under a replaced typed client is still built and still reads its neighbour's host out of the environment. Reaching a dead connection panics with its label, which says which replacement did not take louder than a silent call to a real neighbour.
 
 It covers only a transport that is a container field of its own. A client that builds its connection inside its own constructor — `http/client.New(url)` in an adapter, a device opened from a path — has no seam under it to fill; replacing the adapter is the cut, and the placeholder in its variable is what a call that slipped through reaches: `bladerunner-host.harness.invalid`, an error rather than a panic.
 
 **Every fill is guarded with `if cut.X == nil`,** and a `boot` hook guards its own the same way. That is the seam by which a scenario overrides what `Boot` installs — a live fake instead of a dead connection, a hand-built double instead of the harness recorder — without `Boot` having to know which scenarios want one. A recorder goes onto `App` only where it went into the container, so a scenario that brought its own and then reads `app.Logger` gets a nil, not a recorder nobody wrote to.
 
-One consequence of `di.For` worth expecting: it groups the consumers that share a connection, so the container has one field per *connection* rather than one per client, and that field is named after the first consumer of it. Four `Dead` lines can cover eight typed clients, and the label lists all of them.
+One consequence of `di.For` worth expecting: it groups the consumers that share a connection, so the container has one seam per *connection* rather than one per client, and that seam is named after the first of its consumers in name order, so reordering the `di.For` lines does not rename it. Four `Dead` lines can cover eight typed clients, and the label lists all of them.
 
 ### `Noop()` is a recorder nobody queries
 
@@ -384,7 +387,7 @@ err := w.app.Consumer.Deliver(amqp.Delivery{
 
 ## The in-process server
 
-`Serve` is a method on `App`, and it answers with one `Clients` however many transports the service serves. The typed clients on it are read off the handlers — [above](#what-is-read-off-the-container) — so a handler added by `di.Tag` gets its client on the next `make generate`.
+`Serve` is a method on `App` of a service that has a gRPC or HTTP transport, and it answers with one `Clients` however many transports the service serves. The typed clients on it are read off the handlers — [above](#what-is-read-off-the-container) — so a handler added by `di.Tag` gets its client on the next `make generate`.
 
 `waffleGrpc.Serve` runs the handlers over `bufconn` and chains the interceptors with **`UnaryChain`, the exact function the daemon uses**. That is the point of it being exported: interceptor order has caused a real production bug (see [tools/grpc](../tools/grpc.md)), and a harness that sorted its own copy would be checking its copy of the order rather than the service's.
 

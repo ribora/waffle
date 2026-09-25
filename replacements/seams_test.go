@@ -237,6 +237,59 @@ func TestReadSeamsMarksLeaves(t *testing.T) {
 	}
 }
 
+const paramsContainer = `package diogen
+
+import (
+	"context"
+
+	sql "gitlab.com/gorib/sql"
+	di "example.com/svc/config/di"
+	service "example.com/svc/domain/x/service"
+)
+
+type Replacements struct {
+	SqlDb       sql.Db
+	ServiceRepo service.Repo
+}
+
+func InitAppWith(ctx context.Context, cfg *di.Config, replacements Replacements) (_ *Application, err error) {
+	container.sqlDb = replacements.SqlDb
+
+	if container.sqlDb == nil ` + "&&" + ` cfg.Db != "" {
+		container.sqlDb = sql.Open(ctx, cfg.Db)
+	}
+
+	container.serviceRepo = replacements.ServiceRepo
+
+	if container.serviceRepo == nil {
+		container.serviceRepo = service.NewRepo(ctx, container.sqlDb)
+	}
+
+	return container, nil
+}
+`
+
+// A parameter is what the caller hands in, not a node of the graph: reading one
+// leaves a leaf a leaf.
+func TestReadSeamsParametersAreNotContainerReads(t *testing.T) {
+	c := writeContainer(t, paramsContainer)
+
+	seams, err := ReadSeams(c, "example.com/svc/config/diogen")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := map[string]bool{"SqlDb": true, "ServiceRepo": false}
+	if len(seams) != len(want) {
+		t.Fatalf("read %d seams, want %d", len(seams), len(want))
+	}
+	for _, seam := range seams {
+		if seam.Leaf != want[seam.Field] {
+			t.Errorf("%s: Leaf = %v, want %v", seam.Field, seam.Leaf, want[seam.Field])
+		}
+	}
+}
+
 // One constructor feeds two tag collections (di.Wire(NewBoth, di.Tag("h"),
 // di.Tag("n"))). Every tagged member builds unconditionally — diogen does not
 // skip it even when both collections are replaced, the same "a seam does not

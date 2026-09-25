@@ -78,7 +78,7 @@ expensive part, and it is now done.
 ## 3. Add what the container cannot say
 
 Everything else goes into `harness.go` as a hook, and only when the service
-needs one — [the table](conventions/component-harness.md#hooks) lists all five.
+needs one — [the table](conventions/component-harness.md#hooks) lists them.
 The two you are most likely to meet:
 
 **A value with a meaning.**

@@ -24,11 +24,11 @@ t.Cleanup(func() {
 if err := app.Shutdown()(); err != nil {
 t.Errorf("shutdown: %v", err)
 }
-})
+}){{if or .Grpc .Http}}
 
 clients, err := app.Serve()
 if err != nil {
 t.Fatalf("serve: %v", err)
 }
-t.Cleanup(clients.Close)
+t.Cleanup(clients.Close){{end}}
 }

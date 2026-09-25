@@ -84,28 +84,16 @@ import (
 
 ```go
 //go:generate go tool diogen -output config/diogen/di_gen.go -pkg diogen $GOFILE
-
 package di
 
-import (
-    "gitlab.com/gorib/di"
-    "gitlab.com/gorib/env"
-    "gitlab.com/gorib/pry"
-    pryzerolog "gitlab.com/gorib/pry/zerolog"
-)
+// import "gitlab.com/gorib/di" // uncomment when adding di.Wire / di.Define calls below
 
 func InitDi() {
-    di.Wire[pry.Logger](func() (pry.Logger, error) {
-        level, err := pry.ParseLevel(env.Value("LOGLEVEL", "info"))
-        if err != nil {
-            return nil, err
-        }
-        return pry.New(level, pryzerolog.New(pryzerolog.Plain())), nil
-    })
-
-    // Add domain registrations here
+	// service-specific di.Wire / di.Define calls go here
 }
 ```
+
+The logger and the rest of the infrastructure arrive with the modules in `modules.go`.
 
 Each tool page shows the exact block to copy inside `InitDi()` when you need manual control. Example for the HTTP tool:
 
@@ -141,7 +129,7 @@ func InitDi() (app.App, error) {
     if err != nil {
         return nil, err
     }
-    application := di.AppApp()
+    application := di.App()
     if closable, ok := application.(app.HasCloser); ok {
         closable.SetCloser(di.Shutdown())
     }

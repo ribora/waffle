@@ -53,7 +53,7 @@ func InitUserGrpc() {
 ```
 
 The handle carries the registration, not the value — passing anything else to
-`di.Wire` compiles and fails at `InitApp` (see [What generation refuses](#what-generation-refuses-and-what-it-would-have-been)).
+`di.Wire` is a generation error (see [What generation refuses](#what-generation-refuses-and-what-it-would-have-been)).
 A handle that names another domain's package is checked like an alias: see the
 [boundary rule](../architectures.md#the-boundary-rule).
 
@@ -77,11 +77,11 @@ di.Define(notificationService.NewNotificationManagement,
 | `di.For[I]()` | Scope a registration to a specific interface (disambiguates when multiple `Wire` calls target the same interface) |
 | `di.Args(map[string]any{})` | Provide literal argument values instead of resolved types |
 | `di.Alias[I]()` | Expose the same concrete instance under an additional interface |
-| `di.Fallback()` | Mark as a low-priority default — dropped from the container if any normal or `Override` provider targets the same slot |
+| `di.Fallback()` | Mark as a low-priority default — outranked by any normal or `Override` provider of the same slot, but still built in the branches a conditional one leaves empty |
 | `di.Override()` | Mark as the winning provider for a slot — overrides normal and `Fallback` registrations (e.g. to replace a default pulled in from a blank-imported module) |
 | _blank import_ `_ "path"` | Aggregate `di.Wire` / `di.Define` calls from another package (see below) |
 
-**Provider priority.** When several registrations target the same slot (same interface, optionally narrowed by `di.For`), Diogen resolves them by priority: `di.Fallback()` < normal < `di.Override()`. Only the highest tier present survives. Two providers at the same top tier whose conditions are not mutually exclusive are a **generation error** (ambiguous), not last-wins — disambiguate with `di.For`, mutually exclusive `if`/`else`, or by marking one `di.Override()` / the other `di.Fallback()`.
+**Provider priority.** When several registrations target the same slot (same interface, optionally narrowed by `di.For`), Diogen resolves them by priority: `di.Fallback()` < normal < `di.Override()`. The highest tier present wins; an unconditional lower-tier provider is still built wherever the winners' conditions leave the slot empty. Two providers at the same top tier whose conditions are not mutually exclusive are a **generation error** (ambiguous), not last-wins — disambiguate with `di.For`, mutually exclusive `if`/`else`, or by marking one `di.Override()` / the other `di.Fallback()`.
 
 ### Modules — aggregating registrations from another package
 
@@ -119,7 +119,7 @@ Properties:
 
 Constraints:
 
-- Conditional wiring inside an included package may fail to compile if the condition references a **local variable** of the including function — the generator copies expressions as-is and cannot copy the local. References to other *packages* are fine: their imports are carried into the generated file. Keep local-variable conditions in your own `InitDi()`.
+- A condition may use a variable its own `if` declares (`if cfg := config.Load(); cfg.Redis != nil`) — the container evaluates it once, under a name of its own. Any other **local variable** of the markup function is refused at generation: the generator copies expressions into the container and cannot copy the local. References to other *packages* are fine: their imports are carried into the generated file.
 
 ## The InitXxx functions
 
@@ -262,7 +262,7 @@ func InitDi() (app.App, error) {
     if err != nil {
         return nil, err
     }
-    application := di.AppApp()
+    application := di.App()
     if closable, ok := application.(app.HasCloser); ok {
         closable.SetCloser(di.Shutdown())
     }
@@ -313,7 +313,7 @@ di.Define(usergrpc.NewErrorMap, di.Tag(grpcCommand.ErrorMapperTag))
 // Generated — do not edit
 type Application struct { ... }
 
-func (a *Application) AppApp() app.App { ... }
+func (a *Application) App() app.App { ... }
 func (a *Application) Shutdown() func() error { ... }
 
 type Replacements struct { ... }
@@ -324,11 +324,13 @@ func InitAppWith(replacements Replacements) (*Application, error)
 
 The hand-written `config/diogen/di.go` calls `InitApp()` and exposes a clean `InitDi() (app.App, error)`.
 
+A parameter of a markup function — the initialization context, configuration fetched before the container exists — becomes a parameter of both, ahead of `replacements`: `InitApp(ctx context.Context, cfg *config.Config)`. The waffle modules declare none, so `InitApp()` stays bare until a service adds one; `di.go` then passes it, and the component harness asks its [`params` hook](../conventions/component-harness.md#hooks). See [Parameters](https://gitlab.com/gorib/di/-/blob/main/README.md#parameters) in the diogen README.
+
 ### Automatic resource cleanup
 
-`diogen` inspects every registered constructor at generation time. If the returned value implements `io.Closer`, it is automatically added to the shutdown list inside `InitApp()`. `Shutdown()` then calls `Close()` on all of them in **reverse initialization order** — so a database connection opened before a repository is closed after it.
+What `Shutdown()` closes is a closing policy declared in the markup, and `waffle/config/app` declares one: `di.DefaultCloser[io.Closer](di.Fallback())`. Every value it applies to is added to the shutdown list as it is built, and `Shutdown()` closes them in **reverse initialization order** — so a database connection opened before a repository is closed after it.
 
-You do not need to register closers manually. Implementing `io.Closer` is enough:
+You do not register closers by hand. Implementing `io.Closer` is enough:
 
 ```go
 type Store struct { db *sql.DB }
@@ -336,32 +338,36 @@ type Store struct { db *sql.DB }
 func (s *Store) Close() error { return s.db.Close() }
 ```
 
-Anything that does **not** implement `io.Closer` is simply ignored during shutdown.
+- A concrete type without a `Close` method is not closed. One whose `Close` has another signature is a generation error: say how to close it with `di.Close[I]()` on its registration.
+- A value wired as an interface that does not declare `Close` is checked when it is built, and closed if it has the method.
+- A service replaces the policy with a `di.DefaultCloser` of its own — see [Closing](https://gitlab.com/gorib/di/-/blob/main/docs/reference.md#closing) in the diogen reference.
 
 A failed `InitApp()` closes them itself, in the same order: it returns no container, so nothing else could. A `Close()` that fails on the way out is joined onto the error that stopped the build rather than replacing it.
 
 ## Testing with the container
 
-A component test usually wants the real graph with a couple of fakes. The generated `Replacements` struct is that seam: supply a value and the constructor that would have produced it is never called.
+A component test runs the real graph and replaces only what leaves the process — the typed client of a neighbouring service, a publisher. The database and the repositories over it stay real. The generated `Replacements` struct is that seam: supply a value and the constructor that would have produced it is never called.
 
 ```go
-type fakeUserRepository struct{}
+type fakeContracts struct{ contract.ContractServiceClient }
 
-func (fakeUserRepository) ByID(ctx context.Context, id string) (*service.User, error) {
-    return &service.User{ID: id}, nil
+func (fakeContracts) Get(ctx context.Context, in *contract.GetRequest, _ ...grpc.CallOption) (*contract.Contract, error) {
+    return &contract.Contract{Id: in.Id}, nil
 }
 
 func TestUserFlow(t *testing.T) {
     container, err := diogen.InitAppWith(diogen.Replacements{
-        PostgresUserRepository: fakeUserRepository{},
+        ContractServiceClient: fakeContracts{},
     })
     if err != nil {
         t.Fatal(err)
     }
     defer container.Shutdown()()
-    // ... exercise container.AppApp() or any getter ...
+    // ... exercise container.App() or any getter ...
 }
 ```
+
+The connection under a replaced client is still built, because a replacement does not prune what feeds it; the harness fills it with `grpcClient.Dead` for you. Where to cut, and why, is [Choosing where to cut](../conventions/component-harness.md#choosing-where-to-cut).
 
 The field's type is the interface the value is wired as, so a fake that stops satisfying it fails to compile at the line that supplies it. Nothing is asserted at run time.
 
@@ -372,11 +378,11 @@ Note that `InitDi()` in `config/diogen/di.go` calls `InitApp()`, which passes no
 **Not every registration has an entry.** A `Replacements` field exists only where every type the registration is exposed as is an interface:
 
 - `di.Define(NewServer)` exposes the concrete `*Server` — declare an interface and wire it as that if you want the slot replaceable.
-- `di.Tag` members have no entry of their own: the membership of a collection is fixed at generation time, so replacing one member cannot change the set. But the collection its `di.Tags` consumer gathers has its own entry — a `Replacements` field of type `[]T` — so you replace the whole `[]server.Interceptor` chain directly, without touching the server. A member's own constructor is skipped only if it feeds nothing but that one collection; a member feeding more than one collection always builds for real regardless of what you supply.
+- `di.Tag` members have no entry of their own: the membership of a collection is fixed at generation time, so replacing one member cannot change the set. But the collection its `di.Tags` consumer gathers has its own entry — a `Replacements` field of type `[]T` — so you replace the whole set, the HTTP routers say, without touching their consumer. A `di.List` gets the same entry, which is how the whole `[]server.Interceptor` chain is replaced. A member's own constructor is skipped only if it feeds nothing but that one collection; a member feeding more than one collection always builds for real regardless of what you supply.
 
 Registrations that write the same container field — the two branches of an `if`/`else` over an env var, for instance — share a single entry, because which of them wins is decided at run time. Supplying it skips both branches.
 
-See the [diogen README](https://gitlab.com/gorib/di/-/blob/main/README.md#7-testing-services-that-use-diogen) for the full rules.
+See the [diogen reference](https://gitlab.com/gorib/di/-/blob/main/docs/reference.md#replacements) for the full rules.
 
 ## What generation refuses, and what it would have been
 
@@ -405,7 +411,7 @@ That is the line the generator draws: output that does not compile is the
 compiler's problem, output that compiles and is wrong is the generator's.
 
 The full list of generator errors, each with the registrations that produce it,
-is in the [diogen README](https://gitlab.com/gorib/di/-/blob/main/README.md#8-troubleshooting).
+is in the [diogen reference](https://gitlab.com/gorib/di/-/blob/main/docs/reference.md#error-catalogue).
 For the other two generators on the path see
 [input parsing](../conventions/input-parsing.md#troubleshooting-generation) (whisk)
 and [make:domain](../cli/make-domain.md#troubleshooting-store) (store).
@@ -414,6 +420,6 @@ and [make:domain](../cli/make-domain.md#troubleshooting-store) (store).
 
 Because the container is generated Go code, any misconfiguration surfaces as a compile error:
 
-- Missing dependency → undefined symbol
+- Missing dependency → generation error (`dependency for … is not found`)
 - Wrong type → type mismatch at compile time
 - Unresolvable constructor argument → generator error before compilation

@@ -49,9 +49,11 @@ func NewMigrations() embed.FS {
 ```
 
 The interface is one line and it exists for the container: registered as
-`di.Wire[Migration]`, the source gets a named `Replacements` field and a field
-name derived from the domain, so twenty domains produce twenty distinct entries.
-`di.Define` on `embed.FS` would name them all after the same concrete type.
+`di.Wire[Migration]`, the source gets a container field named after its domain,
+so twenty domains produce twenty distinct fields. `di.Define` on `embed.FS` would
+name them all after the same concrete type. The registration is tagged
+`migrate.MigrationsTag`, so a test replaces the sources through the collection's
+own `Replacements` field, all at once.
 
 ### SQL migrations
 

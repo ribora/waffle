@@ -7,7 +7,7 @@ func InitDi() (app.App, error) {
     if err != nil {
         return nil, err
     }
-    application := di.AppApp()
+    application := di.App()
     if appInstance, ok := application.(app.HasCloser); ok {
         appInstance.SetCloser(di.Shutdown())
     }

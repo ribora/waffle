@@ -147,7 +147,11 @@ if err := Up(ctx); err != nil {
 return nil, err
 }
 app := &App{}
-{{if .HookBoot}}if err := app.boot(ctx, &cut); err != nil {
+{{if .Hooked}}{{.Hooked}}, err := app.params(ctx)
+if err != nil {
+return nil, err
+}
+{{end}}{{if .HookBoot}}if err := app.boot(ctx, &cut); err != nil {
 return nil, err
 }
 {{end}}{{range .Postgres}}if cut.{{.}} == nil {
@@ -179,7 +183,7 @@ cut.{{.}}, app.Publisher = publisher, publisher
 cut.{{.Field}} = grpcClient.Dead("{{.Label}}")
 }
 {{end}}
-application, err := {{.Package}}.InitAppWith(cut)
+application, err := {{.Package}}.InitAppWith({{.InitArgs}})
 if err != nil {
 return nil, err
 }

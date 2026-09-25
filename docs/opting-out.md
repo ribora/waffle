@@ -74,8 +74,8 @@ startup rather than a build error.
   it has to be built inside both branches, or hoisted and reassigned.
 - **Collections across packages.** `di.Tag` / `di.Tags` gather every
   implementation registered under a tag, including from packages your service
-  only blank-imports. By hand, every middleware and interceptor is a line in a
-  slice literal that somebody has to remember to update.
+  only blank-imports. By hand, every command and router is a line in a slice
+  literal that somebody has to remember to update.
 - **Modules.** A framework package ships its own registrations; a service opts
   in with one blank import. By hand, adding a tool means copying its wiring into
   your `InitDi()` and re-copying it on every upgrade.
