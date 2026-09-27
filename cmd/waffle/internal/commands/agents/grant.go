@@ -11,7 +11,7 @@ import (
 
 func NewGrant() *grant {
 	return &grant{base: command.New("agents:grant",
-		"Print the areas a Rule #11 mode takes as a grant, or check one and say what it opens; grants nothing",
+		"Print the areas a Rule #11 mode opens on their own and those it takes as a grant, or check one grant and say what it opens; grants nothing",
 		noTemplates, nil).
 		WithUsage("<mode> [name]\n" +
 			"  mode is one of: " + strings.Join(modeNames(), ", ") + "\n" +
@@ -40,23 +40,16 @@ func (c *grant) Run(_ context.Context, args ...string) error {
 	}
 
 	if len(args) == 1 {
-		var lines []string
-		for _, a := range rules.Areas {
-			if slices.Contains(a.Grant, mode.Name) {
-				lines = append(lines, fmt.Sprintf("  %s — %s", a.Name, strings.Join(a.Paths, ", ")))
-			}
-		}
-		if len(lines) == 0 {
-			fmt.Printf("No area is granted in %s mode.\n", mode.Name)
-			return nil
-		}
-		fmt.Printf("Grants in %s mode:\n%s\n", mode.Name, strings.Join(lines, "\n"))
+		fmt.Print(listing(mode, rules.Areas))
 		return nil
 	}
 
 	for _, a := range rules.Areas {
 		if a.Name != args[1] {
 			continue
+		}
+		if slices.Contains(a.Modes, mode.Name) {
+			return fmt.Errorf("the %s area is open in %s mode already and takes no grant there", a.Name, mode.Name)
 		}
 		if !slices.Contains(a.Grant, mode.Name) {
 			return fmt.Errorf("the %s area is not granted in %s mode (it is in: %s)",
@@ -67,6 +60,31 @@ func (c *grant) Run(_ context.Context, args ...string) error {
 		return nil
 	}
 	return fmt.Errorf("no area is named %q", args[1])
+}
+
+// Areas that follow the mode table are left to `agents:mode`, which prints what
+// the table opens.
+func listing(mode Mode, areas []Area) string {
+	var open, grants []string
+	for _, a := range areas {
+		line := fmt.Sprintf("  %s — %s", a.Name, strings.Join(a.Paths, ", "))
+		if slices.Contains(a.Modes, mode.Name) {
+			open = append(open, line)
+		}
+		if slices.Contains(a.Grant, mode.Name) {
+			grants = append(grants, line)
+		}
+	}
+	var b strings.Builder
+	if len(open) > 0 {
+		fmt.Fprintf(&b, "Open in %s mode on their own:\n%s\n", mode.Name, strings.Join(open, "\n"))
+	}
+	if len(grants) == 0 {
+		fmt.Fprintf(&b, "No area takes a grant in %s mode.\n", mode.Name)
+	} else {
+		fmt.Fprintf(&b, "Grants in %s mode:\n%s\n", mode.Name, strings.Join(grants, "\n"))
+	}
+	return b.String()
 }
 
 func orNone(modes []string) string {

@@ -68,6 +68,32 @@ func TestGrantBelongsToItsMode(t *testing.T) {
 	}
 }
 
+func TestGrantOfAnAreaTheModeOpensSaysSo(t *testing.T) {
+	service(t)
+	err := NewGrant().Run(context.Background(), "spec", "proto")
+	if err == nil || !strings.Contains(err.Error(), "open in spec mode already") {
+		t.Errorf("proto in spec: %v", err)
+	}
+}
+
+func TestGrantListsTheAreasAModeOpensAsWellAsItsGrants(t *testing.T) {
+	areas := monorepoRules(t).Areas
+	spec, _ := LookupMode("spec")
+	redgreen, _ := LookupMode("redgreen")
+
+	got := listing(spec, areas)
+	for _, want := range []string{"Open in spec mode on their own:", "proto — ../../shared/api/proto/",
+		"events — ../../shared/api/events/", "No area takes a grant in spec mode."} {
+		if !strings.Contains(got, want) {
+			t.Errorf("spec listing lacks %q:\n%s", want, got)
+		}
+	}
+	got = listing(redgreen, areas)
+	if strings.Contains(got, "Open in") || !strings.Contains(got, "gomod — go.mod, go.sum") {
+		t.Errorf("redgreen listing:\n%s", got)
+	}
+}
+
 func TestGuardLeavesAPathNoAreaNamesOutsideTheService(t *testing.T) {
 	service(t)
 	if err := NewGuard().Run(context.Background(), "spec", filepath.Join(os.TempDir(), "elsewhere.go")); err != nil {

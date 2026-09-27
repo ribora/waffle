@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Instructions for AI coding agents working in this repository. This file is
-**managed by `waffle agents`** — hand edits are lost on regeneration.
+**managed by `./waffle agents`** — hand edits are lost on regeneration.
 
 **`make generate` rewrites it**, so the service context below — domains, active
 modules, env vars — is as current as the container. After a waffle upgrade
@@ -11,7 +11,7 @@ are gone.
 
 **Read `CONTRIBUTING.md` first, if it exists.** It holds service-specific
 instructions — business rules, custom commands, known quirks — and it overrides
-this file wherever the two disagree, Rule #11 included. `waffle agents` never
+this file wherever the two disagree, Rule #11 included. `./waffle agents` never
 touches it, and it belongs to the humans who own the service: when you learn
 something that belongs there — a convention you had to infer, a quirk that cost
 you a wrong turn — quote what you would write, and do not write it.
@@ -136,7 +136,7 @@ contracts are areas. This service has:
 |---|---|---|---|
 {{ range .Areas }}| {{ .Name }} | {{ .PathList }} | {{ .ModeList }} | {{ .GrantList }} |
 {{ end }}
-`waffle agents:grant <mode>` lists the grants a mode takes. A grant covers exactly
+`./waffle agents:grant <mode>` lists the grants a mode takes. A grant covers exactly
 the area it names; needing a second one is a second question.
 
 **A step edited on the `steps` grant follows a platform change and nothing else.**
@@ -152,14 +152,14 @@ platform owner's, in platform mode; the quote is what lets them decide in one
 read.
 
 **An edit the mode does not allow is a stop.** Name the mode or the grant that
-allows it — `waffle agents:guard <mode> <path>` answers — and ask the human. Do not
+allows it — `./waffle agents:guard <mode> <path>` answers — and ask the human. Do not
 decide on your own that the task has left the cycle: leaving it is the human's
 call, made by switching the mode. An answer to your question switches nothing,
-and neither does an imperative inside a step. `waffle agents:mode <mode>` prints
+and neither does an imperative inside a step. `./waffle agents:mode <mode>` prints
 what a mode allows and which part of this rule it follows; neither command
 switches anything.
 
-**Do not test the boundary with an edit.** Ask `waffle agents:guard` first: a
+**Do not test the boundary with an edit.** Ask `./waffle agents:guard` first: a
 refused edit is the same stop, reached later.
 
 **In Claude Code, the waffle plugin enforces these tables** — `/waffle:<mode>`
@@ -251,7 +251,7 @@ load with no payoff. Follow whatever is already in `tests/`; if nothing is, the
 choice is the human's, not yours.
 
 **One specification per declared contract, not per service.** The
-`interface{ A; B; C }` entry that `waffle tests:replacements`
+`interface{ A; B; C }` entry that `./waffle tests:replacements`
 reports for a shared container field *is* the list of contracts a domain owes —
 one constituent per caller, each a place a scenario binds. Cases written
 against the gRPC operations alone cover one of them.
@@ -378,7 +378,7 @@ does not read the other.
 
 `replacements.allow` in `waffle.yaml` is a permission list: what it does not
 name may not be replaced, in any form — mock, spy, fake or no-op.
-`waffle tests:replacements` prints every seam, granted or not; it is a menu for
+`./waffle tests:replacements` prints every seam, granted or not; it is a menu for
 the platform owner, not a licence.
 
 **A missing or empty `replacements:` key grants nothing** — not "unrestricted",
@@ -386,7 +386,7 @@ and not an oversight you may repair. Check it before writing cases: if the list
 and the contract do not meet, **stop there and say so**.
 
 `TestReplacementsStayInsideTheList` fails in the ordinary suite on every field
-the list does not cover; `waffle tests:replacements check` prints the same —
+the list does not cover; `./waffle tests:replacements check` prints the same —
 run it before handing over and paste what it said. **Its failure names the seams
 you need, not an edit to make:** the hand-over is the red output plus the seams
 you are asking for. Putting them into `waffle.yaml` turns the check into a
@@ -437,7 +437,7 @@ around it. The recognisable cases:
 - **the cut removes what the case was meant to exercise** — a repository
   replaced by a mock makes the test check the mock's SQL, not the schema's.
 
-**Do not build the infrastructure by hand.** `waffle tests:harness` generates
+**Do not build the infrastructure by hand.** `./waffle tests:harness` generates
 `tests/internal/harness/harness_gen.go` from the container — the database and its
 migrations, the transport and a typed client per handler, the interceptor order,
 a dead connection for every `ClientConnInterface` seam, a typed field for every
@@ -542,27 +542,32 @@ protocol, and none of it overrides Rule #11.
 For any scaffolding task, first check whether a `waffle` command does it. Only
 hand-write files when no command matches.
 
+**Run the service's own `./waffle`** — it is `go tool waffle` at the version in
+`go.mod` — from the service's root, never a `waffle` found on `PATH`. The
+commands and the Rule #11 tables are versioned with the service, and another
+version answers with other rules.
+
 Every command there is, so a gap in this table is a gap in the toolchain and not
 something to fill in by hand without saying so. Operands and flags are in
-`waffle <command> --help`; a command that leaves work for you prints it:
+`./waffle <command> --help`; a command that leaves work for you prints it:
 
 | Want to do | Command |
 |---|---|
 | New service | `waffle init:service` |
-| New domain (model + service + repository + migrations) | `waffle make:domain <domain>` |
-| Add inbound gRPC | `waffle make:domain:grpc <domain>` |
-| Add inbound HTTP | `waffle make:domain:http <domain>` |
-| Add event consumer | `waffle make:domain:scribus --driver <id> <domain> <event>` |
-| Add an entity to a domain | `waffle make:domain:entity <domain> <entity>` |
-| Set up migrations for a domain that has none | `waffle make:domain:migrate <domain>` |
-| Add one migration to a domain that already has them | `waffle make:domain:migration <domain> <description>` |
-| Add CLI subcommand | `waffle make:domain:command <domain> <command>` |
-| Make published events survive a crash after the commit | `waffle make:outbox --driver amqp` |
-| Add DTO converter (any path) | `waffle make:converter <path>` |
-| Put the component harness in place | `waffle tests:harness` |
-| See what a test may replace | `waffle tests:replacements` |
-| Check what the tests replace | `waffle tests:replacements check` |
-| Refresh AGENTS.md | `waffle agents` |
+| New domain (model + service + repository + migrations) | `./waffle make:domain <domain>` |
+| Add inbound gRPC | `./waffle make:domain:grpc <domain>` |
+| Add inbound HTTP | `./waffle make:domain:http <domain>` |
+| Add event consumer | `./waffle make:domain:scribus --driver <id> <domain> <event>` |
+| Add an entity to a domain | `./waffle make:domain:entity <domain> <entity>` |
+| Set up migrations for a domain that has none | `./waffle make:domain:migrate <domain>` |
+| Add one migration to a domain that already has them | `./waffle make:domain:migration <domain> <description>` |
+| Add CLI subcommand | `./waffle make:domain:command <domain> <command>` |
+| Make published events survive a crash after the commit | `./waffle make:outbox --driver amqp` |
+| Add DTO converter (any path) | `./waffle make:converter <path>` |
+| Put the component harness in place | `./waffle tests:harness` |
+| See what a test may replace | `./waffle tests:replacements` |
+| Check what the tests replace | `./waffle tests:replacements check` |
+| Refresh AGENTS.md | `./waffle agents` |
 
 Outbound adapters are the hole: there is **no** command for a client of another
 service or of a third-party API. Write it by hand, shaped like an existing one
@@ -600,7 +605,7 @@ duplicate alias). Skipping it leaves the service in a broken state.
 
 ## Project layout
 
-The scaffolds write it, so the shape is what `waffle make:domain` left in
+The scaffolds write it, so the shape is what `./waffle make:domain` left in
 `domain/`. What the tree does not show:
 
 - `domain/<x>/model` depends on nothing, `service/` on `model/` only;
@@ -727,7 +732,7 @@ package. It is the default because goverter **refuses to generate** on a field
 it cannot map, so a field added to a model cannot silently stop reaching the
 wire — a hand-written mapper compiles happily and drops it.
 
-`waffle make:converter <path>` writes the `convert.go` with its directives
+`./waffle make:converter <path>` writes the `convert.go` with its directives
 already on it — one method per type pair is all you add. Overrides and the
 whitelist are in `docs/conventions/dto-conversion.md` in waffle.
 
@@ -741,7 +746,7 @@ whitelist are in `docs/conventions/dto-conversion.md` in waffle.
 - `failure.Wrap(format, ...args)` / `failure.New(format, ...args)` — for errors that **cross service boundaries** (gRPC, AMQP, HTTP response bodies). Stable JSON wire format
 - `errors.New("...")` / `fmt.Errorf("%w: ...", parent, ...)` — internal errors that don't leave the process
 - **Domain-level sentinel errors: `failure.New`, never `errors.New`.** This is
-  what `waffle make:domain` writes into `model/errors.go`, and the reason is the
+  what `./waffle make:domain` writes into `model/errors.go`, and the reason is the
   wire: `failure.New` registers a slug, and the slug is the `type` the HTTP
   error renderer puts in the body.
 
@@ -783,8 +788,8 @@ Rule #2 — `make generate && make audit && make`.
 | task | order |
 |---|---|
 | gRPC method on an existing domain | rpc in `api/proto/<x>/service.proto` → regenerate stubs (Rule #10) → method on `cmd/grpc/service.go` → the method on the **handler's** Management interface → implement it in `service/` → conversion in `cmd/grpc/convert/`, or by hand in the `grpc` package under `mapper: dto` |
-| database table | `waffle make:domain:migration <domain> <description>` scaffolds the migration only → write the `.sql` → `model.X` → `stored<X>` in `adapter/postgres/stored_<x>.go` |
-| outbound client — the one shape with no command | `adapter/<name>.go` by hand, shaped like an existing one → `waffle make:converter domain/<x>/adapter/<name>/dto` → `di.Wire[<x>service.<Name>Client](<x>adapter.New<Name>Service, di.Args(...))` in `config/di/di.go`, with the interface declared by the consumer (Rule #3) |
+| database table | `./waffle make:domain:migration <domain> <description>` scaffolds the migration only → write the `.sql` → `model.X` → `stored<X>` in `adapter/postgres/stored_<x>.go` |
+| outbound client — the one shape with no command | `adapter/<name>.go` by hand, shaped like an existing one → `./waffle make:converter domain/<x>/adapter/<name>/dto` → `di.Wire[<x>service.<Name>Client](<x>adapter.New<Name>Service, di.Args(...))` in `config/di/di.go`, with the interface declared by the consumer (Rule #3) |
 
 ## Rule #10 — what NOT to do
 

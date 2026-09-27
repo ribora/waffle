@@ -98,6 +98,21 @@ func TestAPathNoAreaNamesOutsideTheServiceIsUnclaimed(t *testing.T) {
 	}
 }
 
+func TestAnAreaClaimsItsOwnDirectory(t *testing.T) {
+	mode, _ := LookupMode("spec")
+	r := monorepoRules(t)
+	for p, want := range map[string]Verdict{
+		"../../shared/api/proto":         Allowed,
+		"../../shared/api/proto/":        Allowed,
+		"../../shared/api/events":        Allowed,
+		"../../shared/api/protobuf/x.go": Unclaimed,
+	} {
+		if v, _ := r.Check(mode, abs(p), nil); v != want {
+			t.Errorf("%s in spec mode: verdict %v, want %v", p, v, want)
+		}
+	}
+}
+
 // The refusal is what the agent acts on, so it has to name what to ask for.
 func TestRefusalNamesWhatWouldAllow(t *testing.T) {
 	cases := map[string]struct{ mode, path, names string }{

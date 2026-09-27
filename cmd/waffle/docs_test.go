@@ -189,8 +189,9 @@ func TestAgentsTemplateRuleNumbering(t *testing.T) {
 	}
 }
 
-// `waffle <code>` inside backticks, so prose about "waffle conventions" is ignored.
-var citedCommand = regexp.MustCompile("`waffle ([a-z][a-z:]*)")
+// `waffle <code>` or `./waffle <code>` inside backticks, so prose about "waffle
+// conventions" is ignored.
+var citedCommand = regexp.MustCompile("`(?:\\./)?waffle ([a-z][a-z:]*)")
 
 func TestDocsCiteRealCommands(t *testing.T) {
 	root := repoRoot(t)
@@ -234,7 +235,7 @@ func TestAgentsTemplateListsEveryCommand(t *testing.T) {
 
 // The check above stops at the command code, so the operands after it drifted.
 var (
-	citedInvocation = regexp.MustCompile("`waffle ([a-z][a-z:]*)([^`]*)`")
+	citedInvocation = regexp.MustCompile("`(?:\\./)?waffle ([a-z][a-z:]*)([^`]*)`")
 	// A whole operand: `domain/<x>/adapter/dto` is a `<path>`, not a slot `<x>`.
 	// Optional ones too: `[routing-key]` outlived the operand by that name because
 	// only the angle brackets were read.

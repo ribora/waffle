@@ -219,7 +219,7 @@ func (r Rules) area(abs string) (Area, bool) {
 	return Area{}, false
 }
 
-// A pattern ending in a slash is a directory, and matches everything below it.
+// A pattern ending in a slash is a directory, and matches it and everything below it.
 func matches(pattern string, dir bool, abs string) bool {
 	if !dir {
 		ok, _ := filepath.Match(pattern, abs)
@@ -227,7 +227,7 @@ func matches(pattern string, dir bool, abs string) bool {
 	}
 	depth := len(strings.Split(filepath.ToSlash(pattern), "/"))
 	parts := strings.Split(filepath.ToSlash(abs), "/")
-	if len(parts) <= depth {
+	if len(parts) < depth {
 		return false
 	}
 	ok, _ := filepath.Match(pattern, filepath.FromSlash(strings.Join(parts[:depth], "/")))
