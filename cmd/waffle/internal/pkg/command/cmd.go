@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"go/format"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -22,11 +23,9 @@ func New(name, description string, templates embed.FS, funcs template.FuncMap) *
 		name:        name,
 		description: description,
 		templates:   templates,
-		funcs: Funcs(),
+		funcs:       Funcs(),
 	}
-	for n, f := range funcs {
-		c.funcs[n] = f
-	}
+	maps.Copy(c.funcs, funcs)
 	return c
 }
 
