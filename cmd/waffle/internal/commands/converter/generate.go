@@ -27,5 +27,5 @@ func Generate(targetDir, projectName string) error {
 	if err := c.Write(sources, params); err != nil {
 		return err
 	}
-	return c.EnsureTool("github.com/jmattheis/goverter/cmd/goverter")
+	return c.EnsureTool("gitlab.com/gorib/convert/cmd/goverter")
 }

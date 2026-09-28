@@ -142,7 +142,7 @@ waffle make:domain:http product
   + domain/product/cmd/http/main.go
   + domain/product/cmd/http/convert/convert.go
   + pkg/goverter/convert.go
-  + added tool github.com/jmattheis/goverter/cmd/goverter
+  + added tool gitlab.com/gorib/convert/cmd/goverter
   + enabled module gitlab.com/gorib/waffle/config/tools/http
   + added to .env: DAEMON_HOST, DAEMON_PORT, HEALTH_PATH
   + added tool gitlab.com/gorib/whisk/cmd/whisk

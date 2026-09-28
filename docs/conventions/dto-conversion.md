@@ -152,6 +152,24 @@ type Convert interface {
 
 This overrides conversion for a single field without changing the whitelist.
 
+## Proto enums
+
+The `goverter` the scaffolds install is `gitlab.com/gorib/convert/cmd/goverter`:
+upstream plus one transformer on every method, so a proto enum and a string
+enum map by value with nothing to annotate — one declared method per pair:
+
+```go
+type Convert interface {
+    StatusToDomain(pb.OrderStatus_Value) (model.Status, error)
+}
+```
+
+The proto value name is what reaches HTTP clients, so it must be the domain
+string exactly — the naming rules are in the
+[convert README](https://gitlab.com/gorib/convert#proto-enums). A service still
+on upstream goverter has to drop it by hand before scaffolding: two tools named
+`goverter` leave `go tool goverter` refusing to run.
+
 ## Adding a project-wide helper
 
 1. Add the var to `pkg/goverter/convert.go`:
