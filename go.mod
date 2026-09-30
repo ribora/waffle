@@ -4,26 +4,29 @@ go 1.27.0
 
 require (
 	github.com/fatih/color v1.19.0
+	github.com/go-chi/chi/v5 v5.3.2
 	github.com/go-co-op/gocron/v2 v2.22.0
 	github.com/pborman/getopt/v2 v2.2.0
 	github.com/pressly/goose/v3 v3.27.3
-	gitlab.com/gorib/amqp v1.9.1
+	gitlab.com/gorib/amqp v1.9.2
 	gitlab.com/gorib/criteria v1.1.0
 	gitlab.com/gorib/di v1.10.0
-	gitlab.com/gorib/elastic v1.4.0
+	gitlab.com/gorib/elastic v1.4.1
 	gitlab.com/gorib/env v1.0.1
-	gitlab.com/gorib/failure v1.3.1
-	gitlab.com/gorib/grpc v1.6.3
+	gitlab.com/gorib/failure v1.4.0
+	gitlab.com/gorib/grpc v1.6.4
 	gitlab.com/gorib/hilton v1.2.3
-	gitlab.com/gorib/http v1.12.3
-	gitlab.com/gorib/pry v1.4.1
-	gitlab.com/gorib/redis v1.3.0
+	gitlab.com/gorib/http v1.12.4
+	gitlab.com/gorib/pry v1.4.2
+	gitlab.com/gorib/redis v1.3.1
 	gitlab.com/gorib/session v1.2.0
 	gitlab.com/gorib/sql v1.10.0
-	gitlab.com/gorib/whisk v1.3.2
+	gitlab.com/gorib/whisk v1.3.4
 	golang.org/x/mod v0.40.0
 	golang.org/x/tools v0.49.0
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260819154853-08b0e4226688
 	google.golang.org/grpc v1.83.1
+	google.golang.org/protobuf v1.36.12
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -36,7 +39,6 @@ require (
 	github.com/elastic/elastic-transport-go/v8 v8.11.0 // indirect
 	github.com/elastic/go-elasticsearch/v8 v8.19.7 // indirect
 	github.com/getsentry/sentry-go v0.48.0 // indirect
-	github.com/go-chi/chi/v5 v5.3.2 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-sql-driver/mysql v1.10.0 // indirect
@@ -79,8 +81,6 @@ require (
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260819154853-08b0e4226688 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260819154853-08b0e4226688 // indirect
-	google.golang.org/protobuf v1.36.12 // indirect
 	modernc.org/libc v1.75.4 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect

@@ -288,6 +288,60 @@ func InitAppWith(replacements Replacements) (*Application, error) {
 }
 `
 
+const narrowPublisherContainer = `package diogen
+
+import (
+	publisher "example.test/shop/pkg/publisher"
+)
+
+type Replacements struct {
+	// gitlab.com/gorib/amqp.NewPublisher
+	Publisher publisher.Publisher
+}
+
+type Application struct{}
+
+func InitAppWith(replacements Replacements) (*Application, error) {
+	return container, nil
+}
+`
+
+const outboundContainer = `package diogen
+
+import (
+	pb "example.test/shop/api/pb"
+)
+
+type Replacements struct {
+	// example.test/shop/api/pb.NewAccountServiceClient
+	PbAccountServiceClient pb.AccountServiceClient
+}
+
+type Application struct{}
+
+func InitAppWith(replacements Replacements) (*Application, error) {
+	return container, nil
+}
+`
+
+const commandsContainer = `package diogen
+
+import (
+	app "gitlab.com/gorib/waffle/app"
+)
+
+type Replacements struct{}
+
+type Application struct {
+	migrateCommand         app.Command
+	appCommandAsCommandTag []app.Command
+}
+
+func InitAppWith(replacements Replacements) (*Application, error) {
+	return container, nil
+}
+`
+
 const cacheContainer = `package diogen
 
 import (
@@ -582,6 +636,40 @@ func TestRecordersComeBackOnApp(t *testing.T) {
 	)
 	// A collection of loggers is a di.Tags seam, and one recorder is not a list.
 	lacks(t, "harness_gen.go", body, "cut.PryLoggers")
+}
+
+func TestAPublisherNarrowedByTheServiceIsRecordedToo(t *testing.T) {
+	module(t, narrowPublisherContainer, nil)
+
+	run(t)
+
+	contains(t, "harness_gen.go", generatedFile(t),
+		"cut.Publisher, app.Publisher = publisher, publisher",
+		"cut.Publisher = trace.Publisher(cut.Publisher)",
+	)
+}
+
+func TestAClientTheScenarioSuppliesIsTracedThroughItsOwnConstructor(t *testing.T) {
+	module(t, outboundContainer, nil)
+
+	run(t)
+
+	contains(t, "harness_gen.go", generatedFile(t),
+		`pbProto "example.test/shop/api/pb"`,
+		"cut.PbAccountServiceClient = pbProto.NewAccountServiceClient(trace.Outbound(cut.PbAccountServiceClient))",
+	)
+}
+
+func TestCommandsAreTracedAlsoThroughTheirCollection(t *testing.T) {
+	module(t, commandsContainer, nil)
+
+	run(t)
+
+	contains(t, "harness_gen.go", generatedFile(t),
+		"return trace.Command(a.Application.MigrateCommand())",
+		"func (a *App) AppCommandAsCommandTag() []waffleApp.Command {",
+		"traced[i] = trace.Command(c)",
+	)
 }
 
 func TestRedisBesideTheDatabaseAndTelemetryRecorded(t *testing.T) {

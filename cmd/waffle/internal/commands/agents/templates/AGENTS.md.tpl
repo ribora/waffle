@@ -567,14 +567,17 @@ something to fill in by hand without saying so. Operands and flags are in
 | Put the component harness in place | `./waffle tests:harness` |
 | See what a test may replace | `./waffle tests:replacements` |
 | Check what the tests replace | `./waffle tests:replacements check` |
+| Record what the service publishes, consumes, serves and calls | `./waffle flows record` |
+| Rewrite `tests/flows.yaml` after the cases change | `go test ./tests/... -args -flows.update` |
+| Assemble the project's flows and check its services against each other; `<root>` is the project's, not the service's | `./waffle flows [check] <root> <index.yaml>` |
 | Refresh AGENTS.md | `./waffle agents` |
 
 Outbound adapters are the hole: there is **no** command for a client of another
 service or of a third-party API. Write it by hand, shaped like an existing one
 in `domain/*/adapter/`, and wire it in `config/di/di.go` — see Rule #9.
 
-Each command is idempotent — existing files are NEVER overwritten. You can
-re-run any command safely.
+Each `make:*` command is idempotent — existing files are NEVER overwritten. You
+can re-run any of them safely.
 
 Project conventions (API import path, proto directory, DTO mapper) live in
 `waffle.yaml` at the project root — generators follow it instead of

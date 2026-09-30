@@ -118,6 +118,7 @@ func scaffold(params map[string]any, found found) map[string]string {
 		tpl("harness.go.tpl"):           filepath.Join(harnessDir, "harness.go"),
 		tpl("suite_test.go.tpl"):        filepath.Join("tests", "suite_test.go"),
 		tpl("boot_test.go.tpl"):         filepath.Join("tests", "boot_test.go"),
+		tpl("surface_test.go.tpl"):      filepath.Join("tests", "surface_test.go"),
 		tpl("replacements_test.go.tpl"): filepath.Join(container, "replacements_test.go"),
 		tpl("boundaries_test.go.tpl"):   filepath.Join(container, "boundaries_test.go"),
 	}
@@ -148,10 +149,12 @@ func (c *cmd) plan(root string, own hooks) (map[string]any, found, error) {
 		return nil, found{}, err
 	}
 	missed := s.readClients(module, root)
+	s.nameOutbound()
 
 	service := path.Base(module)
 	migrations := migrations(module)
-	imported := imports(s, own, migrations, importPath, container.Package)
+	godog := usesGodog()
+	imported := imports(s, own, migrations, importPath, container.Package, godog)
 	s.nameLocals(bootLocals(imported))
 	p := map[string]any{
 		"Module":       module,
@@ -177,6 +180,12 @@ func (c *cmd) plan(root string, own hooks) (map[string]any, found, error) {
 		"Clients": records(s.Clients, func(c client) map[string]string {
 			return map[string]string{"Field": c.Field, "Alias": c.Alias, "Service": c.Service}
 		}),
+		"Outbound": records(s.Outbound, func(o outbound) map[string]string {
+			return map[string]string{"Field": o.Field, "Alias": o.Alias, "Name": o.Name}
+		}),
+		"Godog":            godog,
+		"Commands":         s.Commands,
+		"CommandLists":     s.CommandLists,
 		"Grpc":             s.Grpc.Handlers != "",
 		"GrpcHandlers":     s.Grpc.Handlers,
 		"GrpcInterceptors": s.Grpc.Interceptors,
@@ -215,8 +224,14 @@ func records[T any](items []T, record func(T) map[string]string) []map[string]st
 
 func tpl(name string) string { return filepath.Join("templates", name) }
 
+// A suite not on godog is not made to depend on it.
+func usesGodog() bool {
+	body, err := os.ReadFile("go.mod")
+	return err == nil && strings.Contains(string(body), "github.com/cucumber/godog ")
+}
+
 // Standard library first, then the rest in path order, the way goimports groups.
-func imports(s shape, own hooks, migrations []map[string]string, container, pkg string) []map[string]string {
+func imports(s shape, own hooks, migrations []map[string]string, container, pkg string, godog bool) []map[string]string {
 	std := []string{"context", "fmt", "os", "testing"}
 	var rest []map[string]string
 	add := func(alias, p string) { rest = append(rest, map[string]string{"Alias": alias, "Path": p}) }
@@ -246,6 +261,14 @@ func imports(s shape, own hooks, migrations []map[string]string, container, pkg 
 		}
 	}
 	add("", "gitlab.com/gorib/waffle/resource")
+	add("", "gitlab.com/gorib/waffle/tools/trace")
+	add("", "gitlab.com/gorib/waffle/tools/flows")
+	if len(s.Commands)+len(s.CommandLists) > 0 {
+		add("waffleApp", "gitlab.com/gorib/waffle/app")
+	}
+	if godog {
+		add("", "github.com/cucumber/godog")
+	}
 	add(pkg, container)
 	if len(s.Postgres) > 0 {
 		std = append(std, "io/fs")
@@ -284,6 +307,12 @@ func imports(s shape, own hooks, migrations []map[string]string, container, pkg 
 		if !seen[c.Path] {
 			seen[c.Path] = true
 			add(c.Alias, c.Path)
+		}
+	}
+	for _, o := range s.Outbound {
+		if !seen[o.Path] {
+			seen[o.Path] = true
+			add(o.Alias, o.Path)
 		}
 	}
 

@@ -96,8 +96,15 @@ _, _ = fmt.Fprintln(os.Stderr, err)
 os.Exit(1)
 }
 {{end}}Env()
+trace.Enable("{{.Service}}")
 
 code := m.Run()
+if code == 0 && flows.Complete() {
+if err := flows.Check("flows.yaml", "{{.Service}}", trace.Records()); err != nil {
+_, _ = fmt.Fprintln(os.Stderr, err)
+code = 1
+}
+}
 
 if err := Down(context.Background()); err != nil {
 // Not fatal: the run is over, and its result is what the caller wants.
@@ -146,6 +153,7 @@ func Boot(ctx context.Context, cut {{.Package}}.Replacements) (*App, error) {
 if err := Up(ctx); err != nil {
 return nil, err
 }
+trace.Start({{if .Godog}}godog.T(ctx){{else}}nil{{end}})
 app := &App{}
 {{if .Hooked}}{{.Hooked}}, err := app.params(ctx)
 if err != nil {
@@ -176,6 +184,10 @@ cut.{{.}}, app.Consumer = consumer, consumer
 {{end}}{{range .Publisher}}if cut.{{.}} == nil {
 cut.{{.}}, app.Publisher = publisher, publisher
 }
+cut.{{.}} = trace.Publisher(cut.{{.}})
+{{end}}{{range .Outbound}}if cut.{{.Field}} != nil {
+cut.{{.Field}} = {{.Alias}}.New{{.Name}}(trace.Outbound(cut.{{.Field}}))
+}
 {{end}}{{if .Dead}}
 // Replacing a typed client does not prune the connection under it, which is
 // built anyway: dead, a call that reaches it panics instead of dialling out.
@@ -190,6 +202,30 @@ return nil, err
 app.Application = application
 return app, nil
 }
+{{range .Commands}}
+func (a *App) {{.}}() waffleApp.Command { return trace.Command(a.Application.{{.}}()) }
+{{end}}{{range .CommandLists}}
+func (a *App) {{.}}() []waffleApp.Command {
+commands := a.Application.{{.}}()
+traced := make([]waffleApp.Command, len(commands))
+for i, c := range commands {
+traced[i] = trace.Command(c)
+}
+return traced
+}
+{{end}}{{if .Godog}}
+// See waffle/docs/conventions/flows.md.
+func Steps(sc *godog.ScenarioContext) {
+sc.Before(func(ctx context.Context, s *godog.Scenario) (context.Context, error) {
+trace.Case(s.Uri)
+return ctx, nil
+})
+sc.StepContext().Before(func(ctx context.Context, st *godog.Step) (context.Context, error) {
+trace.Step(string(st.Type))
+return ctx, nil
+})
+}
+{{end}}
 {{if or .Grpc .Http}}
 type Clients struct {
 {{range .Clients}}{{.Field}} {{.Alias}}.{{.Service}}Client
@@ -222,7 +258,7 @@ if err != nil {
 return nil, err
 }
 clients.grpc = grpc
-{{if .Clients}}conn := grpc.Conn()
+{{if .Clients}}conn := trace.Inbound(grpc.Conn())
 {{end}}{{range .Clients}}clients.{{.Field}} = {{.Alias}}.New{{.Service}}Client(conn)
 {{end}}{{end}}{{if .Http}}
 web, err := waffleHttp.Serve(a.{{.HttpMux}}(), a.{{.HttpGlobal}}(), a.{{.HttpRouters}}())

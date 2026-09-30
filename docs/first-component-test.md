@@ -320,7 +320,9 @@ container is last precisely so that CI never reaches it.
 
 `waffle` scaffolds Go tests, and the harness is notation-agnostic: `Boot` and
 `Serve` are the same two calls under godog. What waffle does not ship is the
-godog wiring, because the step vocabulary is the service's.
+godog wiring, because the step vocabulary is the service's. The one call it asks
+for is `harness.Steps(sc)` in the `ScenarioInitializer`, so that the
+[flows](conventions/flows.md#the-suites-record) know each case's file and its action.
 
 If you go that way: `.feature` files in `tests/feature/`, the Go beside Go in
 `tests/` — only one of the two is a specification, and it is read by someone who

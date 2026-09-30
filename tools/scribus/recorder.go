@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"gitlab.com/gorib/whisk/scan"
+
+	"gitlab.com/gorib/waffle/tools/trace"
 )
 
 // No Reset: clearing the wiring would drop the handler the container installed.
@@ -94,6 +96,14 @@ func (r *ConsumerRecorder) Deliver(msgs ...scan.Source) error {
 
 	if handler == nil {
 		return errors.New("scribus: no handler installed, boot the container first")
+	}
+	for _, msg := range msgs {
+		if m, ok := msg.(interface {
+			RoutingKey() string
+			Body() []byte
+		}); ok {
+			trace.Event("in", m.RoutingKey(), m.Body())
+		}
 	}
 	return handler(msgs)
 }

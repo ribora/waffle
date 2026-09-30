@@ -231,6 +231,29 @@ func local(expr ast.Expr) string {
 	return ""
 }
 
+// A package the served clients already import keeps their alias.
+func (s *shape) nameOutbound() {
+	taken := map[string]string{} // alias -> path
+	for _, c := range s.Clients {
+		taken[c.Alias] = c.Path
+	}
+	byPath := map[string]string{}
+	for alias, p := range taken {
+		byPath[p] = alias
+	}
+	for i, o := range s.Outbound {
+		alias, known := byPath[o.Path]
+		if !known {
+			alias = path.Base(o.Path) + "Proto"
+			for n := 2; taken[alias] != ""; n++ {
+				alias = path.Base(o.Path) + "Proto" + strconv.Itoa(n)
+			}
+			taken[alias], byPath[o.Path] = o.Path, alias
+		}
+		s.Outbound[i].Alias = alias
+	}
+}
+
 // NotificationService → Notification; two services of one name in different
 // packages are both prefixed by their package.
 func name(clients []client) {

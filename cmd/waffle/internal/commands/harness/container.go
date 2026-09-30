@@ -27,20 +27,23 @@ var (
 // Every list holds Replacements fields: a type the container carries twice is
 // filled twice.
 type shape struct {
-	Postgres  []string
-	Redis     []string
-	Logger    []string
-	Hilton    []string
-	Consumer  []string
-	Publisher []string
-	Dead      []conn
-	Grpc      wiring
-	Http      wiring
-	Variables []variable
-	Clients   []client
-	Params    []param
-	Imports   map[string]string // alias -> path, as the container file spells them
-	file      *ast.File
+	Postgres     []string
+	Redis        []string
+	Logger       []string
+	Hilton       []string
+	Consumer     []string
+	Publisher    []string
+	Dead         []conn
+	Grpc         wiring
+	Http         wiring
+	Variables    []variable
+	Clients      []client
+	Outbound     []outbound
+	Commands     []string // getters of the commands a step may run itself
+	CommandLists []string // getters of the di.Tags collections of commands
+	Params       []param
+	Imports      map[string]string // alias -> path, as the container file spells them
+	file         *ast.File
 
 	paramImports map[string]string // alias -> path the params hook's result types need
 }
@@ -66,12 +69,13 @@ type conn struct {
 }
 
 func read(container replacements.Container, importPath string, seams []replacements.Seam) (shape, error) {
-	file, err := parser.ParseFile(token.NewFileSet(), container.File, nil, parser.SkipObjectResolution)
+	file, err := parser.ParseFile(token.NewFileSet(), container.File, nil, parser.SkipObjectResolution|parser.ParseComments)
 	if err != nil {
 		return shape{}, err
 	}
 	out := shape{file: file, Imports: importAliases(file)}
 	collections := collectionFields(file)
+	built := constructors(file)
 	types := map[string]replacements.TypeRef{}
 	for _, seam := range seams {
 		if seam.Composite() || collections[seam.Field] {
@@ -94,8 +98,14 @@ func read(container replacements.Container, importPath string, seams []replaceme
 			out.Publisher = append(out.Publisher, seam.Field)
 		case grpcConn:
 			out.Dead = append(out.Dead, conn{Field: seam.Field})
+		default:
+			if built[seam.Field] == publisher.Path+".NewPublisher" {
+				out.Publisher = append(out.Publisher, seam.Field)
+			}
 		}
 	}
+	out.Outbound = grpcClients(file, types)
+	out.Commands, out.CommandLists = commands(file, out.Imports)
 
 	out.Params, out.paramImports, err = parameters(initAppWith(file), out.Imports, container.Package, importPath)
 	if err != nil {
@@ -139,6 +149,74 @@ func (s shape) filled() map[string]bool {
 		out[dead.Field] = true
 	}
 	return out
+}
+
+// A typed client of another service.
+type outbound struct {
+	Field string
+	Path  string
+	Name  string
+	Alias string
+}
+
+// protoc-gen-go-grpc names XClient's constructor NewXClient.
+func grpcClients(file *ast.File, types map[string]replacements.TypeRef) []outbound {
+	var out []outbound
+	for field, doc := range constructors(file) {
+		ref, ok := types[field]
+		if ok && strings.HasSuffix(ref.Name, "Client") && doc == ref.Path+".New"+ref.Name {
+			out = append(out, outbound{Field: field, Path: ref.Path, Name: ref.Name})
+		}
+	}
+	slices.SortFunc(out, func(a, b outbound) int { return strings.Compare(a.Field, b.Field) })
+	return out
+}
+
+// What builds each Replacements field, as diogen writes it above the field.
+func constructors(file *ast.File) map[string]string {
+	out := map[string]string{}
+	structure := structType(file, "Replacements")
+	if structure == nil {
+		return out
+	}
+	for _, field := range structure.Fields.List {
+		if field.Doc == nil {
+			continue
+		}
+		for _, name := range field.Names {
+			out[name.Name] = strings.TrimSpace(field.Doc.Text())
+		}
+	}
+	return out
+}
+
+func commands(file *ast.File, imports map[string]string) (single, lists []string) {
+	structure := structType(file, "Application")
+	if structure == nil {
+		return nil, nil
+	}
+	command := func(t ast.Expr) bool {
+		selector, ok := t.(*ast.SelectorExpr)
+		if !ok || selector.Sel.Name != "Command" {
+			return false
+		}
+		x, ok := selector.X.(*ast.Ident)
+		return ok && imports[x.Name] == "gitlab.com/gorib/waffle/app"
+	}
+	for _, field := range structure.Fields.List {
+		into := &single
+		if list, ok := field.Type.(*ast.ArrayType); ok && list.Len == nil && command(list.Elt) {
+			into = &lists
+		} else if !command(field.Type) {
+			continue
+		}
+		for _, name := range field.Names {
+			*into = append(*into, exported(name.Name))
+		}
+	}
+	slices.Sort(single)
+	slices.Sort(lists)
+	return single, lists
 }
 
 // A di.Tags collection shares its element type with a single seam, and filling

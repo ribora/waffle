@@ -27,6 +27,8 @@ go install gitlab.com/gorib/waffle/cmd/waffle@latest
 | `waffle make:outbox --driver <id>` | Enable the transactional outbox: the table, its migration runner, the module and the named broker driver under `config/tools/outbox`. See [tools/outbox](../tools/outbox.md) |
 | `waffle tests:harness` | Regenerate the component harness from the container; the first run also scaffolds the suite ([details](../conventions/component-harness.md)) |
 | `waffle tests:replacements [check] [--container=<path>]` | List everything the containers expose and what `replacements.allow` grants; `check` fails if a test replaces a field the list does not name |
+| `waffle flows record` | Write `tests/surface.yaml`: what the service publishes, consumes, serves and calls, from its code ([details](../conventions/flows.md#the-codes-record)) |
+| `waffle flows [check] <root> <index.yaml>` | Assemble the flows of every service below `root` into an index and pages; `check` fails on a stale page and on what the services' records leave unclosed ([details](../conventions/flows.md#the-projects-flows)) |
 | `waffle agents` | Regenerate `AGENTS.md` after a waffle upgrade ([details](agents.md)) |
 | `waffle agents:guard <mode> <path>`, `waffle agents:mode <mode>`, `waffle agents:grant <mode>` | Rule #11's modes, areas and grants, for a tool that enforces them ([details](agents.md#modes-areas-and-grants)) |
 
@@ -175,6 +177,7 @@ afterwards — and what each produces is described where the produced thing is:
 | `make:outbox` | [tools/outbox](../tools/outbox.md#setup) |
 | `tests:harness` | [conventions/component-harness](../conventions/component-harness.md#the-generated-file-and-yours) |
 | `tests:replacements` | [below](#testsreplacements), and [di/overview](../di/overview.md#testing-with-the-container) for the mechanics |
+| `flows` | [conventions/flows](../conventions/flows.md) |
 
 `tests:harness` takes no operands. Every run rewrites
 `tests/internal/harness/harness_gen.go` from the container, and the first run —

@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"gitlab.com/gorib/http/server"
+
+	"gitlab.com/gorib/waffle/tools/trace"
 )
 
 // Answers with a value of its own: probeReq.Parse is a stub here, so anything
@@ -163,6 +165,27 @@ func TestServeNamesBothRoutersOnACollision(t *testing.T) {
 func TestServeRefusesAnEmptyCollection(t *testing.T) {
 	if _, err := Serve(server.New(), nil, nil); !errors.Is(err, ErrNoRouters) {
 		t.Fatalf("serve: %v", err)
+	}
+}
+
+type slashRouter struct{}
+
+func (slashRouter) Setup(mux server.Mux) {
+	mux.Group("/admin").Post("/goods/", server.Bind(
+		func(context.Context, *probeReq) (*server.Response[probeReq], error) {
+			return server.OK(&probeReq{Name: "slash"}), nil
+		},
+	))
+}
+
+func TestTheTraceNamesARouteAsItWasRegistered(t *testing.T) {
+	trace.Enable("shop")
+	inproc := serve(t, slashRouter{})
+
+	post(t, inproc, "/admin/goods/")
+
+	if !slices.ContainsFunc(trace.Records(), func(r trace.Record) bool { return r.Name == "POST /admin/goods/" }) {
+		t.Errorf("no record of POST /admin/goods/: %+v", trace.Records())
 	}
 }
 

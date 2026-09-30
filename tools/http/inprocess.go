@@ -3,8 +3,12 @@ package http
 import (
 	nethttp "net/http"
 	"net/http/httptest"
+	"strings"
 
+	"github.com/go-chi/chi/v5"
 	"gitlab.com/gorib/http/server"
+
+	"gitlab.com/gorib/waffle/tools/trace"
 )
 
 // Setup is what the daemon calls too, so the routes and the middleware under
@@ -13,8 +17,32 @@ func Serve(mux server.Mux, global Global, routers []server.Router) (*InProcess, 
 	if err := Setup(mux, global, routers); err != nil {
 		return nil, err
 	}
-	srv := httptest.NewServer(mux)
+	mux.Use(matched)
+	srv := httptest.NewServer(trace.HTTP(mux))
 	return &InProcess{URL: srv.URL, Client: srv.Client(), server: srv}, nil
+}
+
+// The mux matches on a request of its own; a global layer is where the pattern
+// is visible again.
+func matched(next server.Handler) server.Handler {
+	return func(src server.Source) (server.Renderer, error) {
+		resp, err := next(src)
+		ctx := src.Request().Context()
+		if rc := chi.RouteContext(ctx); rc != nil {
+			if p := pattern(rc.RoutePatterns); p != "" && p != "/" {
+				trace.Route(ctx, p)
+			}
+		}
+		return resp, err
+	}
+}
+
+func pattern(parts []string) string {
+	p := strings.Join(parts, "")
+	for strings.Contains(p, "/*/") {
+		p = strings.ReplaceAll(p, "/*/", "/")
+	}
+	return p
 }
 
 type InProcess struct {
