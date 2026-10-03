@@ -336,6 +336,78 @@ func InitAppWith(replacements Replacements) (_ *Application, err error) {
 }
 `
 
+// A value of a type the container cannot name lives in a local, not in a field.
+const localContainer = `package diogen
+
+import (
+	env "gitlab.com/gorib/env"
+	lib "example.com/svc/lib"
+	service "example.com/svc/domain/x/service"
+)
+
+type Replacements struct {
+	ServiceRepo  service.Repo
+	ServiceClock service.Clock
+}
+
+func InitAppWith(replacements Replacements) (_ *Application, err error) {
+	container.serviceRepo = replacements.ServiceRepo
+	container.serviceClock = replacements.ServiceClock
+
+	libConn := diogenZero1(lib.NewConn)
+
+	buildLibConn := diogenBuild("example.com/svc/lib.NewConn", func(name string) error {
+		s := lib.NewConn(env.NeedValue[string]("DB_DSN"))
+		libConn = s
+		return nil
+	})
+
+	buildServiceRepo := diogenBuild("example.com/svc/domain/x/service.NewRepo", func(name string) error {
+		if container.serviceRepo == nil {
+			if err := buildLibConn(); err != nil {
+				return err
+			}
+			s := service.NewRepo(libConn)
+			container.serviceRepo = s
+		}
+		return nil
+	})
+
+	buildServiceClock := diogenBuild("example.com/svc/domain/x/service.NewClock", func(name string) error {
+		if container.serviceClock == nil {
+			s := service.NewClock()
+			container.serviceClock = s
+		}
+		return nil
+	})
+
+	if err := diogenNeed(buildServiceRepo, buildServiceClock); err != nil {
+		return nil, err
+	}
+
+	return container, nil
+}
+`
+
+func TestReadSeamsCountsAReadOfALocal(t *testing.T) {
+	c := writeContainer(t, localContainer)
+
+	seams, err := ReadSeams(c, "example.com/svc/config/diogen")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := map[string]bool{"ServiceRepo": false, "ServiceClock": true}
+	if len(seams) != len(want) {
+		t.Fatalf("read %d seams, want %d", len(seams), len(want))
+	}
+	for _, seam := range seams {
+		if seam.Leaf != want[seam.Field] {
+			t.Errorf("%s: Leaf = %v, want %v", seam.Field, seam.Leaf, want[seam.Field])
+		}
+	}
+}
+
 func TestReadSeamsMarksLeavesInsideBuildClosures(t *testing.T) {
 	c := writeContainer(t, closureContainer)
 

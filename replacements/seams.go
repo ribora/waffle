@@ -66,7 +66,7 @@ func leafSeams(file *ast.File) map[string]bool {
 		return nil
 	}
 
-	stmts := diogenfile.BuildStatements(body)
+	stmts, locals := diogenfile.BuildStatements(body), diogenfile.Locals(body)
 	fields := map[string][]string{} // replacements field -> container fields
 	owner := map[string]string{}    // container field -> replacements field
 	for _, stmt := range stmts {
@@ -92,7 +92,7 @@ func leafSeams(file *ast.File) map[string]bool {
 			if reads[seam] == nil {
 				reads[seam] = map[string]bool{}
 			}
-			for read := range diogenfile.ContainerReads(block.Body) {
+			for read := range diogenfile.ContainerReads(block.Body, locals) {
 				reads[seam][read] = true
 			}
 		}

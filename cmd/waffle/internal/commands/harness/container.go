@@ -255,7 +255,7 @@ type block struct {
 func readGraph(file *ast.File, body *ast.BlockStmt) graph {
 	g := graph{owner: map[string]string{}}
 	if body != nil {
-		stmts := diogenfile.BuildStatements(body)
+		stmts, locals := diogenfile.BuildStatements(body), diogenfile.Locals(body)
 		for _, stmt := range stmts {
 			if field, seam, ok := diogenfile.PrologueAssignment(stmt); ok {
 				g.owner[field] = seam
@@ -270,7 +270,7 @@ func readGraph(file *ast.File, body *ast.BlockStmt) graph {
 			if len(guards) == 0 {
 				continue
 			}
-			b := block{guards: guards, reads: diogenfile.ContainerReads(guarded.Body)}
+			b := block{guards: guards, reads: diogenfile.ContainerReads(guarded.Body, locals)}
 			for _, read := range envReads(file, guarded.Body, nil) {
 				b.keys = append(b.keys, read.Key)
 			}

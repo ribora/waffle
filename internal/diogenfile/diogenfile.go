@@ -6,6 +6,7 @@ import (
 	"path"
 	"slices"
 	"strconv"
+	"strings"
 )
 
 func InitAppWith(file *ast.File) *ast.FuncDecl {
@@ -85,9 +86,31 @@ func GuardedFields(cond ast.Expr) []string {
 	return nil
 }
 
-// An assignment target is a write, and the closers slice is bookkeeping the
-// generator adds to every seam alike.
-func ContainerReads(block *ast.BlockStmt) map[string]bool {
+// The locals that hold a value of a type the container cannot name: x := diogenZero1(lib.NewX).
+func Locals(body *ast.BlockStmt) map[string]bool {
+	out := map[string]bool{}
+	for _, stmt := range body.List {
+		assign, ok := stmt.(*ast.AssignStmt)
+		if !ok || assign.Tok != token.DEFINE || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
+			continue
+		}
+		call, ok := assign.Rhs[0].(*ast.CallExpr)
+		if !ok {
+			continue
+		}
+		if fun, ok := call.Fun.(*ast.Ident); !ok || !strings.HasPrefix(fun.Name, "diogenZero") {
+			continue
+		}
+		if local, ok := assign.Lhs[0].(*ast.Ident); ok {
+			out[local.Name] = true
+		}
+	}
+	return out
+}
+
+// An assignment target is a write, the closers slice is bookkeeping the generator
+// adds to every seam alike, and a local stands for a field.
+func ContainerReads(block *ast.BlockStmt, locals map[string]bool) map[string]bool {
 	written := map[ast.Expr]bool{}
 	ast.Inspect(block, func(n ast.Node) bool {
 		if assign, ok := n.(*ast.AssignStmt); ok {
@@ -106,6 +129,9 @@ func ContainerReads(block *ast.BlockStmt) map[string]bool {
 		}
 		if field, ok := QualifiedBy(expr, "container"); ok && field != "closers" {
 			out[field] = true
+		}
+		if ident, ok := expr.(*ast.Ident); ok && locals[ident.Name] {
+			out[ident.Name] = true
 		}
 		return true
 	})
