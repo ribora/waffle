@@ -357,9 +357,8 @@ check would report on correct work as often as on a violation.
 
 What the first services through this showed, worth knowing before yours: the
 expensive parts were not the runner but the decisions around it — binding at the
-declared contract rather than one layer below, discovering that replacing a seam
-does not prune what feeds it, and noticing that most cases need no clock at all
-if fixture dates are set relative to now. Those are written down in Rule #11 so
+declared contract rather than one layer below, and noticing that most cases need
+no clock at all if fixture dates are set relative to now. Those are written down in Rule #11 so
 they are not rediscovered.
 
 The extraction itself taught one thing worth repeating: **what deserved to be

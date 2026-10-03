@@ -425,10 +425,9 @@ around it. The recognisable cases:
 - **a `Then` cannot see what it must assert** — the seam is a no-op, or a mock
   whose expectation would have to be declared before the scenario knows the
   value.
-- **the boot reaches for the environment or the network.** `InitAppWith` is a
-  flat eager sequence: a node is skipped only if that node itself was supplied,
-  so a replaced typed client still has its connection built beneath it. If the
-  harness has not covered that, it is a gap in the harness.
+- **the boot reaches for the environment or the network.** A replaced typed
+  client prunes its connection, and the harness gives every client a scenario
+  leaves real a dead one. A boot that still reaches out is a gap in the harness.
 - **a case needs a seam that does not exist** — controlled time is the usual
   one. Where the code compares a fixture's date against `time.Now()`, set the
   fixture relative to now (`now.AddDate(-1, 0, 0)` for "already started") and no
@@ -703,11 +702,9 @@ What generation does not stop, because it compiles and is wrong:
 - ❌ `di.Override()` to inject a mock — it is a build-time directive, so the mock
   would have to be importable from production code
 
-**Supplying a `Replacements` field does not prune what fed that constructor.**
-Whatever is eagerly built below it still gets built, environment and network
-included. `di_gen.go` says which case a constructor is in, right above the call:
-`// skipped once <Field> is supplied` or `// always builds regardless of
-replacements: ...`.
+**Supplying a `Replacements` field prunes what only that constructor fed.** Its
+dependencies are not built, environment and network included, unless something
+else the container builds still reads them.
 
 ## Rule #5 — input parsing (whisk)
 

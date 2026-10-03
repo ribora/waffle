@@ -367,7 +367,7 @@ func TestUserFlow(t *testing.T) {
 }
 ```
 
-The connection under a replaced client is still built, because a replacement does not prune what feeds it; the harness fills it with `grpcClient.Dead` for you. Where to cut, and why, is [Choosing where to cut](../conventions/component-harness.md#choosing-where-to-cut).
+The connection under a replaced client is not built: a replacement prunes what only it fed. A client a test leaves real still needs its connection, and the harness fills that with `grpcClient.Dead` for you. Where to cut, and why, is [Choosing where to cut](../conventions/component-harness.md#choosing-where-to-cut).
 
 The field's type is the interface the value is wired as, so a fake that stops satisfying it fails to compile at the line that supplies it. Nothing is asserted at run time.
 

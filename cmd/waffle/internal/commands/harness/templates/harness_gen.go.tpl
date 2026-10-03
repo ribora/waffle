@@ -189,8 +189,8 @@ cut.{{.}} = trace.Publisher(cut.{{.}})
 cut.{{.Field}} = {{.Alias}}.New{{.Name}}(trace.Outbound(cut.{{.Field}}))
 }
 {{end}}{{if .Dead}}
-// Replacing a typed client does not prune the connection under it, which is
-// built anyway: dead, a call that reaches it panics instead of dialling out.
+// A typed client the scenario did not replace runs on a dead connection: the harness
+// needs none of its variables, and a call that reaches it panics naming the client.
 {{end}}{{range .Dead}}if cut.{{.Field}} == nil {
 cut.{{.Field}} = grpcClient.Dead("{{.Label}}")
 }

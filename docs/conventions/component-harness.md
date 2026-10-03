@@ -297,12 +297,11 @@ elasticsearch client carries the query DSL.
 So for an outbound gRPC dependency the cut is the **typed client**, one level
 above the transport, even though `tests:replacements` does not mark it `# leaf` — its
 constructor does take the connection out of the container, which is exactly why
-it is not a leaf. Substitute both levels, for two different reasons: the typed
-client because that is the surface worth faking, and the connection with
-`grpcClient.Dead` so the boot stops reading the neighbour's host out of the
-environment — and that second line is one the generated `Boot` already has. This shape
-recurs wherever a service adapts one transport to another — an http-to-grpc
-adapter looks the same.
+it is not a leaf. Replacing it prunes the connection beneath, so the scenario
+supplies the typed client and nothing else; a scenario that leaves a client real
+gets a dead connection under it from the generated `Boot`. This shape recurs
+wherever a service adapts one transport to another — an http-to-grpc adapter looks
+the same.
 
 ### What the marker cannot know
 
@@ -325,7 +324,7 @@ adapter looks the same.
 
 `Boot` fills the cut: everything that is a condition of booting rather than a choice the test makes belongs in `Boot`, not in the scenario. It supplies the database, installs the recorders and hands them back on `App` — a recorder the scenario had to construct would be a seam the scenario had to be granted, for something the harness owns either way.
 
-`Dead` is there because **replacing a seam does not prune what feeds it**: `InitAppWith` is a flat eager sequence that skips a node only if that node itself was supplied, or a collection it alone feeds was, so the connection under a replaced typed client is still built and still reads its neighbour's host out of the environment. Reaching a dead connection panics with its label, which says which replacement did not take louder than a silent call to a real neighbour.
+`Dead` is there for the clients a scenario leaves real. A replaced typed client prunes its connection, but most scenarios replace only the clients their case calls, and every other one is built for real on a connection of its own; without `Dead` that connection would read the neighbour's host out of the environment and dial it. Reaching a dead connection panics with its label, which names the client the scenario forgot to replace — louder than a silent call to a real neighbour.
 
 It covers only a transport that is a container field of its own. A client that builds its connection inside its own constructor — `http/client.New(url)` in an adapter, a device opened from a path — has no seam under it to fill; replacing the adapter is the cut, and the placeholder in its variable is what a call that slipped through reaches: `bladerunner-host.harness.invalid`, an error rather than a panic.
 
