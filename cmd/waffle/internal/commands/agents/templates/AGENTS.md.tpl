@@ -764,6 +764,17 @@ A domain sentinel declared with `errors.New` reaches the client as
 so no caller can tell them apart. A sentinel is domain-level precisely because
 it does leave the process.
 
+- **Throw a sentinel with `failure.Parse(ErrX)`**, not bare and not
+  `failure.Wrap("%w", ErrX)`: `failure.New` holds no stack, and `Parse` returns
+  a copy that carries one.
+- **With context, the sentinel is the first `%w`:**
+  `failure.Wrap("%w: {code}", ErrX, code)`, `failure.Wrap("%w: %w", ErrX, err)`.
+  The type is taken from the first wrapped error, so `failure.Wrap("dsn: %w", err)`
+  slugs the driver's message into an unbounded set of types.
+- **A value goes into the format, not the sentinel.** `failure.New("role {role} exists")`
+  works only while every caller passes the value; `failure.Wrap("%w: {role}", ErrX, name)`
+  keeps the sentinel plain.
+
 ## Rule #8 — observability
 
 `hilton.Provider` is in ctx automatically — propagated by transport middleware

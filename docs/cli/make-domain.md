@@ -143,6 +143,7 @@ import (
     "errors"
 
     "gitlab.com/gorib/criteria"
+    "gitlab.com/gorib/failure"
     "gitlab.com/gorib/pry"
     "gitlab.com/gorib/sql"
 
@@ -173,16 +174,16 @@ func (r *userRepository) Get(ctx context.Context, userId int) (*model.User, erro
     stored, err := r.repo.Get(ctx, sql.Select().From(userTable).Where(criteria.And("id", "eq", userId)))
     if err != nil {
         if errors.Is(err, sql.ErrNoRows) {
-            return nil, model.ErrUserNotFound
+            return nil, failure.Parse(model.ErrUserNotFound)
         }
         r.logger.Error(err, pry.Ctx(ctx))
-        return nil, sql.ErrQueryFailed
+        return nil, failure.Parse(sql.ErrQueryFailed)
     }
     return stored.Unwrap(), nil
 }
 ```
 
-Three things in that shape are the convention rather than this entity's taste.
+Four things in that shape are the convention rather than this entity's taste.
 
 **The constructor returns the unexported `*userRepository`.** Nothing asks for
 the concrete type — `di.Wire[service.UserRepository]` is what puts it in the
@@ -195,6 +196,12 @@ is logged and becomes `sql.ErrQueryFailed`.** A driver error carries the query
 and sometimes its parameters, and the service above has no use for either — so
 the detail goes to the log and the caller gets an error it can act on. This is
 the one place a repository logs; see [No logging in handlers](../tools/http-handler.md#guidelines).
+
+**A sentinel is thrown through `failure.Parse`.** `failure.New` declares it
+without a stack, and `Parse` returns a copy that carries one from the place it
+was thrown. `failure.Wrap` is for a throw with context, and its `%w` comes
+first: with a driver error first, the error's type would be slugged from the
+driver's message.
 
 **`domain/user/adapter/postgres/stored_user.go`**
 
