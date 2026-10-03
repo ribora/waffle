@@ -8,5 +8,5 @@ import (
 )
 
 func Init{{ title .Domain }}Migrate() {
-    di.Wire[{{ camel .Domain }}Migration.Migration]({{ camel .Domain }}Migration.NewMigrations, di.Tag(migrate.MigrationsTag))
+    di.Define({{ camel .Domain }}Migration.NewMigrations, di.Tag(migrate.MigrationsTag))
 }

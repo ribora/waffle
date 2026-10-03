@@ -55,7 +55,7 @@ Run `make generate`, then run migrations:
 
 ## Migration sources
 
-Each domain's migrate package exports `NewMigrations()` returning the embedded SQL files, and a one-line `Migration` interface to register it under:
+Each domain's migrate package exports `NewMigrations()` returning the embedded SQL files:
 
 ```go
 // domain/user/cmd/migrate/main.go
@@ -63,12 +63,7 @@ package migrate
 
 import (
     "embed"
-    "io/fs"
 )
-
-type Migration interface {
-    fs.FS
-}
 
 //go:embed migrations/*
 var migrations embed.FS
@@ -79,17 +74,16 @@ func NewMigrations() embed.FS {
 ```
 
 `waffle make:domain:migrate` and `make:domain` both write the registration —
-one file per domain, under that domain's own interface:
+one file per domain:
 
 ```go
 // config/di/di_user_migrate.go
-di.Wire[userMigration.Migration](userMigration.NewMigrations, di.Tag(migrate.MigrationsTag))
+di.Define(userMigration.NewMigrations, di.Tag(migrate.MigrationsTag))
 ```
 
-The interface is why each domain gets its own `Migration` rather than sharing
-`fs.FS` or registering `embed.FS` concretely: a container field is named after
-the type it is exposed as, so twenty domains registered as `embed.FS` would be
-twenty registrations competing for one name.
+A source is reached only through the tag, so it needs no interface of its own,
+and registering `embed.FS` concretely in twenty domains is twenty distinct
+container fields: each is named after its import alias and the type.
 
 The migrate command collects every source under the tag as `[]fs.FS` and runs
 them in order. Adding a domain with migrations is the one registration above —

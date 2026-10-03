@@ -219,10 +219,10 @@ func (h *orderCreatedHandler) Run(src scan.Source) error {
 
 ### Registering a handler
 
-Tag with `wscribus.CommandTag`. Wire to the `scribus.Handler` interface:
+Register with `di.Define` and tag with `wscribus.CommandTag`. A handler is reached only through the tag, so it needs no interface binding:
 
 ```go
-di.Wire[wscribus.Handler](scribus.NewOrderCreatedHandler, di.Tag(wscribus.CommandTag))
+di.Define(scribus.NewOrderCreatedHandler, di.Tag(wscribus.CommandTag))
 ```
 
 Wire the service dependency via `di.Alias` on the service registration:

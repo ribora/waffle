@@ -26,8 +26,8 @@ A tagged registration has no `Replacements` entry of its own, since replacing on
 | `grpc.ServiceTag` | `tools/grpc` | `di.Define(..., di.Tag(grpc.ServiceTag))` | `[]ServiceHandler` |
 | `grpc.ErrorMapperTag` | `tools/grpc` | `di.Define(..., di.Tag(grpc.ErrorMapperTag))` | `[]server.ErrorMapper` |
 | `http.RouterTag` | `tools/http` | `di.Define(..., di.Tag(http.RouterTag))` | `[]server.Router` |
-| `migrate.MigrationsTag` | `tools/migrate` | `di.Wire[domainMigrate.Migration](..., di.Tag(migrate.MigrationsTag))` | `[]fs.FS` |
-| `scribus.CommandTag` | `tools/scribus` | `di.Wire[scribus.Handler](..., di.Tag(scribus.CommandTag))` | `[]Handler` |
+| `migrate.MigrationsTag` | `tools/migrate` | `di.Define(..., di.Tag(migrate.MigrationsTag))` | `[]fs.FS` |
+| `scribus.CommandTag` | `tools/scribus` | `di.Define(..., di.Tag(scribus.CommandTag))` | `[]Handler` |
 
 ---
 
@@ -127,12 +127,7 @@ package migrate
 
 import (
     "embed"
-    "io/fs"
 )
-
-type Migration interface {
-    fs.FS
-}
 
 //go:embed migrations/*
 var migrations embed.FS
@@ -142,19 +137,18 @@ func NewMigrations() embed.FS {
 }
 ```
 
-Register with `di.Wire` under that domain's own `Migration`, which is what
-`waffle make:domain:migrate` writes:
+Register with `di.Define`, which is what `waffle make:domain:migrate` writes:
 
 ```go
 import userMigration "mymodule/domain/user/cmd/migrate"
 
-di.Wire[userMigration.Migration](userMigration.NewMigrations, di.Tag(migrate.MigrationsTag))
+di.Define(userMigration.NewMigrations, di.Tag(migrate.MigrationsTag))
 ```
 
-The one-line interface per domain is the point: a container field is named
-after the type it is exposed as, so `di.Define` on `embed.FS` would give every
-domain's migrations the same name. All collected sources are applied in
-sequence when the `migrate` command runs.
+A source is reached only through the tag, so it needs no interface of its own.
+Two domains registering `embed.FS` do not collide: a container field is named
+after the import alias and the type (`userMigrationEmbedFS`). All collected
+sources are applied in sequence when the `migrate` command runs.
 
 ---
 
@@ -165,8 +159,8 @@ sequence when the `migrate` command runs.
 Collects `Handler` implementations for the single-mode consumer. Each handler declares its subjects via `Keys()`.
 
 ```go
-di.Wire[scribus.Handler](NewOrderCreatedHandler, di.Tag(scribus.CommandTag))
-di.Wire[scribus.Handler](NewOrderCancelledHandler, di.Tag(scribus.CommandTag))
+di.Define(NewOrderCreatedHandler, di.Tag(scribus.CommandTag))
+di.Define(NewOrderCancelledHandler, di.Tag(scribus.CommandTag))
 ```
 
 On startup the scribus command builds a routing table from all registered handlers and dispatches by subject.

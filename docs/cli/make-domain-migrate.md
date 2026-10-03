@@ -26,19 +26,14 @@ entity.
 
 **`domain/user/cmd/migrate/main.go`**
 
-The migration package exports a `NewMigrations()` constructor that returns the embedded SQL files, and the `Migration` interface it is registered under:
+The migration package exports a `NewMigrations()` constructor that returns the embedded SQL files:
 
 ```go
 package migrate
 
 import (
     "embed"
-    "io/fs"
 )
-
-type Migration interface {
-    fs.FS
-}
 
 //go:embed migrations/*
 var migrations embed.FS
@@ -48,12 +43,11 @@ func NewMigrations() embed.FS {
 }
 ```
 
-The interface is one line and it exists for the container: registered as
-`di.Wire[Migration]`, the source gets a container field named after its domain,
-so twenty domains produce twenty distinct fields. `di.Define` on `embed.FS` would
-name them all after the same concrete type. The registration is tagged
-`migrate.MigrationsTag`, so a test replaces the sources through the collection's
-own `Replacements` field, all at once.
+The source is reached only through `migrate.MigrationsTag`, so it is registered
+with `di.Define` and needs no interface of its own. Each domain still gets a
+container field of its own: the field is named after the import alias and the
+type, `userMigrationEmbedFS`. A test replaces the sources through the
+collection's own `Replacements` field, all at once.
 
 ### SQL migrations
 
@@ -133,7 +127,7 @@ import (
 )
 
 func InitUserMigrate() {
-    di.Wire[userMigration.Migration](userMigration.NewMigrations, di.Tag(migrate.MigrationsTag))
+    di.Define(userMigration.NewMigrations, di.Tag(migrate.MigrationsTag))
 }
 ```
 
