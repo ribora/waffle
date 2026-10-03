@@ -237,6 +237,131 @@ func TestReadSeamsMarksLeaves(t *testing.T) {
 	}
 }
 
+const closureContainer = `package diogen
+
+import (
+	env "gitlab.com/gorib/env"
+	sql "gitlab.com/gorib/sql"
+	pry "gitlab.com/gorib/pry"
+	repo "example.com/svc/domain/x/adapter/postgres"
+	service "example.com/svc/domain/x/service"
+)
+
+type Replacements struct {
+	SqlDb        sql.Db
+	PryLogger    pry.Logger
+	ServiceRepo  service.Repo
+	ServiceCache service.Cache
+	HandlerAsH   []service.Handler
+}
+
+func InitAppWith(replacements Replacements) (_ *Application, err error) {
+	container.sqlDb = replacements.SqlDb
+	container.pryLogger = replacements.PryLogger
+	container.serviceRepo = replacements.ServiceRepo
+	container.serviceCache = replacements.ServiceCache
+	container.handlerAsH = replacements.HandlerAsH
+
+	buildSqlDb := diogenBuild("gitlab.com/gorib/sql.NewDb", func(name string) error {
+		if container.sqlDb == nil {
+			s, err := sql.NewDb(env.NeedValue[string]("DB_DRIVER"), env.NeedValue[string]("DB_DSN"))
+			if err != nil {
+				return err
+			}
+			container.closers.add(name, s.Close)
+			container.sqlDb = s
+		}
+		return nil
+	})
+
+	buildPryLogger := diogenBuild("gitlab.com/gorib/pry.New", func(name string) error {
+		if container.pryLogger == nil {
+			s := pry.New(env.Value("LOGLEVEL", "info"))
+			container.pryLogger = s
+		}
+		return nil
+	})
+
+	buildServiceRepo := diogenBuild("example.com/svc/domain/x/adapter/postgres.NewRepo", func(name string) error {
+		if container.serviceRepo == nil {
+			if err := diogenNeed(buildSqlDb, buildPryLogger); err != nil {
+				return err
+			}
+			s := repo.NewRepo(container.sqlDb, container.pryLogger)
+			container.serviceRepo = s
+		}
+		return nil
+	})
+
+	buildServiceCache := diogenBuild("", func(name string) error {
+		if container.serviceCache == nil ` + "&&" + ` mode() {
+			if err := diogenBuild("example.com/svc/domain/x/service.NewMemory", func(name string) error {
+				s := service.NewMemory()
+				container.serviceCache = s
+				return nil
+			})(); err != nil {
+				return err
+			}
+		}
+		if container.serviceCache == nil ` + "&&" + ` !mode() {
+			if err := diogenBuild("example.com/svc/domain/x/service.NewPersistent", func(name string) error {
+				if err := buildSqlDb(); err != nil {
+					return err
+				}
+				s := service.NewPersistent(container.sqlDb)
+				container.serviceCache = s
+				return nil
+			})(); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+
+	buildHandlerAsH := diogenBuild("di.Tags(\"h\")", func(name string) error {
+		if container.handlerAsH == nil {
+			if err := buildServiceHandler(); err != nil {
+				return err
+			}
+			container.handlerAsH = []service.Handler{container.serviceHandler}
+		}
+		return nil
+	})
+
+	if err := buildServiceRepo(); err != nil {
+		return nil, err
+	}
+
+	return container, nil
+}
+`
+
+func TestReadSeamsMarksLeavesInsideBuildClosures(t *testing.T) {
+	c := writeContainer(t, closureContainer)
+
+	seams, err := ReadSeams(c, "example.com/svc/config/diogen")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := map[string]bool{
+		"SqlDb":       true,
+		"PryLogger":   true,
+		"ServiceRepo": false,
+		// One branch builds from the db, so replacing it cuts that branch out.
+		"ServiceCache": false,
+		"HandlerAsH":   false,
+	}
+	if len(seams) != len(want) {
+		t.Fatalf("read %d seams, want %d", len(seams), len(want))
+	}
+	for _, seam := range seams {
+		if seam.Leaf != want[seam.Field] {
+			t.Errorf("%s: Leaf = %v, want %v", seam.Field, seam.Leaf, want[seam.Field])
+		}
+	}
+}
+
 const paramsContainer = `package diogen
 
 import (
@@ -290,12 +415,7 @@ func TestReadSeamsParametersAreNotContainerReads(t *testing.T) {
 	}
 }
 
-// One constructor feeds two tag collections (di.Wire(NewBoth, di.Tag("h"),
-// di.Tag("n"))). Every tagged member builds unconditionally — diogen does not
-// skip it even when both collections are replaced, the same "a seam does not
-// prune what feeds it" rule ordinary fields already follow — so there is no
-// container.X = replacements.Y prologue line for leafSeams to key on at all;
-// the assignment lives inside an if/else instead.
+// A container generated before diogenBuild, still in services until they regenerate.
 const tagCollectionContainer = `package diogen
 
 type Handler interface{ Path() string }
@@ -327,12 +447,6 @@ func InitAppWith(replacements Replacements) (_ *Application, err error) {
 }
 `
 
-// A tag collection is never a leaf: leafSeams only recognizes the ordinary
-// container.X = replacements.Y prologue shape, which a tag collection's
-// if/else assignment does not match — so it is absent from leafSeams'
-// bookkeeping entirely, and Leaf defaults to false. That default happens to be
-// the right answer regardless: replacing the collection never prunes the real
-// tagged constructors feeding it.
 func TestReadSeamsTagCollectionsAreNotLeaves(t *testing.T) {
 	c := writeContainer(t, tagCollectionContainer)
 
@@ -350,10 +464,7 @@ func TestReadSeamsTagCollectionsAreNotLeaves(t *testing.T) {
 	}
 }
 
-// A tag collected into exactly one collection (the common case) is skippable:
-// diogen guards each tagged constructor with the same container.X == nil
-// prologue shape ordinary fields use, so leafSeams recognizes it directly —
-// unlike the non-skippable, absent-from-bookkeeping case above.
+// A container generated before diogenBuild, still in services until they regenerate.
 const skippableTagCollectionContainer = `package diogen
 
 type Handler interface{ Path() string }
@@ -393,9 +504,6 @@ func TestReadSeamsSkippableTagCollectionIsNotALeaf(t *testing.T) {
 	if len(seams) != 1 {
 		t.Fatalf("read %d seams, want 1: %+v", len(seams), seams)
 	}
-	// Assembling the real value reads tagsHandlerFromNewA/B, which belong to no
-	// seam of their own — same reason as the non-skippable case, just reached
-	// through actual bookkeeping instead of by absence this time.
 	if seams[0].Leaf {
 		t.Errorf("%s: Leaf = true, want false", seams[0].Field)
 	}

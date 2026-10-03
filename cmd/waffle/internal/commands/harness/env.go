@@ -11,6 +11,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"gitlab.com/gorib/waffle/internal/diogenfile"
 )
 
 const envPath = "gitlab.com/gorib/env"
@@ -43,7 +45,7 @@ var (
 // Walked with the guards that enclose each read, so a read under a filled seam
 // is known to be skipped. owners is nil when only the keys are wanted.
 func envReads(file *ast.File, root ast.Node, owners func([]string) []string) []envRead {
-	aliases := importAliases(file)
+	aliases := diogenfile.ImportAliases(file)
 	var out []envRead
 	var walk func(n ast.Node, guards []string)
 	walk = func(n ast.Node, guards []string) {
@@ -52,7 +54,7 @@ func envReads(file *ast.File, root ast.Node, owners func([]string) []string) []e
 				return false
 			}
 			if guarded, ok := node.(*ast.IfStmt); ok && node != n && owners != nil {
-				if fields := guardedFields(guarded.Cond); len(fields) > 0 {
+				if fields := diogenfile.GuardedFields(guarded.Cond); len(fields) > 0 {
 					if guarded.Init != nil {
 						walk(guarded.Init, guards)
 					}

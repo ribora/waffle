@@ -6,9 +6,9 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"path"
 	"slices"
-	"strconv"
+
+	"gitlab.com/gorib/waffle/internal/diogenfile"
 )
 
 type TypeRef struct {
@@ -42,7 +42,7 @@ func ReadSeams(c Container, importPath string) ([]Seam, error) {
 		return nil, fmt.Errorf("%s: %w", c.File, err)
 	}
 
-	imports := importAliases(file)
+	imports := diogenfile.ImportAliases(file)
 	leaves := leafSeams(file)
 	seams := make([]Seam, 0, len(fields))
 	for _, field := range fields {
@@ -61,15 +61,16 @@ func ReadSeams(c Container, importPath string) ([]Seam, error) {
 
 // A guarded block that reads no other container field is building from the environment alone — a leaf.
 func leafSeams(file *ast.File) map[string]bool {
-	body := initAppWithBody(file)
+	body := diogenfile.InitAppWithBody(file)
 	if body == nil {
 		return nil
 	}
 
+	stmts := diogenfile.BuildStatements(body)
 	fields := map[string][]string{} // replacements field -> container fields
 	owner := map[string]string{}    // container field -> replacements field
-	for _, stmt := range body.List {
-		field, seam, ok := prologueAssignment(stmt)
+	for _, stmt := range stmts {
+		field, seam, ok := diogenfile.PrologueAssignment(stmt)
 		if !ok {
 			continue
 		}
@@ -78,12 +79,12 @@ func leafSeams(file *ast.File) map[string]bool {
 	}
 
 	reads := map[string]map[string]bool{}
-	for _, stmt := range body.List {
+	for _, stmt := range stmts {
 		block, ok := stmt.(*ast.IfStmt)
 		if !ok {
 			continue
 		}
-		for _, guarded := range guardedFields(block.Cond) {
+		for _, guarded := range diogenfile.GuardedFields(block.Cond) {
 			seam, known := owner[guarded]
 			if !known {
 				continue
@@ -91,7 +92,7 @@ func leafSeams(file *ast.File) map[string]bool {
 			if reads[seam] == nil {
 				reads[seam] = map[string]bool{}
 			}
-			for read := range containerReads(block.Body) {
+			for read := range diogenfile.ContainerReads(block.Body) {
 				reads[seam][read] = true
 			}
 		}
@@ -109,92 +110,6 @@ func leafSeams(file *ast.File) map[string]bool {
 		out[seam] = leaf
 	}
 	return out
-}
-
-func initAppWithBody(file *ast.File) *ast.BlockStmt {
-	for _, decl := range file.Decls {
-		fn, ok := decl.(*ast.FuncDecl)
-		if ok && fn.Recv == nil && fn.Name.Name == "InitAppWith" {
-			return fn.Body
-		}
-	}
-	return nil
-}
-
-// container.x = replacements.X
-func prologueAssignment(stmt ast.Stmt) (field, seam string, ok bool) {
-	assign, ok := stmt.(*ast.AssignStmt)
-	if !ok || assign.Tok != token.ASSIGN || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
-		return "", "", false
-	}
-	field, ok = qualifiedBy(assign.Lhs[0], "container")
-	if !ok {
-		return "", "", false
-	}
-	seam, ok = qualifiedBy(assign.Rhs[0], "replacements")
-	if !ok {
-		return "", "", false
-	}
-	return field, seam, true
-}
-
-// Recursive, so a guard carrying a branch condition alongside still resolves.
-func guardedFields(cond ast.Expr) []string {
-	binary, ok := cond.(*ast.BinaryExpr)
-	if !ok {
-		return nil
-	}
-	switch binary.Op {
-	case token.LAND, token.LOR:
-		return append(guardedFields(binary.X), guardedFields(binary.Y)...)
-	case token.EQL:
-		if ident, ok := binary.Y.(*ast.Ident); !ok || ident.Name != "nil" {
-			return nil
-		}
-		if field, ok := qualifiedBy(binary.X, "container"); ok {
-			return []string{field}
-		}
-	}
-	return nil
-}
-
-// An assignment target is a write, and the closers slice is bookkeeping the
-// generator adds to every seam alike.
-func containerReads(block *ast.BlockStmt) map[string]bool {
-	written := map[ast.Expr]bool{}
-	ast.Inspect(block, func(n ast.Node) bool {
-		if assign, ok := n.(*ast.AssignStmt); ok {
-			for _, lhs := range assign.Lhs {
-				written[lhs] = true
-			}
-		}
-		return true
-	})
-
-	out := map[string]bool{}
-	ast.Inspect(block, func(n ast.Node) bool {
-		expr, ok := n.(ast.Expr)
-		if !ok || written[expr] {
-			return true
-		}
-		if field, ok := qualifiedBy(expr, "container"); ok && field != "closers" {
-			out[field] = true
-		}
-		return true
-	})
-	return out
-}
-
-func qualifiedBy(expr ast.Expr, ident string) (string, bool) {
-	selector, ok := expr.(*ast.SelectorExpr)
-	if !ok {
-		return "", false
-	}
-	x, ok := selector.X.(*ast.Ident)
-	if !ok || x.Name != ident {
-		return "", false
-	}
-	return selector.Sel.Name, true
 }
 
 func replacementFields(file *ast.File) ([]*ast.Field, error) {
@@ -216,24 +131,6 @@ func replacementFields(file *ast.File) ([]*ast.Field, error) {
 		}
 	}
 	return nil, errors.New("no Replacements type — regenerate with a diogen that emits replacement seams")
-}
-
-// diogen writes an explicit alias on every non-stdlib import, so the fallback to
-// the last path segment is for a file that was not written by it.
-func importAliases(file *ast.File) map[string]string {
-	out := make(map[string]string, len(file.Imports))
-	for _, imp := range file.Imports {
-		p, err := strconv.Unquote(imp.Path.Value)
-		if err != nil {
-			continue
-		}
-		name := path.Base(p)
-		if imp.Name != nil {
-			name = imp.Name.Name
-		}
-		out[name] = p
-	}
-	return out
 }
 
 func typeRefs(expr ast.Expr, aliases map[string]string, self string) ([]TypeRef, error) {

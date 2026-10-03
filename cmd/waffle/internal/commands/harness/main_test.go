@@ -117,6 +117,133 @@ func InitAppWith(replacements Replacements) (*Application, error) {
 }
 `
 
+// grpcContainer as diogen writes it since every registration builds in a diogenBuild closure.
+const grpcClosureContainer = `package diogen
+
+import (
+	"time"
+
+	env "gitlab.com/gorib/env"
+	grpcClient "gitlab.com/gorib/grpc/client"
+	server "gitlab.com/gorib/grpc/server"
+	pry "gitlab.com/gorib/pry"
+	sql "gitlab.com/gorib/sql"
+	grpcCommand "gitlab.com/gorib/waffle/tools/grpc"
+	contractProto "example.test/api/contract"
+	shopGrpc "example.test/shop/domain/shop/cmd/grpc"
+	baseGrpc "google.golang.org/grpc"
+)
+
+type Replacements struct {
+	SqlDb                                                            sql.Db
+	PryLogger                                                        pry.Logger
+	BaseGrpcClientConnInterfaceForContractProtoContractServiceClient baseGrpc.ClientConnInterface
+	ContractProtoContractServiceClient                               contractProto.ContractServiceClient
+	ShopThing                                                        shopGrpc.Thing
+	GrpcCommandServiceHandlerAsServiceTag                            []grpcCommand.ServiceHandler
+}
+
+type Application struct {
+	sqlDb                                                            sql.Db
+	pryLogger                                                        pry.Logger
+	baseGrpcClientConnInterfaceForContractProtoContractServiceClient baseGrpc.ClientConnInterface
+	contractProtoContractServiceClient                               contractProto.ContractServiceClient
+	shopThing                                                        shopGrpc.Thing
+	grpcCommandServiceHandlerAsServiceTag                            []grpcCommand.ServiceHandler
+	serverInterceptorAsMiddlewareTag                                 []server.Interceptor
+	serverStreamInterceptorAsStreamMiddlewareTag                     []server.StreamInterceptor
+}
+
+func InitAppWith(replacements Replacements) (*Application, error) {
+	container.sqlDb = replacements.SqlDb
+	container.baseGrpcClientConnInterfaceForContractProtoContractServiceClient = replacements.BaseGrpcClientConnInterfaceForContractProtoContractServiceClient
+	container.contractProtoContractServiceClient = replacements.ContractProtoContractServiceClient
+	container.shopThing = replacements.ShopThing
+	container.grpcCommandServiceHandlerAsServiceTag = replacements.GrpcCommandServiceHandlerAsServiceTag
+
+	buildSqlDb := diogenBuild("gitlab.com/gorib/sql.NewDb", func(name string) error {
+		if container.sqlDb == nil {
+			s, err := sql.NewDb(env.NeedValue[string]("DB_DRIVER"), env.NeedValue[string]("DB_DSN"))
+			if err != nil {
+				return err
+			}
+			container.sqlDb = s
+		}
+		return nil
+	})
+
+	buildBaseGrpcClientConnInterfaceForContractProtoContractServiceClient := diogenBuild("gitlab.com/gorib/grpc/client.New", func(name string) error {
+		if container.baseGrpcClientConnInterfaceForContractProtoContractServiceClient == nil {
+			s, err := grpcClient.New(env.NeedValue[string]("DUNGEON_HOST"), env.NeedValue[string]("DUNGEON_PORT"))
+			if err != nil {
+				return err
+			}
+			container.baseGrpcClientConnInterfaceForContractProtoContractServiceClient = s
+		}
+		return nil
+	})
+
+	buildContractProtoContractServiceClient := diogenBuild("example.test/api/contract.NewContractServiceClient", func(name string) error {
+		if container.contractProtoContractServiceClient == nil {
+			if err := buildBaseGrpcClientConnInterfaceForContractProtoContractServiceClient(); err != nil {
+				return err
+			}
+			s := contractProto.NewContractServiceClient(container.baseGrpcClientConnInterfaceForContractProtoContractServiceClient)
+			container.contractProtoContractServiceClient = s
+		}
+		return nil
+	})
+
+	buildShopThing := diogenBuild("example.test/shop/domain/shop/cmd/grpc.NewThing", func(name string) error {
+		if container.shopThing == nil {
+			s := shopGrpc.NewThing(env.NeedValue[string]("THING_URL"), env.NeedValue[uint16]("THING_PORT"), env.NeedValue[time.Duration]("THING_TTL"), env.NeedJson[shopGrpc.Config]("THING_CONFIG"),
+				env.NeedArray[int]("THING_SHARDS"), env.Value("LOGLEVEL", "info"), env.Value("POLL", 5*time.Second), env.Array("ORIGINS", []string{}),
+				env.Value("LOCAL", shopGrpc.Fallback), env.Value("SQL_DSN", "x"), env.NeedValue[string]("Custom"))
+			container.shopThing = s
+		}
+		return nil
+	})
+
+	buildShopGrpcOrderServiceAsGrpcCommandServiceHandler := diogenBuild("example.test/shop/domain/shop/cmd/grpc.NewOrderService", func(name string) error {
+		if err := buildSqlDb(); err != nil {
+			return err
+		}
+		s := shopGrpc.NewOrderService(container.sqlDb)
+		container.shopGrpcOrderServiceAsGrpcCommandServiceHandler = s
+		return nil
+	})
+
+	buildGrpcCommandServiceHandlerAsServiceTag := diogenBuild("di.Tags(grpcCommand.ServiceTag)", func(name string) error {
+		if container.grpcCommandServiceHandlerAsServiceTag == nil {
+			if err := buildShopGrpcOrderServiceAsGrpcCommandServiceHandler(); err != nil {
+				return err
+			}
+			container.grpcCommandServiceHandlerAsServiceTag = []grpcCommand.ServiceHandler{container.shopGrpcOrderServiceAsGrpcCommandServiceHandler}
+		}
+		return nil
+	})
+
+	buildGrpcGrpcCommand := diogenBuild("gitlab.com/gorib/waffle/tools/grpc.NewGrpcCommand", func(name string) error {
+		if err := diogenNeed(buildGrpcCommandServiceHandlerAsServiceTag, buildServerInterceptorAsMiddlewareTag); err != nil {
+			return err
+		}
+		s := grpcCommand.NewGrpcCommand(
+			container.grpcCommandServiceHandlerAsServiceTag,
+			container.serverInterceptorAsMiddlewareTag,
+			container.serverStreamInterceptorAsStreamMiddlewareTag,
+			container.appBaseCommandForGrpcCommandGrpcCommand,
+		)
+		container.grpcGrpcCommand = s
+		return nil
+	})
+
+	if err := buildGrpcGrpcCommand(); err != nil {
+		return nil, err
+	}
+	return container, nil
+}
+`
+
 const orderHandler = `package grpc
 
 import (
@@ -559,6 +686,23 @@ func TestVariablesHoldWhatAnUnreplacedConstructorReads(t *testing.T) {
 		`"time"`,
 	)
 	// Under a seam Boot fills, so the constructor never runs.
+	lacks(t, "harness_gen.go", body, "\tDB_DSN ", "\tDUNGEON_HOST ")
+}
+
+func TestAContainerOfBuildClosuresReadsTheSameGraph(t *testing.T) {
+	module(t, grpcClosureContainer, map[string]string{
+		"domain/shop/cmd/grpc/service.go": orderHandler,
+	})
+
+	run(t)
+
+	body := generatedFile(t)
+	contains(t, "harness_gen.go", body,
+		`grpcClient.Dead("contract.ContractServiceClient (DUNGEON_HOST, DUNGEON_PORT)")`,
+		`put("THING_PORT", v.THING_PORT)`,
+		"clients.Order = orderProto.NewOrderServiceClient(conn)",
+		"a.GrpcCommandServiceHandlerAsServiceTag()",
+	)
 	lacks(t, "harness_gen.go", body, "\tDB_DSN ", "\tDUNGEON_HOST ")
 }
 

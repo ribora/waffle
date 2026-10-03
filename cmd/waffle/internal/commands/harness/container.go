@@ -7,10 +7,10 @@ import (
 	"go/token"
 	"path"
 	"slices"
-	"strconv"
 	"strings"
 	"unicode"
 
+	"gitlab.com/gorib/waffle/internal/diogenfile"
 	"gitlab.com/gorib/waffle/replacements"
 )
 
@@ -73,7 +73,7 @@ func read(container replacements.Container, importPath string, seams []replaceme
 	if err != nil {
 		return shape{}, err
 	}
-	out := shape{file: file, Imports: importAliases(file)}
+	out := shape{file: file, Imports: diogenfile.ImportAliases(file)}
 	collections := collectionFields(file)
 	built := constructors(file)
 	types := map[string]replacements.TypeRef{}
@@ -107,12 +107,12 @@ func read(container replacements.Container, importPath string, seams []replaceme
 	out.Outbound = grpcClients(file, types)
 	out.Commands, out.CommandLists = commands(file, out.Imports)
 
-	out.Params, out.paramImports, err = parameters(initAppWith(file), out.Imports, container.Package, importPath)
+	out.Params, out.paramImports, err = parameters(diogenfile.InitAppWith(file), out.Imports, container.Package, importPath)
 	if err != nil {
 		return shape{}, fmt.Errorf("%s: %w", container.File, err)
 	}
 
-	body := initAppWithBody(file)
+	body := diogenfile.InitAppWithBody(file)
 	graph := readGraph(file, body)
 	for i := range out.Dead {
 		out.Dead[i].Label = graph.label(out.Dead[i].Field, types)
@@ -255,21 +255,22 @@ type block struct {
 func readGraph(file *ast.File, body *ast.BlockStmt) graph {
 	g := graph{owner: map[string]string{}}
 	if body != nil {
-		for _, stmt := range body.List {
-			if field, seam, ok := prologueAssignment(stmt); ok {
+		stmts := diogenfile.BuildStatements(body)
+		for _, stmt := range stmts {
+			if field, seam, ok := diogenfile.PrologueAssignment(stmt); ok {
 				g.owner[field] = seam
 			}
 		}
-		for _, stmt := range body.List {
+		for _, stmt := range stmts {
 			guarded, ok := stmt.(*ast.IfStmt)
 			if !ok {
 				continue
 			}
-			guards := g.owners(guardedFields(guarded.Cond))
+			guards := g.owners(diogenfile.GuardedFields(guarded.Cond))
 			if len(guards) == 0 {
 				continue
 			}
-			b := block{guards: guards, reads: containerReads(guarded.Body)}
+			b := block{guards: guards, reads: diogenfile.ContainerReads(guarded.Body)}
 			for _, read := range envReads(file, guarded.Body, nil) {
 				b.keys = append(b.keys, read.Key)
 			}
@@ -377,11 +378,11 @@ func commandArgs(body *ast.BlockStmt, types map[string]string, constructor strin
 		if !ok {
 			return true
 		}
-		if name, ok := qualifiedBy(call.Fun, ""); !ok || name != constructor {
+		if name, ok := diogenfile.QualifiedBy(call.Fun, ""); !ok || name != constructor {
 			return true
 		}
 		for _, arg := range call.Args {
-			if name, ok := qualifiedBy(arg, "container"); ok {
+			if name, ok := diogenfile.QualifiedBy(arg, "container"); ok {
 				out.assign(name, types[name])
 			}
 		}
@@ -433,113 +434,4 @@ func typeName(expr ast.Expr) string {
 		return ident.Name
 	}
 	return ""
-}
-
-func initAppWith(file *ast.File) *ast.FuncDecl {
-	for _, decl := range file.Decls {
-		fn, ok := decl.(*ast.FuncDecl)
-		if ok && fn.Recv == nil && fn.Name.Name == "InitAppWith" {
-			return fn
-		}
-	}
-	return nil
-}
-
-func initAppWithBody(file *ast.File) *ast.BlockStmt {
-	if fn := initAppWith(file); fn != nil {
-		return fn.Body
-	}
-	return nil
-}
-
-// container.x = replacements.X
-func prologueAssignment(stmt ast.Stmt) (field, seam string, ok bool) {
-	assign, ok := stmt.(*ast.AssignStmt)
-	if !ok || assign.Tok != token.ASSIGN || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
-		return "", "", false
-	}
-	field, ok = qualifiedBy(assign.Lhs[0], "container")
-	if !ok {
-		return "", "", false
-	}
-	seam, ok = qualifiedBy(assign.Rhs[0], "replacements")
-	if !ok {
-		return "", "", false
-	}
-	return field, seam, true
-}
-
-func guardedFields(cond ast.Expr) []string {
-	binary, ok := cond.(*ast.BinaryExpr)
-	if !ok {
-		return nil
-	}
-	switch binary.Op {
-	case token.LAND, token.LOR:
-		return append(guardedFields(binary.X), guardedFields(binary.Y)...)
-	case token.EQL:
-		if ident, ok := binary.Y.(*ast.Ident); !ok || ident.Name != "nil" {
-			return nil
-		}
-		if field, ok := qualifiedBy(binary.X, "container"); ok {
-			return []string{field}
-		}
-	}
-	return nil
-}
-
-// An assignment target is a write, and the closers slice is bookkeeping the
-// generator adds to every seam alike.
-func containerReads(block *ast.BlockStmt) map[string]bool {
-	written := map[ast.Expr]bool{}
-	ast.Inspect(block, func(n ast.Node) bool {
-		if assign, ok := n.(*ast.AssignStmt); ok {
-			for _, lhs := range assign.Lhs {
-				written[lhs] = true
-			}
-		}
-		return true
-	})
-	out := map[string]bool{}
-	ast.Inspect(block, func(n ast.Node) bool {
-		expr, ok := n.(ast.Expr)
-		if !ok || written[expr] {
-			return true
-		}
-		if field, ok := qualifiedBy(expr, "container"); ok && field != "closers" {
-			out[field] = true
-		}
-		return true
-	})
-	return out
-}
-
-// An empty qualifier matches any package: the container imports the tool under
-// whatever alias diogen picked.
-func qualifiedBy(expr ast.Expr, ident string) (string, bool) {
-	selector, ok := expr.(*ast.SelectorExpr)
-	if !ok {
-		return "", false
-	}
-	x, ok := selector.X.(*ast.Ident)
-	if !ok || (ident != "" && x.Name != ident) {
-		return "", false
-	}
-	return selector.Sel.Name, true
-}
-
-func importAliases(file *ast.File) map[string]string {
-	out := make(map[string]string, len(file.Imports))
-	for _, imp := range file.Imports {
-		p, err := strconv.Unquote(imp.Path.Value)
-		if err != nil {
-			continue
-		}
-		name := path.Base(p)
-		if imp.Name != nil {
-			name = imp.Name.Name
-		}
-		out[name] = p
-	}
-	return out
 }

@@ -10,6 +10,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"gitlab.com/gorib/waffle/internal/diogenfile"
 )
 
 type client struct {
@@ -27,7 +29,7 @@ func (s *shape) readClients(module, root string) (missed []string) {
 	if s.Grpc.handlers == "" {
 		return nil
 	}
-	body := initAppWithBody(s.file)
+	body := diogenfile.InitAppWithBody(s.file)
 	constructors := builtBy(body)
 	seen := map[string]bool{}
 	for _, member := range members(body, s.Grpc.handlers) {
@@ -66,7 +68,7 @@ func members(body *ast.BlockStmt, field string) []string {
 		if !ok || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
 			return true
 		}
-		if target, ok := qualifiedBy(assign.Lhs[0], "container"); !ok || target != field {
+		if target, ok := diogenfile.QualifiedBy(assign.Lhs[0], "container"); !ok || target != field {
 			return true
 		}
 		literal, ok := assign.Rhs[0].(*ast.CompositeLit)
@@ -74,7 +76,7 @@ func members(body *ast.BlockStmt, field string) []string {
 			return true
 		}
 		for _, elt := range literal.Elts {
-			if member, ok := qualifiedBy(elt, "container"); ok {
+			if member, ok := diogenfile.QualifiedBy(elt, "container"); ok {
 				out = append(out, member)
 			}
 		}
@@ -112,7 +114,7 @@ func builtBy(body *ast.BlockStmt) map[string]string {
 				continue
 			}
 			for _, lhs := range assign.Lhs {
-				if field, ok := qualifiedBy(lhs, "container"); ok && locals[local.Name] != "" {
+				if field, ok := diogenfile.QualifiedBy(lhs, "container"); ok && locals[local.Name] != "" {
 					out[field] = locals[local.Name]
 				}
 			}
@@ -138,7 +140,7 @@ func registration(dir, constructor string) ([]client, bool) {
 	}
 	var out []client
 	for _, file := range files {
-		aliases := importAliases(file)
+		aliases := diogenfile.ImportAliases(file)
 		for _, decl := range file.Decls {
 			fn, ok := decl.(*ast.FuncDecl)
 			if !ok || fn.Recv == nil || fn.Name.Name != "Start" || receiver(fn) != typeName || fn.Body == nil {
