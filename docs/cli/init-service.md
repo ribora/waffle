@@ -129,7 +129,7 @@ func InitDi() (app.App, error) {
     if err != nil {
         return nil, err
     }
-    application := di.App()
+    application := di.AppApp()
     if closable, ok := application.(app.HasCloser); ok {
         closable.SetCloser(di.Shutdown())
     }

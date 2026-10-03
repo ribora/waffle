@@ -262,7 +262,7 @@ func InitDi() (app.App, error) {
     if err != nil {
         return nil, err
     }
-    application := di.App()
+    application := di.AppApp()
     if closable, ok := application.(app.HasCloser); ok {
         closable.SetCloser(di.Shutdown())
     }
@@ -363,7 +363,7 @@ func TestUserFlow(t *testing.T) {
         t.Fatal(err)
     }
     defer container.Shutdown()()
-    // ... exercise container.App() or any getter ...
+    // ... exercise container.AppApp() or any getter ...
 }
 ```
 
