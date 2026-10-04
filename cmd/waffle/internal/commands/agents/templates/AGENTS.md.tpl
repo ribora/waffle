@@ -411,6 +411,10 @@ platform's; putting a case's decision there hides it from the reviewer.
   assertion that exists only as a missing line cannot be reviewed.
 - a **no-op** keeps nothing, so no `Then` can read it.
 
+An outage is not a replacement: the step calls `app.Postgres.FailWith(nil)` —
+`Redis` and `Publisher` likewise — and the next `Reset` heals it. Do not ask for
+a grant on the client to fake one.
+
 `docs/conventions/component-harness.md` in waffle has the catalogue — which
 recorder exists for which seam — and the reasoning behind a particular grant.
 Read it to understand what you were given; it is not a licence to change it.

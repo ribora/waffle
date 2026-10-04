@@ -105,7 +105,7 @@ type Resource interface {
 }
 ```
 
-Three methods, and two optional halves discovered by assertion: `Named` (its name is quoted in errors) and `Ephemeral` (`Down(ctx)`, for a resource with something to remove when the run ends).
+Three methods, and two optional halves discovered by assertion: `Named` (its name is quoted in errors) and `Ephemeral` (`Down(ctx)`, for a resource with something to remove when the run ends). A third, `Fault` (`FailWith(err)`), is not for `Set`: it is all of a resource that `App` hands a step — see [A resource that goes down](#a-resource-that-goes-down).
 
 `Set` runs them: `Up` provisions and migrates **once per run** and memoizes the failure, so a hundred scenarios report the first diagnosis instead of hammering an absent server. `Reset` calls `Up` first, so a suite that only ever calls `Reset` is still correct. `Down` tears down in reverse and does not stop at the first failure.
 
@@ -247,6 +247,53 @@ docker rm -f gorib-harness-es   # to reset the container
 
 Elasticsearch tracks no connections per index, so the process id stands in for one, and it is only comparable on this machine: the sweep runs only for a loopback address.
 
+## A resource that goes down
+
+A case about an outage breaks the client, not the server. Its step calls
+`app.Postgres.FailWith(nil)`, and from then on every client the resource handed
+out fails — the one the container already holds included — until the next
+`Reset`. `nil` is a refused connection, `errors.Is(err, syscall.ECONNREFUSED)`;
+pass an error of your own for anything else, a timeout say.
+
+```go
+app, err := harness.Boot(ctx, diogen.Replacements{})
+...
+app.Postgres.FailWith(nil)                   // Given the database is down
+app.Redis.FailWith(context.DeadlineExceeded) // Given the cache times out
+```
+
+The server stays up because it is shared: every package of `go test ./...` uses
+the one postgres and the one elasticsearch container, so stopping either breaks
+the neighbours and costs a fifteen-second restart. A refusal in the client is
+the scenario's alone.
+
+| resource | what fails |
+|---|---|
+| `sqltest` | `Connect`, `Begin`, `DbSql` and every call of an open transaction. `Commit` rolls the real transaction back, so its connection goes back to the pool. A `*sql.DB` taken from `DbSql()` before the fault keeps working |
+| `redistest` | every command, pipeline and dial |
+| `elastictest` | every method of `elastic.Client` |
+
+The resource's own work never fails: `Reset` heals before it empties, and empties
+through a connection of its own, so its place in the set does not matter.
+
+`Postgres` and `Redis` are on `App` where the harness filled the seam, like a
+recorder; a scenario that supplied its own `SqlDb` gets no `Postgres`. They need
+no grant in `replacements.allow`: the scenario replaces nothing. Elasticsearch is
+not generated, so it reaches `App` through the hooks:
+
+```go
+type extra struct{ Search resource.Fault }
+
+func (a *App) boot(ctx context.Context, cut *diogen.Replacements) error {
+	if cut.ElasticClient == nil {
+		cut.ElasticClient, a.Search = search.Client(), search
+	}
+	return nil
+}
+```
+
+The publisher recorder has had the same method all along: `app.Publisher.FailWith(err)`.
+
 ## Writing a resource
 
 For a client that is not in gorib — your own Kafka wrapper, an in-house system — the harness is three methods next to that client:
@@ -271,6 +318,8 @@ Where to put it, by number of consumers — with no exception for gorib:
 | one service | `tests/internal/harness/kafkatest` |
 | two or more | next to the client: client in `pkg/kafka` → `pkg/kafka/kafkatest` |
 | the client moved into gorib | the harness moves with it |
+
+**To let a step fail it,** hand out a wrapped client that reads one switch, set the switch in `FailWith`, and clear it first thing in `Reset`. A resource with that method is a `resource.Fault`, and the `extra` hook puts it on `App`.
 
 **Measure before choosing what to keep between runs.** All three existing resources start a container: postgres and elasticsearch keep it, redis disposes of it — see [Redis](#redis) for the two numbers that decide it. Take the reasoning from whichever one your system resembles, not the shape.
 

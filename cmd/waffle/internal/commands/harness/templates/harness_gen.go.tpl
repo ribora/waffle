@@ -138,7 +138,9 @@ return nil
 type App struct {
 *{{.Package}}.Application
 {{if .HookExtra}}extra
-{{end}}{{if .Logger}}
+{{end}}{{if .Postgres}}
+Postgres resource.Fault{{end}}{{if .Redis}}
+Redis resource.Fault{{end}}{{if .Logger}}
 Logger *pry.LogRecorder{{end}}{{if .Hilton}}
 Telemetry *hilton.Recording{{end}}{{if .Consumer}}
 Consumer *scribus.ConsumerRecorder{{end}}{{if .Publisher}}
@@ -163,10 +165,10 @@ return nil, err
 return nil, err
 }
 {{end}}{{range .Postgres}}if cut.{{.}} == nil {
-cut.{{.}} = postgres.Db()
+cut.{{.}}, app.Postgres = postgres.Db(), postgres
 }
 {{end}}{{range .Redis}}if cut.{{.}} == nil {
-cut.{{.}} = cache.Db()
+cut.{{.}}, app.Redis = cache.Db(), cache
 }
 {{end}}{{if .Logger}}logger := pry.Recorder()
 {{end}}{{range .Logger}}if cut.{{.}} == nil {

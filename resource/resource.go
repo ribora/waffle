@@ -23,6 +23,11 @@ type Ephemeral interface {
 	Down(ctx context.Context) error
 }
 
+// All a step gets of a resource: Provision and Reset belong to the suite.
+type Fault interface {
+	FailWith(err error)
+}
+
 func New(resources ...Resource) *Set {
 	return &Set{resources: resources}
 }

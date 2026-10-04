@@ -623,7 +623,7 @@ func TestFirstRunScaffoldsTheSuiteAndGeneratesTheHarness(t *testing.T) {
 		"resource.New(postgres",
 		// Boot brings the resources up itself, so a scenario cannot forget.
 		"if err := Up(ctx); err != nil {",
-		"if cut.SqlDb == nil {\n\t\tcut.SqlDb = postgres.Db()",
+		"if cut.SqlDb == nil {\n\t\tcut.SqlDb, app.Postgres = postgres.Db(), postgres",
 	)
 }
 
@@ -826,7 +826,7 @@ func TestRedisBesideTheDatabaseAndTelemetryRecorded(t *testing.T) {
 		`redistest.Env("SHOP_TEST_REDIS")`,
 		`redistest.Docker("redis:8-alpine")`,
 		"resource.New(postgres, cache)",
-		"cut.RedisDb = cache.Db()",
+		"cut.RedisDb, app.Redis = cache.Db(), cache",
 		"Telemetry *hilton.Recording",
 		"cut.HiltonProvider, app.Telemetry = telemetry, telemetry",
 	)

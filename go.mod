@@ -11,16 +11,16 @@ require (
 	gitlab.com/gorib/amqp v1.9.2
 	gitlab.com/gorib/criteria v1.1.0
 	gitlab.com/gorib/di v1.12.2
-	gitlab.com/gorib/elastic v1.5.0
+	gitlab.com/gorib/elastic v1.6.0
 	gitlab.com/gorib/env v1.0.1
 	gitlab.com/gorib/failure v1.4.0
 	gitlab.com/gorib/grpc v1.7.0
 	gitlab.com/gorib/hilton v1.2.3
 	gitlab.com/gorib/http v1.12.4
 	gitlab.com/gorib/pry v1.4.2
-	gitlab.com/gorib/redis v1.3.1
+	gitlab.com/gorib/redis v1.4.0
 	gitlab.com/gorib/session v1.2.0
-	gitlab.com/gorib/sql v1.10.0
+	gitlab.com/gorib/sql v1.11.0
 	gitlab.com/gorib/whisk v1.3.4
 	golang.org/x/mod v0.40.0
 	golang.org/x/tools v0.49.0
