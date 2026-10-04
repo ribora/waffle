@@ -11,7 +11,7 @@ require (
 	gitlab.com/gorib/amqp v1.9.2
 	gitlab.com/gorib/criteria v1.1.0
 	gitlab.com/gorib/di v1.12.1
-	gitlab.com/gorib/elastic v1.4.1
+	gitlab.com/gorib/elastic v1.5.0
 	gitlab.com/gorib/env v1.0.1
 	gitlab.com/gorib/failure v1.4.0
 	gitlab.com/gorib/grpc v1.6.4

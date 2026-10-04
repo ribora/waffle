@@ -203,7 +203,9 @@ Two things follow. The runtime picks the port (`-p 127.0.0.1::6379`, read back w
 ```go
 var search = elastictest.New(
 	elastictest.Env("CATALOG_TEST_ES"),
+	elastictest.Docker("elasticsearch:8.19.7"),
 	elastictest.Prefix("test_"),
+	elastictest.Ephemeral(),
 	elastictest.Index("product", productMappings),
 )
 ```
@@ -212,11 +214,38 @@ Going over the wire also makes it blind to the client's major version — the ma
 
 `Migrate` creates missing indices and **leaves existing ones alone**: a mapping change is a migration of its own, and guessing at one silently is worse than failing on the first query. `Reset` deletes by query with `refresh=true&conflicts=proceed`, keeping the mapping. `Refresh(ctx)` is exposed for a fixture that seeds through `Bulk` and then searches — without it that scenario flickers.
 
-`Prefix` has to match what the container passes to `elastic.New`, or the resource manages indices the service never reads.
+`Client()` is the service's own `elastic.New` with the resource's address and prefix, built in `Provision` — the way `redistest.Db()` is. A container that builds its own client instead has to be given `Prefix()` and `Url()`, or the resource manages indices the service never reads.
 
-**No `Down`.** The indices `Migrate` creates are kept between runs, the way a postgres database is when `Ephemeral` is not asked for. Nothing removes them; drop the index by hand after a mapping change.
+### The container
 
-> Tested against `httptest`, not yet against a live cluster.
+The address chain is the postgres one: explicit `Url`, then `Env` in order, then `Docker`. `Docker(image)` runs a single node with security off, so **no password exists**, published on loopback only, with a 512 MB heap and the disk watermark off — on a nearly full laptop disk elasticsearch otherwise turns the indices read-only mid-run. A missing image is pulled first, under a timeout of its own: it is over half a gigabyte.
+
+**The container is named and reused, like postgres.** Measured on a laptop, `elasticsearch:8.19.7`:
+
+| | time |
+|---|---|
+| starting the container, to a yellow cluster | ~15 s |
+| reusing the running one | ~0.24 s |
+| creating an index | ~0.15 s |
+| emptying or deleting one | ~0.05 s |
+
+A container that costs a hundred times its contents is kept; the indices are what a run throws away. Defaults are `gorib-harness-es` on port 59200, shared by every service in a repository; `Container`, `Port` and `Runtime` change them. Only a started container is waited for, up to two minutes; a given address fails at once.
+
+```bash
+docker rm -f gorib-harness-es   # to reset the container
+```
+
+### Ephemeral indices
+
+`Ephemeral()` makes the indices this run's own: the process id goes into the prefix — `test_` becomes `test_48213_` — and `Down` deletes them. That is what makes two packages under `go test ./...` safe on one cluster. Without it the prefix is taken exactly as given and the indices are kept between runs; drop one by hand after a mapping change.
+
+**The sweep keeps a killed run from leaking indices.** `Provision` deletes an index only when all of these hold:
+
+- it is the base prefix, digits, `_` and a declared index name — another service's `test_2024_sales` is not ours to take;
+- elasticsearch reports it created over an hour ago;
+- no process with that id is alive.
+
+Elasticsearch tracks no connections per index, so the process id stands in for one, and it is only comparable on this machine: the sweep runs only for a loopback address.
 
 ## Writing a resource
 
@@ -243,7 +272,7 @@ Where to put it, by number of consumers — with no exception for gorib:
 | two or more | next to the client: client in `pkg/kafka` → `pkg/kafka/kafkatest` |
 | the client moved into gorib | the harness moves with it |
 
-**Measure before choosing what to keep between runs.** Both existing resources start a container, and they dispose of it oppositely — see [Redis](#redis) for the two numbers that decide it. Take the reasoning from whichever one your system resembles, not the shape.
+**Measure before choosing what to keep between runs.** All three existing resources start a container: postgres and elasticsearch keep it, redis disposes of it — see [Redis](#redis) for the two numbers that decide it. Take the reasoning from whichever one your system resembles, not the shape.
 
 ## Choosing where to cut
 
@@ -406,5 +435,5 @@ The **lists** come from the container for the same reason — `a.ServerIntercept
 
 ## Not there yet
 
-- **Elasticsearch is not parallel-safe.** `sqltest.Ephemeral()` gives each process its own database and `redistest` its own container; `elastictest` has neither, so two processes sharing an elasticsearch would share its indices. A prefix per process is the same idea and the same few lines, once a service needs it.
+- **Elasticsearch is not generated.** The harness fills an `elastic.Client` seam only through the `resources` and `boot` hooks; `redistest` gets `cut.X = cache.Db()` from the generator.
 - **Rabbit has no resource yet.** A `flushdb`-shaped afternoon when a service needs one.
