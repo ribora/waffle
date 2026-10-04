@@ -83,7 +83,7 @@ import (
 **`config/di/di.go`** — the `//go:generate` directive and `InitDi()` with service-specific wiring:
 
 ```go
-//go:generate go tool diogen -output config/diogen/di_gen.go -pkg diogen $GOFILE
+//go:generate go tool diogen -output config/diogen/di_gen.go $GOFILE
 package di
 
 // import "gitlab.com/gorib/di" // uncomment when adding di.Wire / di.Define calls below

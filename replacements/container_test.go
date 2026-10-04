@@ -41,7 +41,7 @@ func TestDiscoverContainers(t *testing.T) {
 		{
 			name: "scaffolded directive",
 			files: map[string]string{
-				filepath.Join("config", "di", "di.go"): "//go:generate go tool diogen -output config/diogen/di_gen.go -pkg diogen $GOFILE\n\npackage di\n",
+				filepath.Join("config", "di", "di.go"): "//go:generate go tool diogen -output config/diogen/di_gen.go $GOFILE\n\npackage di\n",
 			},
 			want: []Container{{File: "config/diogen/di_gen.go", Dir: "config/diogen", Package: "diogen"}},
 		},
@@ -62,8 +62,8 @@ func TestDiscoverContainers(t *testing.T) {
 		{
 			name: "two containers, sorted",
 			files: map[string]string{
-				filepath.Join("worker", "di", "di.go"): "//go:generate diogen -output worker/diogen/di_gen.go -pkg diogen $GOFILE\n\npackage di\n",
-				filepath.Join("api", "di", "di.go"):    "//go:generate diogen -output api/diogen/di_gen.go -pkg diogen $GOFILE\n\npackage di\n",
+				filepath.Join("worker", "di", "di.go"): "//go:generate diogen -output worker/diogen/di_gen.go $GOFILE\n\npackage di\n",
+				filepath.Join("api", "di", "di.go"):    "//go:generate diogen -output api/diogen/di_gen.go $GOFILE\n\npackage di\n",
 			},
 			want: []Container{
 				{File: "api/diogen/di_gen.go", Dir: "api/diogen", Package: "diogen"},
@@ -74,7 +74,7 @@ func TestDiscoverContainers(t *testing.T) {
 			name: "other generators ignored",
 			files: map[string]string{
 				"store.go":                             "//go:generate go tool store -output stored.go $GOFILE\n\npackage x\n",
-				filepath.Join("config", "di", "di.go"): "//go:generate diogen -output config/diogen/di_gen.go -pkg diogen $GOFILE\n\npackage di\n",
+				filepath.Join("config", "di", "di.go"): "//go:generate diogen -output config/diogen/di_gen.go $GOFILE\n\npackage di\n",
 			},
 			want: []Container{{File: "config/diogen/di_gen.go", Dir: "config/diogen", Package: "diogen"}},
 		},
@@ -83,7 +83,7 @@ func TestDiscoverContainers(t *testing.T) {
 			files: map[string]string{
 				filepath.Join("testdata", "cases", "x", "setup.go"): "//go:generate diogen -output testdata/cases/x/di_gen.go -pkg x $GOFILE\n\npackage x\n",
 				filepath.Join("vendor", "dep", "di.go"):             "//go:generate diogen -output vendor/dep/di_gen.go -pkg dep $GOFILE\n\npackage dep\n",
-				filepath.Join("config", "di", "di.go"):              "//go:generate diogen -output config/diogen/di_gen.go -pkg diogen $GOFILE\n\npackage di\n",
+				filepath.Join("config", "di", "di.go"):              "//go:generate diogen -output config/diogen/di_gen.go $GOFILE\n\npackage di\n",
 			},
 			want: []Container{{File: "config/diogen/di_gen.go", Dir: "config/diogen", Package: "diogen"}},
 		},

@@ -1,4 +1,4 @@
-//go:generate go tool diogen -output config/diogen/di_gen.go -pkg diogen $GOFILE
+//go:generate go tool diogen -output config/diogen/di_gen.go $GOFILE
 package di
 
 // Service-specific wires go in InitDi() below. The set of bundled waffle

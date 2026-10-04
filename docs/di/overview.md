@@ -216,7 +216,7 @@ Keeping the module composition in its own file separates the high-level "what th
 Holds the `//go:generate` directive and the `InitDi()` function with service-specific wiring:
 
 ```go
-//go:generate go tool diogen -output config/diogen/di_gen.go -pkg diogen $GOFILE
+//go:generate go tool diogen -output config/diogen/di_gen.go $GOFILE
 
 package di
 

@@ -10,7 +10,7 @@ import (
 func TestCheckReadsTheModuleAndTheList(t *testing.T) {
 	tree := func(allow string) map[string]string {
 		return map[string]string{
-			"config/di/di.go": "//go:generate diogen -output config/diogen/di_gen.go -pkg diogen $GOFILE\n\npackage di\n",
+			"config/di/di.go": "//go:generate diogen -output config/diogen/di_gen.go $GOFILE\n\npackage di\n",
 			"waffle.yaml":     "replacements:\n  allow:\n    example.test/pkg/sql: [" + allow + "]\n",
 			"tests/feature/steps_test.go": `package feature
 

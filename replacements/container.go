@@ -56,8 +56,7 @@ func DiscoverContainers(root string) ([]Container, error) {
 
 			pkg, ok := flagValue(fields, "-pkg")
 			if !ok {
-				// diogen falls back to the package of its input, which only
-				// coincides with the output directory when the two are the same.
+				// diogen's own default, short of a package already there under another name.
 				pkg = filepath.Base(filepath.Dir(output))
 			}
 			found = append(found, Container{File: output, Dir: filepath.Dir(output), Package: pkg})

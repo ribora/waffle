@@ -1,4 +1,4 @@
-//go:generate diogen -output=worker/diogen/di_gen.go -pkg diogen $GOFILE
+//go:generate diogen -output=worker/diogen/di_gen.go $GOFILE
 
 package di
 

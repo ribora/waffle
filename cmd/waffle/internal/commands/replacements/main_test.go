@@ -48,7 +48,7 @@ func module(t *testing.T) {
 
 	files := map[string]string{
 		"go.mod": "module example.test\n\ngo 1.27\n",
-		"config/di/di.go": "//go:generate diogen -output config/diogen/di_gen.go -pkg diogen $GOFILE\n\n" +
+		"config/di/di.go": "//go:generate diogen -output config/diogen/di_gen.go $GOFILE\n\n" +
 			"package di\n",
 		"config/diogen/di_gen.go":     container,
 		"pkg/sql/sql.go":              sqlPkg,

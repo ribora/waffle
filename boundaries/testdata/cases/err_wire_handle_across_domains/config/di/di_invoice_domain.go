@@ -1,4 +1,4 @@
-//go:generate diogen -output config/diogen/di_gen.go -pkg diogen $GOFILE
+//go:generate diogen -output config/diogen/di_gen.go $GOFILE
 
 package di
 
