@@ -4,9 +4,11 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/converter"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/whisk"
@@ -104,6 +106,14 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 		filepath.Join("templates", "model", "event.go.tpl"): filepath.Join(path, "cmd", "scribus", "model", event+".go"),
 		filepath.Join("templates", mode, "di.go.tpl"):       filepath.Join("config", "di", "di_"+domain+"_"+event+"_scribus.go"),
 	}
+	// Every handler of the domain shares these two; one scaffolded by an older waffle keeps them in its own files.
+	management := command.Title(domain) + "Management"
+	if !declares(filepath.Join(path, "cmd", "scribus"), "type "+management+" interface") {
+		sources[filepath.Join("templates", "management.go.tpl")] = filepath.Join(path, "cmd", "scribus", "management.go")
+	}
+	if !declares(filepath.Join("config", "di"), "di.Wire[scribus"+command.Title(domain)+"."+management+"]") {
+		sources[filepath.Join("templates", "di.go.tpl")] = filepath.Join("config", "di", "di_"+domain+"_scribus.go")
+	}
 
 	if err := c.Write(sources, params); err != nil {
 		return err
@@ -129,4 +139,12 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 		return fmt.Errorf("%v: %v", err, string(info))
 	}
 	return nil
+}
+
+func declares(dir, code string) bool {
+	files, _ := filepath.Glob(filepath.Join(dir, "*.go"))
+	return slices.ContainsFunc(files, func(file string) bool {
+		data, err := os.ReadFile(file)
+		return err == nil && strings.Contains(string(data), code)
+	})
 }

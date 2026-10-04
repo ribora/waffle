@@ -605,6 +605,9 @@ boundaries are clean. Run it, and paste what it said.
 errors that surface only at generation time (missing dependency, circular,
 duplicate alias). Skipping it leaves the service in a broken state.
 
+`go.mod` is never edited by hand. What `make .tidy` changes in it and in `go.sum`
+is part of your change, not something to revert.
+
 ## Project layout
 
 The scaffolds write it, so the shape is what `./waffle make:domain` left in
@@ -701,6 +704,11 @@ What generation does not stop, because it compiles and is wrong:
   production wiring. A test substitutes through `Replacements` (Rule #11 step 3)
 - ❌ `di.Override()` to inject a mock — it is a build-time directive, so the mock
   would have to be importable from production code
+- ❌ The AMQP publisher exposed as both `amqp.Publisher` and a service's port. Its
+  `Replacements` field becomes a composite interface the harness has no recorder
+  for, so a component test builds the real publisher. Expose it as one type: the
+  port alone, or, when `amqp.Publisher` is read too, the port declared as an alias,
+  `type Publisher = amqp.Publisher`
 
 **Supplying a `Replacements` field prunes what only that constructor fed.** Its
 dependencies are not built, environment and network included, unless something
@@ -771,6 +779,9 @@ it does leave the process.
 - **A value goes into the format, not the sentinel.** `failure.New("role {role} exists")`
   works only while every caller passes the value; `failure.Wrap("%w: {role}", ErrX, name)`
   keeps the sentinel plain.
+- **The cause travels with the error, on the wire too.** To keep it inside, log it and
+  return the sentinel alone, as a repository does; never `fmt.Errorf`, which looks like
+  wrapping and drops the cause from the reply without saying so.
 
 ## Rule #8 — observability
 

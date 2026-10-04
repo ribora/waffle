@@ -7,10 +7,6 @@ import (
 	"gitlab.com/gorib/whisk/scan"
 )
 
-type {{ title .Domain }}Management interface {
-	// Methods consumed by this handler go here.
-}
-
 func New{{ title .Event }}Command(
 	{{ camel .Domain }}Management {{ title .Domain }}Management,
 	logger pry.Logger,

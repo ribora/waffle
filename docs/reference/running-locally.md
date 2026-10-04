@@ -21,7 +21,7 @@ about what the framework asks for.
 | `config/service/redis` | Redis | `REDIS_HOST` | `REDIS_PORT` (`6379`), `REDIS_PASSWORD`, `REDIS_DB` (`0`) |
 | `config/service/elastic` | Elasticsearch | `ES_HOST` | `ES_INDEX` |
 | `config/tools/http` | — | `DAEMON_HOST`, `DAEMON_PORT` | `HEALTH_PATH` |
-| `config/tools/grpc` | — | `DAEMON_HOST`, `DAEMON_PORT` | — |
+| `config/tools/grpc` | — | `DAEMON_HOST`, `DAEMON_PORT` | `GRPC_MAX_RECV_MSG_SIZE` (`4194304`) |
 | `config/tools/scribus/amqp` | RabbitMQ | `RABBIT_DSN`, `RABBIT_EXCHANGE`, `RABBIT_QUEUE` | — |
 | `config/tools/scribus/single`<br>`config/tools/scribus/batch` | whatever the driver needs | — | — |
 | `config/service/amqp` | RabbitMQ | `RABBIT_DSN`, `RABBIT_EXCHANGE` | — |
@@ -108,7 +108,8 @@ See [tools/http](../tools/http.md#listen-address) and
 [tools/grpc](../tools/grpc.md#listen-address).
 
 Enabling both modules does not duplicate the keys: `waffle` adds only what is
-missing, so the second module contributes `HEALTH_PATH` and nothing else.
+missing, so the second module contributes only its own key — `HEALTH_PATH` or
+`GRPC_MAX_RECV_MSG_SIZE`.
 
 ## When it does not start
 

@@ -81,6 +81,54 @@ func TestHandlerTemplatesSatisfyTheirInterfaces(t *testing.T) {
 	}
 }
 
+func renderFile(t *testing.T, path, event string) string {
+	t.Helper()
+	body, err := templates.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tpl, err := template.New(filepath.Base(path)).Funcs(command.Funcs()).Parse(string(body))
+	if err != nil {
+		t.Fatalf("parse %s: %v", path, err)
+	}
+	var out bytes.Buffer
+	if err := tpl.Execute(&out, map[string]string{"Domain": "user", "Event": event, "Subject": event, "Project": "example.com/svc"}); err != nil {
+		t.Fatalf("render %s: %v", path, err)
+	}
+	return out.String()
+}
+
+func TestTwoHandlersOfADomainShareOneManagement(t *testing.T) {
+	for _, mode := range []string{"single", "batch"} {
+		t.Run(mode, func(t *testing.T) {
+			pkg := []string{
+				renderFile(t, filepath.Join("templates", mode, "handler.go.tpl"), "order_paid"),
+				renderFile(t, filepath.Join("templates", mode, "handler.go.tpl"), "order_cancelled"),
+				renderFile(t, filepath.Join("templates", "management.go.tpl"), "order_paid"),
+			}
+			declared := 0
+			for _, src := range pkg {
+				declared += strings.Count(src, "type UserManagement interface")
+			}
+			if declared != 1 {
+				t.Errorf("UserManagement is declared %d times in the handlers' package, want once", declared)
+			}
+
+			wired := 0
+			for _, src := range []string{
+				renderFile(t, filepath.Join("templates", mode, "di.go.tpl"), "order_paid"),
+				renderFile(t, filepath.Join("templates", mode, "di.go.tpl"), "order_cancelled"),
+				renderFile(t, filepath.Join("templates", "di.go.tpl"), "order_paid"),
+			} {
+				wired += strings.Count(src, "di.Wire[scribusUser.UserManagement]")
+			}
+			if wired != 1 {
+				t.Errorf("the management is wired %d times, want once", wired)
+			}
+		})
+	}
+}
+
 // Both templates must bind the subject, not the event that named the type.
 func TestKeysReturnTheSubject(t *testing.T) {
 	for _, mode := range []string{"single", "batch"} {

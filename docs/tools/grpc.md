@@ -63,7 +63,8 @@ func InitDi() {
         di.For[wgrpc.GrpcCommand](),
     )
     di.Wire[wgrpc.GrpcCommand](wgrpc.NewGrpcCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
-        "commands": di.Tags(wgrpc.ServiceTag),
+        "commands":       di.Tags(wgrpc.ServiceTag),
+        "maxRecvMsgSize": env.Value("GRPC_MAX_RECV_MSG_SIZE", 4<<20),
     }))
 }
 ```
@@ -90,6 +91,12 @@ Override the address at runtime with the `--listen` / `-l` flag (takes precedenc
 # or short form
 ./app grpc -l :50051
 ```
+
+## Message size
+
+`GRPC_MAX_RECV_MSG_SIZE` caps the size of a request, in bytes. Unset, it is
+gRPC's own 4 MiB, and a larger request is refused with `ResourceExhausted`
+before any handler runs.
 
 ## Service handlers
 

@@ -3,7 +3,8 @@
 [Docs](../README.md) · CLI scaffolding
 
 Sets up migrations for a domain that has none: the migration package, the
-bootstrap SQL and the DI registration.
+bootstrap SQL and the DI registration. It also enables `config/service/sql` and
+`config/tools/migrate`, the database and the `migrate` command the runner needs.
 
 ## Usage
 

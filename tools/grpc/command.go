@@ -39,14 +39,15 @@ type Server interface {
 	Close() error
 }
 
-func NewGrpcCommand(commands []ServiceHandler, interceptors grpc.Interceptors, streamInterceptors grpc.StreamInterceptors, command app.BaseCommand, addr net.Addr, logger pry.Logger) *grpcCommand {
+func NewGrpcCommand(commands []ServiceHandler, interceptors grpc.Interceptors, streamInterceptors grpc.StreamInterceptors, command app.BaseCommand, addr net.Addr, maxRecvMsgSize int, logger pry.Logger) *grpcCommand {
 	return &grpcCommand{
-		commands:    commands,
-		middlewares: UnaryChain(interceptors),
-		streamMw:    StreamChain(streamInterceptors),
-		addr:        addr,
-		BaseCommand: command,
-		logger:      logger,
+		commands:       commands,
+		middlewares:    UnaryChain(interceptors),
+		streamMw:       StreamChain(streamInterceptors),
+		addr:           addr,
+		maxRecvMsgSize: maxRecvMsgSize,
+		BaseCommand:    command,
+		logger:         logger,
 	}
 }
 
@@ -75,12 +76,13 @@ func StreamChain(interceptors grpc.StreamInterceptors) []baseGrpc.StreamServerIn
 
 type grpcCommand struct {
 	app.BaseCommand
-	commands    []ServiceHandler
-	middlewares []baseGrpc.UnaryServerInterceptor
-	streamMw    []baseGrpc.StreamServerInterceptor
-	addr        net.Addr
-	connection  Server
-	logger      pry.Logger
+	commands       []ServiceHandler
+	middlewares    []baseGrpc.UnaryServerInterceptor
+	streamMw       []baseGrpc.StreamServerInterceptor
+	addr           net.Addr
+	maxRecvMsgSize int
+	connection     Server
+	logger         pry.Logger
 }
 
 func (c *grpcCommand) Setup(server *baseGrpc.Server) {
@@ -95,7 +97,7 @@ func (c *grpcCommand) Run(ctx context.Context) error {
 		return err
 	}
 
-	c.connection = grpc.NewServer(c, c.middlewares, c.streamMw, c.addr, c.logger)
+	c.connection = grpc.NewServer(c, c.middlewares, c.streamMw, c.addr, c.logger, baseGrpc.MaxRecvMsgSize(c.maxRecvMsgSize))
 	return c.connection.Serve(ctx)
 }
 

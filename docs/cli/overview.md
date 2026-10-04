@@ -119,10 +119,11 @@ Some commands run additional steps after writing files:
 - `make:domain:http` — enables `config/tools/http`, installs `whisk` (and `goverter`, under the default mapper) and writes `whisk.yaml`, then runs `make .tidy generate`
 - `make:domain:scribus` — enables `config/tools/scribus/<driver>` and the mode module, installs `whisk`, then runs `make .tidy generate`
 - `make:domain:command` — runs `make .tidy generate`
+- `make:domain:migrate` — enables `config/service/sql` and `config/tools/migrate`, and stops there
 - `make:outbox` — enables `config/service/sql`, `config/tools/migrate`, `config/tools/outbox` and the driver named by `--driver`, then runs `make .tidy generate`
 
 `make:domain:migrate`, `make:domain:migration`, `make:converter`,
-`tests:harness` and `agents` write files and stop; run `make generate` yourself
+`tests:harness` and `agents` run no `make`; run `make generate` yourself
 afterwards. `make generate` also runs `tests:harness` again, through the
 `go:generate` line in the harness package.
 

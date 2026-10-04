@@ -10,9 +10,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime/debug"
 	"slices"
 	"strings"
 	"text/template"
+
+	"golang.org/x/mod/module"
+	"golang.org/x/mod/semver"
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/plural"
 	"gitlab.com/gorib/waffle/internal/gomod"
@@ -164,6 +168,12 @@ func (c *Command) EnableStorage() error {
 	if err := c.EnsureTool("gitlab.com/gorib/sql/cmd/store"); err != nil {
 		return err
 	}
+	return c.EnableMigrations()
+}
+
+// EnableMigrations is what a migration runner needs: the runner it writes is a
+// command over a sql.Db, and neither exists until these modules are enabled.
+func (c *Command) EnableMigrations() error {
 	if err := c.UncommentModule("gitlab.com/gorib/waffle/config/service/sql"); err != nil {
 		return err
 	}
@@ -276,6 +286,41 @@ func assignment(line string) (string, bool) {
 // EnsureTool adds module via `go get -tool` only if go.mod doesn't already
 // list it — safe (and network-free) to call on every scaffold.
 func (c *Command) EnsureTool(module string) error {
+	return c.ensureTool(module, "latest")
+}
+
+// EnsureBuiltTool installs module at the version of owner this waffle was built
+// with, so a new service does not get a generator newer than the waffle that scaffolds it.
+func (c *Command) EnsureBuiltTool(module, owner string) error {
+	return c.ensureTool(module, builtVersion(owner))
+}
+
+func builtVersion(owner string) string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "latest"
+	}
+	version := ""
+	if info.Main.Path == owner {
+		version = info.Main.Version
+	}
+	for _, dep := range info.Deps {
+		if dep.Path != owner {
+			continue
+		}
+		if dep.Replace != nil {
+			dep = dep.Replace
+		}
+		version = dep.Version
+	}
+	// A local build stamps (devel), +dirty or a pseudo-version of a commit nobody can fetch.
+	if !semver.IsValid(version) || semver.Build(version) != "" || module.IsPseudoVersion(version) {
+		return "latest"
+	}
+	return version
+}
+
+func (c *Command) ensureTool(module, version string) error {
 	root, err := gomod.Root()
 	if err != nil {
 		return err
@@ -287,7 +332,7 @@ func (c *Command) EnsureTool(module string) error {
 	if strings.Contains(string(data), module) {
 		return nil
 	}
-	if info, err := exec.Command("go", "get", "-tool", module+"@latest").CombinedOutput(); err != nil {
+	if info, err := exec.Command("go", "get", "-tool", module+"@"+version).CombinedOutput(); err != nil {
 		return fmt.Errorf("go get -tool %s: %v: %s", module, err, string(info))
 	}
 	reportAction("added tool " + module)

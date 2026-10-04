@@ -63,10 +63,10 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 	if _, err := agents.Generate(projectName, false); err != nil {
 		return err
 	}
-	if err := c.EnsureTool("gitlab.com/gorib/di/cmd/diogen"); err != nil {
+	if err := c.EnsureBuiltTool("gitlab.com/gorib/di/cmd/diogen", "gitlab.com/gorib/di"); err != nil {
 		return err
 	}
-	if err := c.EnsureTool("gitlab.com/gorib/waffle/cmd/waffle"); err != nil {
+	if err := c.EnsureBuiltTool("gitlab.com/gorib/waffle/cmd/waffle", "gitlab.com/gorib/waffle"); err != nil {
 		return err
 	}
 	info, err := exec.Command("make", ".tidy", "generate").CombinedOutput()

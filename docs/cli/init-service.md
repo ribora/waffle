@@ -215,10 +215,15 @@ without the rest of the suite.
 After writing all files, `init:service` runs:
 
 ```sh
-go get -tool gitlab.com/gorib/di/cmd/diogen@latest
-go get -tool gitlab.com/gorib/waffle/cmd/waffle@latest
+go get -tool gitlab.com/gorib/di/cmd/diogen@<di version waffle was built with>
+go get -tool gitlab.com/gorib/waffle/cmd/waffle@<its own version>
 make .tidy generate
 ```
+
+Both versions come from the binary, so the service starts on the generator and
+the waffle that scaffolded it, not on whatever was released since. A waffle
+built from a checkout carries no version anyone can fetch and installs
+`@latest`.
 
 This installs the DI code generator, puts `waffle` behind the scaffolded `./waffle` script that `make replacements` calls, and produces the initial `diogen/di_gen.go` so the project compiles immediately. It also writes `AGENTS.md` (+ symlinks `CLAUDE.md`, `.cursorrules`) with the current framework conventions for AI coding agents — see [agents](agents.md).
 

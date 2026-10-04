@@ -80,6 +80,7 @@ one instance on one connection rather than two.
 | `DAEMON_HOST` | yes | — | Listen address |
 | `DAEMON_PORT` | yes | — | Listen port |
 | `HEALTH_PATH` | no | empty | `http` only — empty means the middleware's own default path |
+| `GRPC_MAX_RECV_MSG_SIZE` | no | `4194304` | `grpc` only — the largest request the server accepts, in bytes |
 
 Both servers read the same pair, so a service running HTTP and gRPC in one process runs them as two commands, not two listeners in one.
 

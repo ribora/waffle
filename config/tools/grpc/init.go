@@ -46,6 +46,7 @@ func InitGrpc() {
 
 	di.Wire[app.BaseCommand](func() app.BaseCommand { return app.NewCommand("grpc", "Start grpc server") }, di.For[grpc.GrpcCommand]())
 	di.Wire[grpc.GrpcCommand](grpc.NewGrpcCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
-		"commands": di.Tags(grpc.ServiceTag),
+		"commands":       di.Tags(grpc.ServiceTag),
+		"maxRecvMsgSize": env.Value("GRPC_MAX_RECV_MSG_SIZE", 4<<20),
 	}))
 }

@@ -165,7 +165,18 @@ type OrderCreated struct {
 
 ### Implementing a handler
 
-The handler defines its own management interface (consumer-defined, same pattern as gRPC). The struct is private; the constructor is public.
+The handlers of a domain consume one management interface, declared beside them (consumer-defined, same pattern as gRPC). `make:domain:scribus` writes it once per domain, in `cmd/scribus/management.go`, and wires it once, in `config/di/di_<domain>_scribus.go`; the next handler adds its methods to the same interface.
+
+```go
+// cmd/scribus/management.go
+package scribus
+
+type OrderManagement interface {
+    HandleOrderCreated(ctx context.Context, order *model.Order) error
+}
+```
+
+The struct is private; the constructor is public.
 
 ```go
 // cmd/scribus/order_created.go
@@ -179,10 +190,6 @@ import (
     "gitlab.com/gorib/pry"
     "gitlab.com/gorib/whisk/scan"
 )
-
-type OrderManagement interface {
-    HandleOrderCreated(ctx context.Context, order *model.Order) error
-}
 
 func NewOrderCreatedHandler(management OrderManagement, logger pry.Logger) *orderCreatedHandler {
     return &orderCreatedHandler{management: management, logger: logger}
