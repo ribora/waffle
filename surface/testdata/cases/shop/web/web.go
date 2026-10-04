@@ -36,3 +36,10 @@ func (r *renderer) render(ctx context.Context, id int) error {
 	_, err := r.c.Get(ctx, fmt.Sprintf("/api/documents/%d?full=%t", id, true))
 	return err
 }
+
+type asset struct{ Url string }
+
+func (r *renderer) download(ctx context.Context, a asset) error {
+	_, err := r.c.Get(ctx, a.Url)
+	return err
+}

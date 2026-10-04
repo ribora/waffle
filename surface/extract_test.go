@@ -21,7 +21,7 @@ func TestExtractReadsWhatCrossesTheEdge(t *testing.T) {
 		Serves: []string{"/order.OrderService/Place", "/refund.RefundService/Issue",
 			"DELETE /admin/users/{userId}", "GET /admin/users/{userId}", "GET /health", "POST /customers/password"},
 		Calls: []string{"/audit.AuditService/Record", "/stock.StockService/Reserve",
-			"GET /api/documents/{}", "POST /api/render/text"},
+			"GET /api/documents/{}", "GET external", "POST /api/render/text"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got  %+v\nwant %+v", got, want)

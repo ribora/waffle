@@ -58,7 +58,7 @@ func TestVerifyMatchesRequestsToRoutesAndLetsTheRestLeave(t *testing.T) {
 	r, err := Verify([]Surface{
 		{Service: "herald", Calls: []string{
 			"POST /api/render/text", "GET /documents/{}", "GET /elsewhere", "GET payments/{}",
-			"POST https://api.acquirer.test/v3/payments",
+			"POST https://api.acquirer.test/v3/payments", "GET external",
 		}},
 		{Service: "renderer", Serves: []string{"POST /api/render/text", "GET /documents/{id}"}},
 		{Service: "archive", Serves: []string{"GET /documents/{id}"}},
@@ -72,6 +72,7 @@ func TestVerifyMatchesRequestsToRoutesAndLetsTheRestLeave(t *testing.T) {
 		Ambiguous: []string{"GET /documents/{} (by herald, routed by archive, renderer)"},
 		Outside: []string{
 			"GET /elsewhere (by herald)",
+			"GET external (by herald)",
 			"GET payments/{} (by herald)",
 			"POST https://api.acquirer.test/v3/payments (by herald)",
 		},

@@ -38,10 +38,13 @@ func (x *extraction) template(p *packages.Package, fd *ast.FuncDecl, e ast.Expr,
 	return x.follow(p, fd, e, depth, x.template)
 }
 
-// "VERB path" for every verb and path a request can carry.
+// "VERB path" for every verb and path a request can carry; a path with no
+// constant part is an address from data, somewhere outside.
 func (x *extraction) requests(p *packages.Package, fd *ast.FuncDecl, call *ast.CallExpr, s sink) []string {
 	paths, lost := x.template(p, fd, call.Args[s.arg], 3)
-	x.fail(lost, "requests a path with no constant part")
+	if len(lost) > 0 {
+		paths = append(paths, external)
+	}
 	var out []string
 	for _, m := range x.verbs(p, fd, call, s) {
 		for _, path := range paths {
@@ -84,6 +87,8 @@ func (x *extraction) fail(lost []string, why string) {
 		x.lost = append(x.lost, l+": "+why)
 	}
 }
+
+const external = "external"
 
 var verbs = regexp.MustCompile(`%%|%[-+# 0]*[0-9*]*(\.[0-9*]+)?[a-zA-Z]`)
 
