@@ -268,7 +268,7 @@ func InitAppWith(replacements Replacements) (_ *Application, err error) {
 			if err != nil {
 				return err
 			}
-			container.closers.add(name, s.Close)
+			container.closers.add(0, name, s.Close)
 			container.sqlDb = s
 		}
 		return nil
@@ -424,6 +424,75 @@ func TestReadSeamsMarksLeavesInsideBuildClosures(t *testing.T) {
 		"ServiceCache": false,
 		"HandlerAsH":   false,
 	}
+	if len(seams) != len(want) {
+		t.Fatalf("read %d seams, want %d", len(seams), len(want))
+	}
+	for _, seam := range seams {
+		if seam.Leaf != want[seam.Field] {
+			t.Errorf("%s: Leaf = %v, want %v", seam.Field, seam.Leaf, want[seam.Field])
+		}
+	}
+}
+
+const closeWithContainer = `package diogen
+
+import (
+	"time"
+
+	env "gitlab.com/gorib/env"
+	sql "gitlab.com/gorib/sql"
+	service "example.com/svc/domain/x/service"
+)
+
+type Replacements struct {
+	SqlDb       sql.Db
+	ServiceRepo service.Repo
+}
+
+func InitAppWith(replacements Replacements) (_ *Application, err error) {
+	container.sqlDb = replacements.SqlDb
+	container.serviceRepo = replacements.ServiceRepo
+
+	buildSqlDb := diogenBuild("gitlab.com/gorib/sql.Open", func(name string) error {
+		if container.sqlDb == nil {
+			closeWith := sql.CloseWithin(env.Value("DB_CLOSE_TIMEOUT", time.Second))
+			s := sql.Open()
+			container.closers.add(0, name, func() error {
+				return closeWith(s)
+			})
+			container.sqlDb = s
+		}
+		return nil
+	})
+
+	buildServiceRepo := diogenBuild("example.com/svc/domain/x/service.NewRepo", func(name string) error {
+		if container.serviceRepo == nil {
+			if err := buildSqlDb(); err != nil {
+				return err
+			}
+			s := service.NewRepo(container.sqlDb)
+			container.serviceRepo = s
+		}
+		return nil
+	})
+
+	if err := buildServiceRepo(); err != nil {
+		return nil, err
+	}
+	return container, nil
+}
+`
+
+// di.CloseWith adds a local and a closer to the block; neither is a read of the graph.
+func TestReadSeamsCloseWithLeavesALeafALeaf(t *testing.T) {
+	c := writeContainer(t, closeWithContainer)
+
+	seams, err := ReadSeams(c, "example.com/svc/config/diogen")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := map[string]bool{"SqlDb": true, "ServiceRepo": false}
 	if len(seams) != len(want) {
 		t.Fatalf("read %d seams, want %d", len(seams), len(want))
 	}
