@@ -268,7 +268,7 @@ func InitAppWith(replacements Replacements) (_ *Application, err error) {
 			if err != nil {
 				return err
 			}
-			container.closers.add(0, name, s.Close)
+			container.closers.add(name, s.Close)
 			container.sqlDb = s
 		}
 		return nil
@@ -295,23 +295,23 @@ func InitAppWith(replacements Replacements) (_ *Application, err error) {
 
 	buildServiceCache := diogenBuild("", func(name string) error {
 		if container.serviceCache == nil ` + "&&" + ` mode() {
-			if err := diogenBuild("example.com/svc/domain/x/service.NewMemory", func(name string) error {
+			if err := diogenRun("example.com/svc/domain/x/service.NewMemory", func(name string) error {
 				s := service.NewMemory()
 				container.serviceCache = s
 				return nil
-			})(); err != nil {
+			}); err != nil {
 				return err
 			}
 		}
 		if container.serviceCache == nil ` + "&&" + ` !mode() {
-			if err := diogenBuild("example.com/svc/domain/x/service.NewPersistent", func(name string) error {
+			if err := diogenRun("example.com/svc/domain/x/service.NewPersistent", func(name string) error {
 				if err := buildSqlDb(); err != nil {
 					return err
 				}
 				s := service.NewPersistent(container.sqlDb)
 				container.serviceCache = s
 				return nil
-			})(); err != nil {
+			}); err != nil {
 				return err
 			}
 		}
@@ -457,7 +457,7 @@ func InitAppWith(replacements Replacements) (_ *Application, err error) {
 		if container.sqlDb == nil {
 			closeWith := sql.CloseWithin(env.Value("DB_CLOSE_TIMEOUT", time.Second))
 			s := sql.Open()
-			container.closers.add(0, name, func() error {
+			container.closers.add(name, func() error {
 				return closeWith(s)
 			})
 			container.sqlDb = s

@@ -328,7 +328,7 @@ A parameter of a markup function — the initialization context, configuration f
 
 ### Automatic resource cleanup
 
-What `Shutdown()` closes is a closing policy declared in the markup, and `waffle/config/app` declares one: `di.DefaultCloser[io.Closer](di.Fallback())`. Every value it applies to is registered for shutdown as it is built, and `Shutdown()` closes **each value once everything that read it has closed**, values that do not depend on each other at once — so a database connection is closed after the repository that reads it.
+What `Shutdown()` closes is a closing policy declared in the markup, and `waffle/config/app` declares one: `di.DefaultCloser[io.Closer](di.Fallback())`. Every value it applies to is added to the shutdown list as it is built, and `Shutdown()` closes them in **reverse initialization order** — so a database connection opened before a repository is closed after it.
 
 You do not register closers by hand. Implementing `io.Closer` is enough:
 
