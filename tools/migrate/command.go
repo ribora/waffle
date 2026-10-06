@@ -3,6 +3,7 @@ package migrate
 import (
 	"context"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"strings"
@@ -74,6 +75,9 @@ func (c *migrateCommand) Run(ctx context.Context) (err error) {
 		c.connection, err = sql.NewDb(dsn[0], *connection)
 		if err != nil {
 			return err
+		}
+		if closer, ok := c.connection.(io.Closer); ok {
+			defer func() { _ = closer.Close() }()
 		}
 		// The scheme names the database this run targets, so it names the dialect
 		// too — DB_DRIVER describes the connection that was just replaced.
