@@ -24,7 +24,6 @@ This pulls in the registrations from [`config/tools/migrate/init.go`](../../conf
 import (
     "io/fs"
     "gitlab.com/gorib/di"
-    "gitlab.com/gorib/env"
     "gitlab.com/gorib/waffle/app"
     "gitlab.com/gorib/waffle/tools/migrate"
 )
@@ -36,14 +35,12 @@ di.Wire[app.BaseCommand](
 )
 di.Wire[migrate.MigrateCommand](migrate.NewMigrateCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
     "migrations": di.Tags(migrate.MigrationsTag),
-    "driver":     env.NeedValue[string]("DB_DRIVER"),
 }))
 ```
 
-`driver` is the goose dialect, and it is not optional: goose defaults to postgres
-in its own package init, so without it a service on MySQL or SQLite migrates with
-postgres syntax. It is the same `DB_DRIVER` that `config/service/sql` reads, which
-is why this module pulls that one in.
+The goose dialect comes from the `sql.Db` itself — `Driver().Dialect()` — so it
+always matches the connection the command runs against, whichever alias
+(`pgx`, `pgsql`, `sqlite3`, …) selected it.
 
 Run `make generate`, then run migrations:
 
@@ -98,8 +95,7 @@ By default the migrate command uses the `sql.Db` from the DI container — `DB_D
 ```
 
 The flag value is parsed as a standard DSN: `driver://user:pass@host:port/dbname`.
-Its scheme also becomes the goose dialect for that run, overriding `DB_DRIVER` —
-it describes the connection the flag just replaced.
+Its scheme selects the driver, and the dialect follows from that connection.
 
 ## Subcommands
 
@@ -177,5 +173,5 @@ domain/user/cmd/migrate/
 | Setting a domain up with migrations | [cli/make:domain:migrate](../cli/make-domain-migrate.md) |
 | Adding one more `.sql` to a domain that has them | `waffle make:domain:migration <domain> <description>` — [cli/overview](../cli/overview.md#commands) |
 | The table a scaffolded entity gets, and the `stored<X>` struct it pairs with | [cli/make:domain](../cli/make-domain.md#migrations) |
-| `DB_DRIVER` as both connection and goose dialect | [reference/environment](../reference/environment.md#configservicesql) |
+| `DB_DRIVER` and `DB_DSN` | [reference/environment](../reference/environment.md#configservicesql) |
 | Applying the same migrations in a component test | [conventions/component-harness](../conventions/component-harness.md#postgres) |

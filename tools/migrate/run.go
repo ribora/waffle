@@ -25,7 +25,7 @@ func run(ctx context.Context, db *dbSql.DB, sources []fs.FS, dialect, command st
 	return nil
 }
 
-// Postgres and not the service's DB_DRIVER, because sqltest speaks nothing else.
+// Postgres, because sqltest speaks nothing else.
 func Up(sources ...fs.FS) func(ctx context.Context, handle *dbSql.DB) error {
 	return func(ctx context.Context, handle *dbSql.DB) error {
 		goose.SetLogger(goose.NopLogger())

@@ -20,9 +20,7 @@ A variable is only read if the module that reads it is enabled — every one bel
 `postgres`, `pgx` and `pgsql` all select the native pgx pool — the scaffolded
 `.env` says `pgx`. Any other value is passed to `database/sql` as a driver name,
 so it has to be one your binary registers by import: `mysql`, `sqlite`,
-`sqlite3`. The same string is the goose dialect when `config/tools/migrate` is
-enabled, which is the reason the two modules share one variable rather than each
-reading its own.
+`sqlite3`.
 
 ### `config/service/redis`
 

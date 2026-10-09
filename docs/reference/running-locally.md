@@ -36,8 +36,7 @@ off, so no `SENTRY_DSN` means no Sentry channel and no
 `OTEL_EXPORTER_OTLP_ENDPOINT` means spans go nowhere.
 
 `config/tools/migrate` pulls in `config/service/sql` and runs against whatever it
-connected to, which is where both of its variables come from. `DB_DRIVER` also
-names the goose dialect — see [tools/migrate](../tools/migrate.md).
+connected to, which is where both of its variables come from.
 
 ## The minimum
 
