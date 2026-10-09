@@ -328,9 +328,20 @@ be replaced; `gitlab.com/gorib/di` covers how a seam is derived.
 ## Post-generation steps
 
 The command does these itself: it installs `gitlab.com/gorib/sql/cmd/store`,
-enables the `service/sql` and `tools/migrate` modules in `modules.go`, and runs
-`make .tidy generate` so `stored_user.go` gets its mapping methods. A project
-that had no database before is ready to run when the command returns.
+enables the `service/sql` and `tools/migrate` modules in `modules.go`, runs
+`make .tidy`, and runs `go generate ./domain/user/...` so `stored_user.go` gets
+its mapping methods.
+
+It does not rebuild the container. Nothing reads the management until a
+transport does, and `diogen` refuses a registration nothing reads:
+
+```
+diogen: nothing reads mymodule/domain/user/service.NewUserManagement (config/di/di_user_domain.go:12), and no di.Entry names it — declare it with di.Entry[T]() if it is built for itself, or remove it
+```
+
+That is what `make generate` prints until the first of the commands below. The
+previous container stays in place, so the project still compiles; the domain
+joins it with its first consumer.
 
 ## What to do next
 

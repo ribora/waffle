@@ -124,12 +124,22 @@ waffle make:domain --no-repository product
   + domain/product/model/errors.go
   + domain/product/service/service.go
   + domain/product/model/product.go
+  + AGENTS.md
+  ! product is not in the container until something reads its management — make generate refuses it until then; add a consumer:
+      waffle make:domain:http product
+      waffle make:domain:grpc product
+      waffle make:domain:scribus --driver <id> product <event>
+      waffle make:domain:command product <command>
 ```
 
 `--no-repository` stops the chain at its first link: a model, a management and
 its errors, but no postgres adapter, no table and no database module — which is
 why nothing has to be running. Drop the flag when you want the storage half; see
 [make:domain](cli/make-domain.md).
+
+The domain is half of something. Nothing reads its management yet, so `diogen`
+refuses to put it in the container, and `make generate` fails until the next
+step gives it a reader.
 
 ## Give the domain an HTTP router
 

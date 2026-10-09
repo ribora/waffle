@@ -113,8 +113,8 @@ Each command ships embedded Go templates. When you run a command, waffle renders
 Some commands run additional steps after writing files:
 
 - `init:service` — installs the `diogen` and `waffle` tools, then runs `make .tidy generate`
-- `make:domain` — installs the `store` tool and enables `config/service/sql` and `config/tools/migrate` (unless `--no-repository`), then runs `make .tidy generate`
-- `make:domain:entity` — the same tail as `make:domain`, for one more entity
+- `make:domain` — installs the `store` tool and enables `config/service/sql` and `config/tools/migrate` (unless `--no-repository`), then runs `make .tidy` and `go generate ./domain/<domain>/...` — not the container, which refuses the domain until a transport reads it
+- `make:domain:entity` — installs the `store` tool and enables `config/service/sql` and `config/tools/migrate`, then runs `make .tidy generate`
 - `make:domain:grpc` — enables `config/tools/grpc`, runs `go generate ./api/...`, then `make .tidy generate`; when `proto_dir` is outside the module both runs are skipped and the command prints the steps to do by hand
 - `make:domain:http` — enables `config/tools/http`, installs `whisk` (and `goverter`, under the default mapper) and writes `whisk.yaml`, then runs `make .tidy generate`
 - `make:domain:scribus` — enables `config/tools/scribus/<driver>` and the mode module, installs `whisk`, then runs `make .tidy generate`

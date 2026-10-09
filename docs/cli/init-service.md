@@ -243,8 +243,8 @@ A fresh service registers no commands at all, so `go run ./cmd/app --help` lists
 none — every command arrives with a module, and a module arrives with the
 scaffolding command that needs it.
 
-1. `waffle make:domain <domain>` — the first domain, and with it the database modules
-2. `waffle make:domain:http <domain>` or `make:domain:grpc` — a transport, which is what puts a command in the list
+1. `waffle make:domain <domain>` — the first domain, and with it the database modules; `make generate` refuses it until step 2
+2. `waffle make:domain:http <domain>` or `make:domain:grpc` — a transport, which reads the domain and puts a command in the list
 3. Both of those enable their modules in `modules.go` and append the variables they read to `.env`; the per-module list is [Running locally](../reference/running-locally.md)
 4. `make generate` after every DI change — `make run ARGS=<command>` does it for you
 
