@@ -1,7 +1,9 @@
 package surface
 
 import (
+	"cmp"
 	"fmt"
+	"maps"
 	"slices"
 	"sort"
 	"strings"
@@ -13,6 +15,8 @@ type Report struct {
 	Unserved    []string `yaml:"unserved,omitempty"`
 	Uncalled    []string `yaml:"uncalled,omitempty"`
 	Ambiguous   []string `yaml:"ambiguous,omitempty"`
+	Hostless    []string `yaml:"hostless,omitempty"`
+	Needless    []string `yaml:"needless,omitempty"`
 
 	PatternOnly []string `yaml:"pattern_only,omitempty"`
 	Loops       []string `yaml:"loops,omitempty"`
@@ -20,7 +24,7 @@ type Report struct {
 }
 
 func (r Report) Failed() bool {
-	return len(r.Unconsumed)+len(r.Unpublished)+len(r.Unserved)+len(r.Uncalled)+len(r.Ambiguous) > 0
+	return len(r.Unconsumed)+len(r.Unpublished)+len(r.Unserved)+len(r.Uncalled)+len(r.Ambiguous)+len(r.Hostless)+len(r.Needless) > 0
 }
 
 func (r Report) String() string {
@@ -39,6 +43,8 @@ func (r Report) String() string {
 	section("called, nobody serves", r.Unserved)
 	section("served, nobody calls", r.Uncalled)
 	section("requested, routed by more than one service", r.Ambiguous)
+	section("a client no service routes, not named in flows.clients", r.Hostless)
+	section("named in flows.clients, not needed", r.Needless)
 	section("taken only by a wildcard subscription", r.PatternOnly)
 	section("consumed by the service that publishes it", r.Loops)
 	section("requested outside the set", r.Outside)
@@ -97,26 +103,55 @@ func Verify(set []Surface) (Report, error) {
 		r.Unpublished = append(r.Unpublished, fmt.Sprintf("%s (by %s)", sub, strings.Join(consumers[sub], ", ")))
 	}
 	for _, m := range sorted(callers) {
-		by := strings.Join(callers[m], ", ")
-		if !isHTTP(m) {
-			if servers[m] == nil {
-				r.Unserved = append(r.Unserved, fmt.Sprintf("%s (by %s)", m, by))
-			}
-			continue
+		if !isHTTP(m) && servers[m] == nil {
+			r.Unserved = append(r.Unserved, fmt.Sprintf("%s (by %s)", m, strings.Join(callers[m], ", ")))
 		}
-		var on []string
-		for _, route := range sorted(servers) {
-			if isHTTP(route) && known(m) && names(route) && routeMatches(route, m) {
-				on = append(on, servers[route]...)
+	}
+	type finding struct{ section, request, tail string }
+	found := map[finding][]string{}
+	for _, s := range set {
+		for _, q := range outgoing(set, s) {
+			var f finding
+			switch {
+			case q.hostless, len(q.to) == 1:
+				continue
+			case len(q.to) > 1:
+				f = finding{"ambiguous", q.name, ", routed by " + strings.Join(q.to, ", ")}
+			case q.outside:
+				f = finding{"outside", q.name, ", to " + q.host}
+			case q.host != "" && known(q.name):
+				f = finding{"unserved", q.name, ", not on " + q.host}
+			default:
+				f = finding{"outside", q.name, ""}
+			}
+			found[f] = append(found[f], s.Service)
+		}
+		for _, client := range sorted(s.Clients) {
+			if _, named := s.Hosts[client]; !named && len(hosts(set, s.Clients[client])) == 0 {
+				r.Hostless = append(r.Hostless, fmt.Sprintf("%s: %s", s.Service, client))
 			}
 		}
-		slices.Sort(on)
-		on = slices.Compact(on)
-		switch {
-		case len(on) == 0:
-			r.Outside = append(r.Outside, fmt.Sprintf("%s (by %s)", m, by))
-		case len(on) > 1:
-			r.Ambiguous = append(r.Ambiguous, fmt.Sprintf("%s (by %s, routed by %s)", m, by, strings.Join(on, ", ")))
+		for _, client := range slices.Sorted(maps.Keys(s.Hosts)) {
+			switch {
+			case s.Clients[client] == nil:
+				r.Needless = append(r.Needless, fmt.Sprintf("%s: %s (no such client)", s.Service, client))
+			case slices.Equal(hosts(set, s.Clients[client]), []string{s.Hosts[client]}):
+				r.Needless = append(r.Needless, fmt.Sprintf("%s: %s (the set tells %s)", s.Service, client, s.Hosts[client]))
+			}
+		}
+	}
+	findings := slices.SortedFunc(maps.Keys(found), func(a, b finding) int {
+		return cmp.Or(strings.Compare(a.request, b.request), strings.Compare(a.tail, b.tail))
+	})
+	for _, f := range findings {
+		line := fmt.Sprintf("%s (by %s%s)", f.request, strings.Join(slices.Compact(found[f]), ", "), f.tail)
+		switch f.section {
+		case "ambiguous":
+			r.Ambiguous = append(r.Ambiguous, line)
+		case "unserved":
+			r.Unserved = append(r.Unserved, line)
+		default:
+			r.Outside = append(r.Outside, line)
 		}
 	}
 	// A route nobody in the set requests is a way in from outside, so only RPCs
@@ -136,11 +171,84 @@ func Verify(set []Surface) (Report, error) {
 	return r, nil
 }
 
-// Receivers names the services in the set that take a message: an event by its
-// key — exactly, or only through a wildcard subscription; an RPC by its full
-// name; an HTTP request by the routes that name it. Kind is event, grpc or http,
-// as tests/flows.yaml writes it.
-func Receivers(set []Surface, kind, name string) (exact, wild []string) {
+type request struct {
+	name     string
+	host     string
+	outside  bool
+	hostless bool // the client is what is reported, not each of its requests
+	to       []string
+}
+
+func outgoing(set []Surface, s Surface) []request {
+	var out []request
+	for _, m := range s.Calls {
+		if !isHTTP(m) {
+			continue
+		}
+		q := request{name: m, to: routing(set, m)}
+		if len(q.to) == 1 {
+			q.host = q.to[0]
+		}
+		out = append(out, q)
+	}
+	for _, client := range sorted(s.Clients) {
+		told := hosts(set, s.Clients[client])
+		host := s.Hosts[client]
+		if host == "" && len(told) == 1 {
+			host = told[0]
+		}
+		for _, m := range s.Clients[client] {
+			q := request{name: m, host: host, to: routing(set, m)}
+			switch {
+			case host != "" && !slices.ContainsFunc(set, func(o Surface) bool { return o.Service == host }):
+				q.outside, q.to = true, nil
+			case host != "":
+				q.to = slices.DeleteFunc(q.to, func(svc string) bool { return svc != host })
+			case len(told) == 0:
+				q.hostless = true
+			}
+			out = append(out, q)
+		}
+	}
+	return out
+}
+
+func hosts(set []Surface, requests []string) []string {
+	count := map[string]int{}
+	for _, m := range requests {
+		for _, svc := range routing(set, m) {
+			count[svc]++
+		}
+	}
+	var best []string
+	for _, svc := range slices.Sorted(maps.Keys(count)) {
+		switch {
+		case len(best) == 0 || count[svc] > count[best[0]]:
+			best = []string{svc}
+		case count[svc] == count[best[0]]:
+			best = append(best, svc)
+		}
+	}
+	return best
+}
+
+func routing(set []Surface, request string) []string {
+	if !known(request) {
+		return nil
+	}
+	var out []string
+	for _, s := range set {
+		if slices.ContainsFunc(s.Serves, func(route string) bool {
+			return isHTTP(route) && names(route) && routeMatches(route, request)
+		}) {
+			out = append(out, s.Service)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+func Receivers(set []Surface, from, kind, name string) (exact, wild []string) {
 	for _, s := range set {
 		switch kind {
 		case "event":
@@ -158,7 +266,7 @@ func Receivers(set []Surface, kind, name string) (exact, wild []string) {
 			}
 		case "http":
 			for _, route := range s.Serves {
-				if isHTTP(route) && known(name) && names(route) && routeMatches(route, name) {
+				if isHTTP(route) && known(name) && names(route) && routeMatches(route, name) && landsOn(set, from, name, s.Service) {
 					exact = append(exact, s.Service)
 				}
 			}
@@ -169,9 +277,22 @@ func Receivers(set []Surface, kind, name string) (exact, wild []string) {
 	return slices.Compact(exact), slices.Compact(slices.DeleteFunc(wild, func(w string) bool { return slices.Contains(exact, w) }))
 }
 
-// Senders names the services in the set whose code sends a message to kind and
-// name, the way Receivers reads them; for HTTP, name is the route.
-func Senders(set []Surface, kind, name string) []string {
+func landsOn(set []Surface, from, name, to string) bool {
+	for _, s := range set {
+		if s.Service != from {
+			continue
+		}
+		for _, q := range outgoing(set, s) {
+			if q.host != "" && q.host != to && routeMatches(name, q.name) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// For HTTP, name is a route of service to, where Receivers takes a request.
+func Senders(set []Surface, to, kind, name string) []string {
 	var out []string
 	for _, s := range set {
 		switch kind {
@@ -184,8 +305,8 @@ func Senders(set []Surface, kind, name string) []string {
 				out = append(out, s.Service)
 			}
 		case "http":
-			for _, request := range s.Calls {
-				if isHTTP(request) && known(request) && routeMatches(name, request) {
+			for _, q := range outgoing(set, s) {
+				if known(q.name) && routeMatches(name, q.name) && (q.host == "" || q.host == to) {
 					out = append(out, s.Service)
 				}
 			}

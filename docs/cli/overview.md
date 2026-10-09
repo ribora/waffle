@@ -149,6 +149,7 @@ Project-level conventions live in `waffle.yaml`, next to `go.mod`. `init:service
 | `proto_dir` | `api/proto` | Where `.proto` sources are written |
 | `mapper` | `"goverter"` | `"goverter"` scaffolds a goverter `convert/convert.go`; `"dto"` scaffolds nothing extra (hand-written conversions) |
 | `replacements.allow` | empty | Interfaces a test may supply on the container's `Replacements`, keyed by import path: `gitlab.com/gorib/sql: [Db]`. A permission list — an empty one allows nothing |
+| `flows.clients` | empty | An HTTP client's host, by its key in `tests/surface.yaml`, where the set cannot tell it: a party outside the set (`…adapter.bladeRunner.client: bladerunner`), or the last resort on a tie. The check refuses one it does not need. See [flows](../conventions/flows.md#the-codes-record) |
 | `agents.areas` | `model`, `gomod` | Named sets of paths that Rule #11's modes open, or that the human grants on top of a mode; paths may leave the service. See [agents](agents.md#modes-areas-and-grants) |
 
 `<service>` is the last path segment of the module name. A missing `waffle.yaml`, or one missing some keys, behaves exactly like a file containing only the defaults above — the two are indistinguishable to every command. An unknown key (e.g. a typo) is a hard error, and an invalid `mapper` value (anything other than `dto` or `goverter`) is a hard error.

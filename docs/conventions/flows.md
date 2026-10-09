@@ -30,6 +30,32 @@ writes `tests/surface.yaml` from the module's code, and the harness scaffolds `t
 
 A service's own interface in front of one of those — its `Publisher` over the outbox — counts as the library, and a wrapper function is followed to its callers. A name that is not a constant at the end of that chain is refused: it is a contract, and a contract has a name. The one exception is an HTTP request whose whole address comes from data — a supplier's file URL — which is recorded as `GET external` and lands outside the set.
 
+A record may also group HTTP requests by the client that sends them, under `clients`, keyed by where the client lives in the code:
+
+```yaml
+clients:
+  lib/http-client.httpClient:
+    - GET /customers/contracts/{}
+    - GET /rest/prices
+```
+
+A client has one base URL, and the base URL is configuration, so no record says where it points. Every client still has a **host**, and the check fails on one without:
+
+- **told by the set** — the service whose routes take the most of the client's requests. Each of them lands there alone: a wildcard route of another service that happens to fit one does not compete.
+- **named in the caller's `waffle.yaml`** — for a party outside the set, and for the last resort inside it: two services the set cannot tell apart, though the domains they live on can.
+
+```yaml
+flows:
+  clients:
+    domain/template/adapter.bladeRunner.client: bladerunner
+    domain/catalog/adapter.download.client: suppliers   # any URL from data
+    lib/http-client.httpClient: apostle                 # only on a tie
+```
+
+The key is the one the record writes, so it is copied, not made up. A name outside the set is a party, and its requests are reported outside under it; a service of the set is the host its requests are checked against. The check refuses a name it does not need — the set tells the same host, or the record has no such client — so a declaration exists only where there is no way out, and one left behind by a rename fails rather than lingers.
+
+The Go extraction does not group yet, so its requests are matched one by one and one no service routes lands outside without failing; a record written by another extractor — a frontend's — may group.
+
 ## The suite's record
 
 The generated harness traces everything that crosses the service's edge during the suite: the calls the suite sends to its server, the calls the service makes to what a scenario replaced, the events it publishes and consumes, and the commands a step runs. A godog suite calls
@@ -74,10 +100,10 @@ finds every waffle service below `root` the way `go test ./...` finds packages, 
 | `system` | the records against each other, below |
 | `orphaned` | a flow's `title` or `description` whose flow is gone |
 
-`system` fails the command on an event published and consumed by nobody, subscribed to and published by nobody, an RPC called and served by nobody, served and called by nobody, or an HTTP request more than one service routes. It only reports an event taken by a wildcard alone, a service consuming its own event, and an HTTP request no service routes: each of those is a legitimate design.
+`system` fails the command on an event published and consumed by nobody, subscribed to and published by nobody, an RPC called and served by nobody, served and called by nobody, a client with no host, a client's request its host does not route, an HTTP request more than one service routes, or a host named without need. It only reports an event taken by a wildcard alone, a service consuming its own event, and an HTTP request no service routes: each of those is a legitimate design.
 
 ## What is not there
 
-- **A party outside waffle.** A service with no records is not in the set: an RPC only it calls is "served, nobody calls", and an HTTP request to it leaves the system — both true of the records, which is all the check reads. There is no way to declare a link by hand, in config or in code; a declared link is one more thing to forget.
+- **A party outside waffle.** A service with no records is not in the set: an RPC only it calls is "served, nobody calls", and an HTTP request to it leaves the system — both true of the records, which is all the check reads. A link is never declared by hand, in config or in code — a declared link is one more thing to forget — except a client's host the set cannot tell, above, which the check fails without.
 - **Outgoing HTTP in a trace.** The trace sees the service's own server and the calls a scenario replaced; a request to another system goes through a client the harness does not wrap, so the pages show it only where the code's record names it.
 - **Paths no case takes.** A branch in the code that no case reaches is in neither record. Coverage of the suite over the production packages is the tool for that.

@@ -74,6 +74,11 @@ func load(root string) (project, error) {
 			return nil
 		}
 		if s, err := surface.Read(filepath.Join(dir, surface.File)); err == nil {
+			cfg, err := surface.LoadConfig(dir)
+			if err != nil {
+				return err
+			}
+			s.Hosts = cfg.Clients
 			p.surfaces = append(p.surfaces, s)
 		} else if !errors.Is(err, os.ErrNotExist) {
 			return err
@@ -117,7 +122,7 @@ func (p project) beyond(from, m string) string {
 		return "not traced"
 	}
 	k, name, _ := strings.Cut(m, " ")
-	exact, wild := surface.Receivers(p.surfaces, k, name)
+	exact, wild := surface.Receivers(p.surfaces, from, k, name)
 	if k != "event" {
 		exact = slices.DeleteFunc(exact, func(s string) bool { return s == from })
 	}
@@ -132,7 +137,7 @@ func (p project) beyond(from, m string) string {
 
 func (p project) senders(s step) []string {
 	k, name, _ := strings.Cut(s.input.Message, " ")
-	return slices.DeleteFunc(surface.Senders(p.surfaces, k, name), func(from string) bool {
+	return slices.DeleteFunc(surface.Senders(p.surfaces, s.service, k, name), func(from string) bool {
 		return from == s.service && k != "event"
 	})
 }
@@ -153,7 +158,7 @@ func (p project) untested(traced []Link) []string {
 			continue
 		}
 		for _, key := range s.Publishes {
-			exact, _ := surface.Receivers(p.surfaces, "event", key)
+			exact, _ := surface.Receivers(p.surfaces, s.Service, "event", key)
 			for _, to := range exact {
 				add(s.Service, to, "event "+key)
 			}
@@ -162,7 +167,7 @@ func (p project) untested(traced []Link) []string {
 			if !strings.HasPrefix(m, "/") {
 				continue // outgoing HTTP is not traced, so no case could follow it
 			}
-			exact, _ := surface.Receivers(p.surfaces, "grpc", m)
+			exact, _ := surface.Receivers(p.surfaces, s.Service, "grpc", m)
 			for _, to := range exact {
 				if to != s.Service {
 					add(s.Service, to, "grpc "+m)

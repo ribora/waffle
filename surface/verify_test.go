@@ -1,6 +1,8 @@
 package surface
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 )
@@ -82,6 +84,122 @@ func TestVerifyMatchesRequestsToRoutesAndLetsTheRestLeave(t *testing.T) {
 	}
 }
 
+func TestVerifyLandsAClientsRequestsOnItsHost(t *testing.T) {
+	r, err := Verify([]Surface{
+		{Service: "portal", Clients: map[string][]string{"lib/http-client.httpClient": {
+			"GET /customers/contracts/{}", "GET /customers/invoices/{}", "GET /rest/prices", "POST /customers/feedback",
+		}}},
+		{Service: "apostle", Serves: []string{"GET /customers/contracts/{contractId}", "GET /customers/invoices/{invoiceId}", "GET /rest/prices"}},
+		{Service: "media", Serves: []string{"GET /customers/{customerId}/*"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := Report{Unserved: []string{"POST /customers/feedback (by portal, not on apostle)"}}
+	if !reflect.DeepEqual(r, want) {
+		t.Errorf("got  %+v\nwant %+v", r, want)
+	}
+}
+
+func TestVerifyFailsOnAClientWithNoHost(t *testing.T) {
+	r, err := Verify([]Surface{
+		{Service: "herald", Clients: map[string][]string{
+			"adapter.renderer.client": {"GET /documents/{}"},
+			"adapter.download.client": {"GET external"},
+			"driver.sendSms.client":   {"GET sms/send"},
+		}},
+		{Service: "renderer", Serves: []string{"GET /documents/{id}"}},
+		{Service: "archive", Serves: []string{"GET /documents/{id}"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := Report{
+		Ambiguous: []string{"GET /documents/{} (by herald, routed by archive, renderer)"},
+		Hostless:  []string{"herald: adapter.download.client", "herald: driver.sendSms.client"},
+	}
+	if !reflect.DeepEqual(r, want) {
+		t.Errorf("got  %+v\nwant %+v", r, want)
+	}
+}
+
+func TestVerifyTakesAClientsHostFromFlowsClients(t *testing.T) {
+	r, err := Verify([]Surface{
+		{
+			Service: "herald",
+			Clients: map[string][]string{
+				"adapter.archive.client":  {"GET /documents/{}", "GET /files/{}"},
+				"adapter.download.client": {"GET external"},
+				"driver.sendSms.client":   {"GET sms/send"},
+			},
+			Hosts: map[string]string{
+				"adapter.archive.client":  "archive",
+				"adapter.download.client": "suppliers",
+				"driver.sendSms.client":   "sms.ru",
+			},
+		},
+		{Service: "renderer", Serves: []string{"GET /documents/{id}"}},
+		{Service: "archive", Serves: []string{"GET /documents/{id}"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := Report{
+		Unserved: []string{"GET /files/{} (by herald, not on archive)"},
+		Outside:  []string{"GET external (by herald, to suppliers)", "GET sms/send (by herald, to sms.ru)"},
+	}
+	if !reflect.DeepEqual(r, want) {
+		t.Errorf("got  %+v\nwant %+v", r, want)
+	}
+}
+
+func TestVerifyFailsOnAHostNamedWithoutNeed(t *testing.T) {
+	r, err := Verify([]Surface{
+		{
+			Service: "portal",
+			Clients: map[string][]string{"lib/http-client.httpClient": {"GET /rest/prices"}},
+			Hosts:   map[string]string{"lib/http-client.httpClient": "apostle", "lib/gone.client": "apostle"},
+		},
+		{Service: "apostle", Serves: []string{"GET /rest/prices"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := Report{Needless: []string{
+		"portal: lib/gone.client (no such client)",
+		"portal: lib/http-client.httpClient (the set tells apostle)",
+	}}
+	if !reflect.DeepEqual(r, want) {
+		t.Errorf("got  %+v\nwant %+v", r, want)
+	}
+}
+
+func TestConfigRefusesAClientWithoutAHost(t *testing.T) {
+	for _, clients := range []map[string]string{{"": "archive"}, {"adapter.archive.client": " "}} {
+		if err := (Config{Clients: clients}).Validate(); err == nil {
+			t.Errorf("%v: want a refusal", clients)
+		}
+	}
+}
+
+func TestLoadConfigReadsTheFlowsGroupAlone(t *testing.T) {
+	dir := t.TempDir()
+	body := "mapper: dto\nflows:\n  clients:\n    adapter.archive.client: archive\n"
+	if err := os.WriteFile(filepath.Join(dir, "waffle.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := LoadConfig(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := map[string]string{"adapter.archive.client": "archive"}; !reflect.DeepEqual(cfg.Clients, want) {
+		t.Errorf("got %v, want %v", cfg.Clients, want)
+	}
+	if cfg, err := LoadConfig(t.TempDir()); err != nil || cfg.Clients != nil {
+		t.Errorf("without a file: %v, %v; want nothing", cfg, err)
+	}
+}
+
 func TestRouteMatching(t *testing.T) {
 	for _, c := range []struct {
 		route, request string
@@ -119,16 +237,33 @@ func TestReceiversAndSenders(t *testing.T) {
 		{"http", "POST /api/render/text", []string{"renderer"}, nil},
 		{"http", "GET /anything", nil, nil},
 	} {
-		exact, wild := Receivers(set, c.kind, c.name)
+		exact, wild := Receivers(set, "dungeon", c.kind, c.name)
 		if !reflect.DeepEqual(exact, c.exact) || !reflect.DeepEqual(wild, c.wild) {
 			t.Errorf("Receivers(%s %s) = %v, %v; want %v, %v", c.kind, c.name, exact, wild, c.exact, c.wild)
 		}
 	}
-	if got := Senders(set, "http", "POST /api/render/{kind}"); !reflect.DeepEqual(got, []string{"dungeon"}) {
+	if got := Senders(set, "renderer", "http", "POST /api/render/{kind}"); !reflect.DeepEqual(got, []string{"dungeon"}) {
 		t.Errorf("Senders(http) = %v, want [dungeon]", got)
 	}
-	if got := Senders(set, "event", "contracts.moved"); !reflect.DeepEqual(got, []string{"dungeon"}) {
+	if got := Senders(set, "bastion", "event", "contracts.moved"); !reflect.DeepEqual(got, []string{"dungeon"}) {
 		t.Errorf("Senders(event) = %v, want [dungeon]", got)
+	}
+}
+
+func TestReceiversAndSendersKeepAClientToItsHost(t *testing.T) {
+	set := []Surface{
+		{Service: "portal", Clients: map[string][]string{"lib/http-client.httpClient": {"GET /customers/contracts/{}", "GET /rest/prices"}}},
+		{Service: "apostle", Serves: []string{"GET /customers/contracts/{contractId}", "GET /rest/prices"}},
+		{Service: "media", Serves: []string{"GET /customers/{customerId}/*"}},
+	}
+	if exact, _ := Receivers(set, "portal", "http", "GET /customers/contracts/{contractId}"); !reflect.DeepEqual(exact, []string{"apostle"}) {
+		t.Errorf("Receivers = %v, want [apostle]", exact)
+	}
+	if got := Senders(set, "apostle", "http", "GET /customers/contracts/{contractId}"); !reflect.DeepEqual(got, []string{"portal"}) {
+		t.Errorf("Senders(apostle) = %v, want [portal]", got)
+	}
+	if got := Senders(set, "media", "http", "GET /customers/{customerId}/*"); got != nil {
+		t.Errorf("Senders(media) = %v, want none", got)
 	}
 }
 
