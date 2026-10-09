@@ -2,6 +2,7 @@ package flows
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"gitlab.com/gorib/waffle/surface"
@@ -53,6 +54,41 @@ func TestUntestedIsWhatTheCodeLinksAndNoCaseFollows(t *testing.T) {
 	}
 	if got := p.untested(followed); !reflect.DeepEqual(got, want) {
 		t.Errorf("got  %v\nwant %v", got, want)
+	}
+}
+
+func TestPagesAreNamedApartAndInASCII(t *testing.T) {
+	steps := map[string]step{}
+	for _, m := range []string{
+		"http POST /orders",
+		`ui the visitor clicks "Оплатить"`,
+		`ui the visitor clicks "СБП"`,
+		`ui the visitor applies promo code " summer "`,
+		`ui the visitor applies promo code "SUMMER"`,
+		"grpc /document.TemplateService/Create",
+		"grpc /notification.TemplateService/Create",
+	} {
+		s := step{service: "portal", input: Input{Message: m}}
+		steps[s.id()] = s
+	}
+	got := names(steps)
+	for id, want := range map[string]string{
+		"portal: grpc /document.TemplateService/Create":     "portal-grpc-document-templateservice-create",
+		"portal: grpc /notification.TemplateService/Create": "portal-grpc-notification-templateservice-create",
+		"portal: http POST /orders":                         "portal-http-post-orders",
+		`portal: ui the visitor clicks "Оплатить"`:          "portal-ui-the-visitor-clicks-oplatit",
+		`portal: ui the visitor clicks "СБП"`:               "portal-ui-the-visitor-clicks-sbp",
+	} {
+		if got[id] != want {
+			t.Errorf("%s: %q, want %q", id, got[id], want)
+		}
+	}
+	spaced, upper := got[`portal: ui the visitor applies promo code " summer "`], got[`portal: ui the visitor applies promo code "SUMMER"`]
+	if spaced == upper || !strings.HasPrefix(spaced, "portal-ui-the-visitor-applies-promo-code-summer-") {
+		t.Errorf("a name both share must part them: %q, %q", spaced, upper)
+	}
+	if again := names(steps); !reflect.DeepEqual(again, got) {
+		t.Errorf("names moved between runs: %v, then %v", got, again)
 	}
 }
 

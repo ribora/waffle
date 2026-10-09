@@ -11,17 +11,18 @@ import (
 )
 
 func projectOf(steps ...step) project {
-	p := project{services: map[string]service{}, steps: map[string]step{}, consumes: map[string][]string{}, produces: map[string][]string{}}
+	p := project{services: map[string]service{}}
 	for _, s := range steps {
-		p.services[s.service] = service{}
-		p.steps[s.id()] = s
-		p.consumes[s.input.Message] = append(p.consumes[s.input.Message], s.id())
+		doc := p.services[s.service].doc
+		doc.Inputs = append(doc.Inputs, s.input)
 		for _, b := range s.input.Branches {
 			for _, m := range b.Sends {
-				p.produces[m] = append(p.produces[m], s.service)
+				doc.Outputs = append(doc.Outputs, Output{Message: m})
 			}
 		}
+		p.services[s.service] = service{doc: doc}
 	}
+	p.index()
 	return p
 }
 

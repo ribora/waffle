@@ -63,7 +63,7 @@ func page(p project, f Flow, entry bool) []byte {
 		for _, br := range s.input.Branches {
 			fmt.Fprintf(&b, "- %s — %s\n", p.branchName(s, br), count(len(br.Cases)))
 		}
-		fmt.Fprintf(&b, "\nIts cases: [%s](%s.md)\n", slug(s), slug(s))
+		fmt.Fprintf(&b, "\nIts cases: [%s](%s.md)\n", p.slug(s), p.slug(s))
 	}
 	return []byte(b.String())
 }
@@ -77,7 +77,7 @@ func (p project) origin(f Flow, entry bool) (string, []string) {
 			sender := p.steps[id]
 			for _, sent := range sequence(sender.input.Branches) {
 				if sent.message == s.input.Message && slices.Contains(p.receivers(sender.service, sent.message), f.Entry) {
-					from = append(from, fmt.Sprintf("[%s](%s.md)", id, slug(sender)))
+					from = append(from, fmt.Sprintf("[%s](%s.md)", id, p.slug(sender)))
 					break
 				}
 			}

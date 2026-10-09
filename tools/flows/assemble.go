@@ -2,9 +2,11 @@ package flows
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -59,10 +61,11 @@ type project struct {
 	consumes map[string][]string // message -> step ids
 	produces map[string][]string // message -> services
 	surfaces []surface.Surface   // every service's, traced or not
+	names    map[string]string   // step id -> page
 }
 
 func load(root string) (project, error) {
-	p := project{services: map[string]service{}, steps: map[string]step{}, consumes: map[string][]string{}, produces: map[string][]string{}}
+	p := project{services: map[string]service{}}
 	err := filepath.WalkDir(root, func(dir string, d fs.DirEntry, err error) error {
 		switch {
 		case err != nil || !d.IsDir():
@@ -100,6 +103,12 @@ func load(root string) (project, error) {
 	if err != nil {
 		return p, err
 	}
+	p.index()
+	return p, nil
+}
+
+func (p *project) index() {
+	p.steps, p.consumes, p.produces = map[string]step{}, map[string][]string{}, map[string][]string{}
 	for _, name := range sorted(keys(p.services)) {
 		doc := p.services[name].doc
 		for _, in := range doc.Inputs {
@@ -111,7 +120,7 @@ func load(root string) (project, error) {
 			p.produces[out.Message] = append(p.produces[out.Message], name)
 		}
 	}
-	return p, nil
+	p.names = names(p.steps)
 }
 
 func kind(m string) string { k, _, _ := strings.Cut(m, " "); return k }
@@ -294,10 +303,46 @@ func sequence(branches []Branch) []send {
 
 var unsafe = regexp.MustCompile(`[^a-z0-9]+`)
 
+var cyrillic = strings.NewReplacer(
+	"а", "a", "б", "b", "в", "v", "г", "g", "д", "d", "е", "e", "ё", "e", "ж", "zh", "з", "z", "и", "i", "й", "y",
+	"к", "k", "л", "l", "м", "m", "н", "n", "о", "o", "п", "p", "р", "r", "с", "s", "т", "t", "у", "u", "ф", "f",
+	"х", "kh", "ц", "ts", "ч", "ch", "ш", "sh", "щ", "shch", "ъ", "", "ы", "y", "ь", "", "э", "e", "ю", "yu", "я", "ya",
+)
+
 // A page is named by its step, which stays put; a title is prose and may change.
-func slug(s step) string {
-	return strings.Trim(unsafe.ReplaceAllString(strings.ToLower(s.service+"-"+kind(s.input.Message)+"-"+short(s.input.Message)), "-"), "-")
+func (p project) slug(s step) string { return p.names[s.id()] }
+
+// A hash, not a counter: a renamed page loses its prose to orphaned, never to a neighbour.
+func names(steps map[string]step) map[string]string {
+	out := make(map[string]string, len(steps))
+	for name, ids := range named(steps, slices.Collect(maps.Keys(steps)), short) {
+		if len(ids) == 1 {
+			out[ids[0]] = name
+			continue
+		}
+		for full, same := range named(steps, ids, whole) {
+			for _, id := range same {
+				out[id] = full
+				if len(same) > 1 {
+					out[id] = fmt.Sprintf("%s-%x", full, sha256.Sum256([]byte(id)))[:len(full)+7]
+				}
+			}
+		}
+	}
+	return out
 }
+
+func named(steps map[string]step, ids []string, of func(string) string) map[string][]string {
+	out := map[string][]string{}
+	for _, id := range ids {
+		s := steps[id]
+		name := strings.Trim(unsafe.ReplaceAllString(cyrillic.Replace(strings.ToLower(s.service+"-"+kind(s.input.Message)+"-"+of(s.input.Message))), "-"), "-")
+		out[name] = append(out[name], id)
+	}
+	return out
+}
+
+func whole(m string) string { _, name, _ := strings.Cut(m, " "); return name }
 
 // The name of a message without its package: Service.Method for a call.
 func short(m string) string {
@@ -352,7 +397,7 @@ func Assemble(root, path string) (map[string][]byte, error) {
 		if !onward {
 			continue
 		}
-		f := Flow{Id: slug(s), Entry: id, From: p.senders(s), Steps: order}
+		f := Flow{Id: p.slug(s), Entry: id, From: p.senders(s), Steps: order}
 		if was, ok := prose[f.Id]; ok {
 			f.Title, f.Description, used[f.Id] = was.Title, was.Description, true
 		}
@@ -364,7 +409,7 @@ func Assemble(root, path string) (map[string][]byte, error) {
 	}
 	for _, id := range sorted(reached) {
 		order, _ := p.walk(id)
-		f := Flow{Id: slug(p.steps[id]), Entry: id, Steps: order}
+		f := Flow{Id: p.slug(p.steps[id]), Entry: id, Steps: order}
 		files[filepath.Join(filepath.Dir(path), f.Id+".md")] = page(p, f, false)
 	}
 	for _, id := range sorted(keys(prose)) {
