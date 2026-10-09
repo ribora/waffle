@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -29,17 +30,19 @@ type Doc struct {
 }
 
 type Input struct {
-	Message     string   `yaml:"message"`
-	Description string   `yaml:"description,omitempty"`
-	Fields      []string `yaml:"fields,omitempty"`
-	Branches    []Branch `yaml:"branches"`
+	Message     string              `yaml:"message"`
+	Description string              `yaml:"description,omitempty"`
+	Fields      []string            `yaml:"fields,omitempty"`
+	Needs       map[string][]string `yaml:"needs,omitempty"`
+	Branches    []Branch            `yaml:"branches"`
 }
 
 type Branch struct {
-	Sends       []string `yaml:"sends,omitempty"`
-	Refusal     string   `yaml:"refused,omitempty"`
-	Description string   `yaml:"description,omitempty"`
-	Cases       []string `yaml:"cases"`
+	Sends       []string            `yaml:"sends,omitempty"`
+	Sent        map[string][]string `yaml:"sent,omitempty"`
+	Refusal     string              `yaml:"refused,omitempty"`
+	Description string              `yaml:"description,omitempty"`
+	Cases       []string            `yaml:"cases"`
 }
 
 func (b Branch) refused() bool { return b.Refusal != "" }
@@ -77,6 +80,8 @@ func build(service string, records []trace.Record, cases features) Doc {
 	branches := map[string]map[key]*Branch{}
 	outputs := map[string]map[string]bool{}
 	fields := map[string]map[string]bool{}
+	received := map[*Branch]*shape{}
+	sentFields := map[*Branch]map[string]map[string]bool{}
 
 	for _, run := range scenarios(records) {
 		title := normal(run[0].Scenario)
@@ -88,11 +93,13 @@ func build(service string, records []trace.Record, cases features) Doc {
 		acting := func(r trace.Record) bool { return !marked || r.Step == "Action" }
 		last := -1
 		sent := map[int][]string{} // in the order it happened
+		carried := map[int]map[string]map[string]bool{}
 		for i, r := range run {
 			switch {
 			case r.Dir == "in" && acting(r):
 				last = i
 				sent[i] = []string{}
+				carried[i] = map[string]map[string]bool{}
 				m := message(r.Kind, r.Name)
 				if inputs[m] == nil {
 					inputs[m] = &Input{Message: m}
@@ -108,6 +115,10 @@ func build(service string, records []trace.Record, cases features) Doc {
 				paths(r.Request, outputs[m])
 				if last >= 0 && acting(r) {
 					sent[last] = append(sent[last], m)
+					if carried[last][m] == nil {
+						carried[last][m] = map[string]bool{}
+					}
+					paths(r.Request, carried[last][m])
 				}
 			}
 		}
@@ -124,9 +135,20 @@ func build(service string, records []trace.Record, cases features) Doc {
 					b.Sends = strings.Split(k.sends, "\n")
 				}
 				branches[m][k] = b
+				received[b] = &shape{}
+				sentFields[b] = map[string]map[string]bool{}
 			}
 			if !slices.Contains(b.Cases, label) {
 				b.Cases = append(b.Cases, label)
+			}
+			got := map[string]bool{}
+			paths(r.Request, got)
+			received[b].add(got)
+			for sm, fs := range carried[i] {
+				if sentFields[b][sm] == nil {
+					sentFields[b][sm] = map[string]bool{}
+				}
+				maps.Copy(sentFields[b][sm], fs)
 			}
 		}
 	}
@@ -135,8 +157,23 @@ func build(service string, records []trace.Record, cases features) Doc {
 	for _, m := range sorted(keys(inputs)) {
 		in := *inputs[m]
 		in.Fields = sorted(fields[m])
+		var answered []*Branch
+		for _, b := range branches[m] {
+			if !b.refused() {
+				answered = append(answered, b)
+			}
+		}
+		in.Needs = needs(received, answered)
 		for _, b := range branches[m] {
 			slices.Sort(b.Cases)
+			for sm, fs := range sentFields[b] {
+				if len(fs) > 0 {
+					if b.Sent == nil {
+						b.Sent = map[string][]string{}
+					}
+					b.Sent[sm] = sorted(fs)
+				}
+			}
 			in.Branches = append(in.Branches, *b)
 		}
 		slices.SortFunc(in.Branches, func(a, b Branch) int { return strings.Compare(a.anchor(in), b.anchor(in)) })
@@ -146,6 +183,58 @@ func build(service string, records []trace.Record, cases features) Doc {
 		doc.Outputs = append(doc.Outputs, Output{Message: m, Fields: sorted(outputs[m])})
 	}
 	return doc
+}
+
+type shape struct {
+	every, any map[string]bool
+}
+
+func (s *shape) add(got map[string]bool) {
+	if s.any == nil {
+		s.every, s.any = maps.Clone(got), map[string]bool{}
+	} else {
+		maps.DeleteFunc(s.every, func(f string, _ bool) bool { return !got[f] })
+	}
+	maps.Copy(s.any, got)
+}
+
+// A need splits the answered branches exactly, or fixtures naming a unit in most
+// cases would make the unit a need of the promo redeemed in some of them.
+func needs(received map[*Branch]*shape, answered []*Branch) map[string][]string {
+	messages := map[string]bool{}
+	for _, b := range answered {
+		for _, m := range b.Sends {
+			messages[m] = true
+		}
+	}
+	out := map[string][]string{}
+	for m := range messages {
+		var with, without []*Branch
+		for _, b := range answered {
+			if slices.Contains(b.Sends, m) {
+				with = append(with, b)
+			} else {
+				without = append(without, b)
+			}
+		}
+		if len(without) == 0 {
+			continue
+		}
+		split := maps.Clone(received[with[0]].every)
+		for _, b := range with[1:] {
+			maps.DeleteFunc(split, func(f string, _ bool) bool { return !received[b].every[f] })
+		}
+		for _, b := range without {
+			maps.DeleteFunc(split, func(f string, _ bool) bool { return received[b].any[f] })
+		}
+		if len(split) > 0 {
+			out[m] = sorted(split)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func passes(sends []string) []string {

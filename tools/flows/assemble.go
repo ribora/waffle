@@ -213,27 +213,99 @@ func (p project) entry(s step) bool {
 	return true
 }
 
-// Everything reachable from the entry through the branches that were not
-// refused, depth first: a step comes right after the first message that
-// reaches it, the way the diagram draws it. onward says whether anything did.
+// Everything reachable from the entry through the branches the flow takes,
+// depth first: a step comes right after the first message that reaches it, the
+// way the diagram draws it. onward says whether anything did.
 func (p project) walk(entry string) (order []string, onward bool) {
-	seen := map[string]bool{}
-	var visit func(id string)
-	visit = func(id string) {
-		seen[id] = true
-		order = append(order, id)
-		s := p.steps[id]
-		for _, sent := range sequence(s.input.Branches) {
-			for _, to := range p.receivers(s.service, sent.message) {
-				onward = true
-				if !seen[to] {
-					visit(to)
+	r := p.route(entry)
+	return r.order, r.onward
+}
+
+type route struct {
+	entry   string
+	order   []string
+	onward  bool
+	carried map[string]map[string]bool // step id -> the fields of what reaches it
+}
+
+// What reaches a step depends on the branches its senders take, which depends
+// on what reaches them: the walk repeats until that stops growing.
+func (p project) route(entry string) route {
+	carried := map[string]map[string]bool{}
+	for {
+		r := route{entry: entry, carried: carried}
+		next := map[string]map[string]bool{}
+		seen := map[string]bool{}
+		var visit func(id string)
+		visit = func(id string) {
+			seen[id] = true
+			r.order = append(r.order, id)
+			s := p.steps[id]
+			taken, _ := r.branches(s, id)
+			for _, sent := range sequence(taken) {
+				for _, to := range p.receivers(s.service, sent.message) {
+					r.onward = true
+					if next[to] == nil {
+						next[to] = map[string]bool{}
+					}
+					for _, b := range taken {
+						for _, f := range b.Sent[sent.message] {
+							next[to][f] = true
+						}
+					}
+					if !seen[to] {
+						visit(to)
+					}
 				}
 			}
 		}
+		visit(entry)
+		if maps.EqualFunc(next, carried, maps.Equal) {
+			return r
+		}
+		carried = next
 	}
-	visit(entry)
-	return order, onward
+}
+
+type folded struct {
+	message string
+	missing []string
+}
+
+// The entry is taken whole: nothing that reaches it is known.
+func (r route) branches(s step, id string) ([]Branch, []folded) {
+	if id == r.entry {
+		return s.input.Branches, nil
+	}
+	var by []folded
+	for _, m := range sorted(keys(s.input.Needs)) {
+		if missing := slices.DeleteFunc(slices.Clone(s.input.Needs[m]), func(f string) bool { return r.carried[id][f] }); len(missing) > 0 {
+			by = append(by, folded{message: m, missing: missing})
+		}
+	}
+	if len(by) == 0 {
+		return s.input.Branches, nil
+	}
+	isFolded := func(m string) bool { return slices.ContainsFunc(by, func(f folded) bool { return f.message == m }) }
+	whole := map[string]bool{}
+	for _, b := range s.input.Branches {
+		if !slices.ContainsFunc(b.Sends, isFolded) {
+			for _, m := range b.Sends {
+				whole[m] = true
+			}
+		}
+	}
+	var out []Branch
+	for _, b := range s.input.Branches {
+		lost := slices.ContainsFunc(b.Sends, isFolded)
+		b.Sends = slices.DeleteFunc(slices.Clone(b.Sends), isFolded)
+		// Its cases sent what this flow cannot; it stays only for what no other branch sends.
+		if lost && !b.refused() && !slices.ContainsFunc(b.Sends, func(m string) bool { return !whole[m] }) {
+			continue
+		}
+		out = append(out, b)
+	}
+	return out, by
 }
 
 // A message as a branch sends it: the nth time that branch sends it.

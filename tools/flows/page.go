@@ -31,7 +31,8 @@ func page(p project, f Flow, entry bool) []byte {
 	for i, id := range f.Steps {
 		number[id] = i + 1
 	}
-	d := diagram{p: p, b: &b, number: number, drawn: map[string]bool{}}
+	r := p.route(f.Entry)
+	d := diagram{p: p, r: r, b: &b, number: number, drawn: map[string]bool{}}
 	b.WriteString("```mermaid\nsequenceDiagram\n")
 	b.WriteString("  participant ext_in as in\n")
 	var services []string
@@ -62,6 +63,10 @@ func page(p project, f Flow, entry bool) []byte {
 		}
 		for _, br := range s.input.Branches {
 			fmt.Fprintf(&b, "- %s — %s\n", p.branchName(s, br), count(len(br.Cases)))
+		}
+		_, by := r.branches(s, id)
+		for _, f := range by {
+			fmt.Fprintf(&b, "- not followed here: %s — %s\n", p.branchName(s, Branch{Sends: []string{f.message}}), needing(f.missing))
 		}
 		fmt.Fprintf(&b, "\nIts cases: [%s](%s.md)\n", p.slug(s), p.slug(s))
 	}
@@ -172,8 +177,13 @@ func count(n int) string {
 	return fmt.Sprintf("%d cases", n)
 }
 
+func needing(fields []string) string {
+	return "sent only in cases that carried " + strings.Join(fields, ", ") + ", which nothing reaching it carries"
+}
+
 type diagram struct {
 	p      project
+	r      route
 	b      *strings.Builder
 	number map[string]int
 	drawn  map[string]bool
@@ -183,6 +193,8 @@ func (d *diagram) from(id string, depth int) {
 	d.drawn[id] = true
 	s := d.p.steps[id]
 	in := s.input
+	var by []folded
+	in.Branches, by = d.r.branches(s, id)
 	type arrowTo struct {
 		send
 		to string
@@ -245,6 +257,10 @@ func (d *diagram) from(id string, depth int) {
 	for len(open) > 0 {
 		open = open[:len(open)-1]
 		fmt.Fprintf(d.b, "%send\n", pad())
+	}
+	for _, f := range by {
+		fmt.Fprintf(d.b, "%sNote over %s: not followed: %s — %s\n", pad(), participant(s.service),
+			sequenceText(d.p.branchName(s, Branch{Sends: []string{f.message}})), sequenceText(needing(f.missing)))
 	}
 }
 

@@ -77,6 +77,8 @@ go test ./tests/... -args -flows.update
 
 The file lists every input, and under each its **branches**: the cases that, having received it, sent the same messages on in the same order, or were refused the same way. A refusal is named by what a case asserts about it — `NotFound contract_not_found`, `HTTP 403 forbidden` — not by its message, which carries ids. A block sent again straight after itself is one pass of a loop, so the number of items a case had does not split its branch; a message sent again after others is a step of its own. A case in two branches — a scenario that received the input twice by different paths — is two cases.
 
+A branch also records the fields of what it sent, by message, under `sent`. The input records under `needs`, by message it sends, the fields that split its answered branches exactly: carried in every case of the branches sending the message, in no case of the others. Anything weaker is the fixtures' habits — a `comment` most cases fill, a unit most cases name while a promo is redeemed in one of them — and would make a need of it. A refusal is left out, since any body can be refused. Values are never compared: two suites' fixtures share field names through the contract, not values.
+
 `description` fields are the only thing written by hand. They are kept by anchor across rewrites; one whose input or branch is gone moves to `orphaned`, and the check fails until somebody deletes it or moves it.
 
 ## The project's flows
@@ -89,6 +91,8 @@ The file lists every input, and under each its **branches**: the cases that, hav
 finds every waffle service below `root` the way `go test ./...` finds packages, takes them as the whole system, and writes the index and the pages beside it; `check` writes nothing and fails on any difference. A flow starts at every way in: a route, a command, or a message no traced service sends. A monorepo keeps them in its own directory — `.docs/flows/` — and runs the command from its root; the index is the project's, not a service's.
 
 **Pages.** One per flow, and one per input a flow reaches. A flow's page draws the sequence, each step's sends nested under the arrow that reached it and inside the condition — "in 2 of 3 cases of step 1" — that made them; an event a service consumes itself is marked. The page lists the cases of its own input with their comments from the `.feature` file; a step further on shows its branches and how many cases each has, and links to its own page, so a step many flows share — authentication, say — is written once.
+
+A step further on is drawn with what this flow can make it send. A message that needs a field nothing reaching the step carries — a saved card's `methodId`, when the flow pays with a new card — is folded to a note on the step and a line under its branches, and is not followed. The note says what the cases show, not what the code allows: either the message cannot be sent here, or the receiver has no case sending it with what this flow carries. It is folded, not dropped, so the second reading stays on the page as a gap to close.
 
 **The index** holds, besides the flows:
 
