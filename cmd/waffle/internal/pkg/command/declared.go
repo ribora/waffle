@@ -1,6 +1,7 @@
 package command
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -56,5 +57,5 @@ func declaresType(file *ast.File, name string) bool {
 // KeptAs reports a declaration left alone because it is already there, naming
 // where it was found — the file it is in is rarely the one that was asked for.
 func KeptAs(name, where string) {
-	reportAction(name + " — declared in " + filepath.ToSlash(where) + ", kept")
+	_, _ = fmt.Fprintf(output, "  %s %s — declared in %s, kept\n", keepMark, name, filepath.ToSlash(where))
 }

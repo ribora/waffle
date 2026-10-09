@@ -76,6 +76,20 @@ func TestSecondRunSaysWhatItKept(t *testing.T) {
 	}
 }
 
+func TestKeptDeclarationIsMarkedKept(t *testing.T) {
+	_, log := scaffoldIn(t)
+
+	KeptAs("model.User", filepath.Join("domain", "user", "model", "user.go"))
+
+	got := log.String()
+	if !strings.Contains(got, "= model.User — declared in domain/user/model/user.go, kept") {
+		t.Errorf("the kept declaration was not marked as kept:\n%s", got)
+	}
+	if strings.Contains(got, "+ model.User") {
+		t.Errorf("a kept declaration was reported as created:\n%s", got)
+	}
+}
+
 // A target that cannot be read is the one case where skipping is wrong: it used to
 // count as "already there" and pass in silence.
 func TestUnreadableTargetIsAnError(t *testing.T) {
