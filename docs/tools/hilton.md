@@ -91,7 +91,7 @@ someone changes how the error is wrapped.
 | gRPC server, client | the code (`NotFound`, `Unavailable`) |
 | AMQP consumer | the failure type, else `_OTHER`; a caught panic is `panic` |
 | Redis | `no_rows`, `wrong_type`, `cluster`, `auth`, `timeout`, `connect`, … else `_OTHER` |
-| SQL | `conflict`, `deadlock`, `no_rows`, `bad_request`, `internal`, `connect`, `tx`, else `_OTHER` |
+| SQL | `conflict`, `deadlock`, `no_rows`, `bad_request`, `no_column`, `internal`, `connect`, `tx`, else `_OTHER` |
 | Elasticsearch | the cluster's exception type (`index_not_found_exception`), else `wrong_response`, `unknown_response` or `_OTHER` |
 | CLI command | `usage`, else the failure type, else `_OTHER` |
 
