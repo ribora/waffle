@@ -2,6 +2,7 @@ package replacements
 
 import (
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -121,6 +122,41 @@ type Replacements struct {
 	}
 	if got.Composite() {
 		t.Error("a single-element []T collection reports itself as composite")
+	}
+}
+
+func TestReadSeamsForPointerCollections(t *testing.T) {
+	c := writeContainer(t, `package diogen
+
+import fw "example.com/svc/framework"
+
+type DB struct{}
+
+type Replacements struct {
+	PoolConnections       []*DB
+	FwHandlerAsHandlerTag []*fw.Handler
+}
+`)
+
+	seams, err := ReadSeams(c, "example.com/svc/config/diogen")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := []Seam{
+		{Field: "PoolConnections", Types: []TypeRef{{"example.com/svc/config/diogen", "DB"}}},
+		{Field: "FwHandlerAsHandlerTag", Types: []TypeRef{{"example.com/svc/framework", "Handler"}}},
+	}
+	if !reflect.DeepEqual(seams, want) {
+		t.Errorf("= %+v, want %+v", seams, want)
+	}
+}
+
+func TestReadSeamsRefusesAPointerSeam(t *testing.T) {
+	c := writeContainer(t, "package diogen\n\ntype DB struct{}\n\ntype Replacements struct{ Db *DB }\n")
+
+	if _, err := ReadSeams(c, "example.com/svc/config/diogen"); err == nil {
+		t.Fatal("a pointer outside a collection read as a seam")
 	}
 }
 

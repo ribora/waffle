@@ -135,12 +135,16 @@ func replacementFields(file *ast.File) ([]*ast.Field, error) {
 
 func typeRefs(expr ast.Expr, aliases map[string]string, self string) ([]TypeRef, error) {
 	switch t := expr.(type) {
-	// A di.Tags(tag)
+	// A di.Tags(tag) or a di.List
 	case *ast.ArrayType:
 		if t.Len != nil {
 			return nil, fmt.Errorf("unexpected fixed-size array — every seam is an interface or a []T tag collection")
 		}
-		return typeRefs(t.Elt, aliases, self)
+		elem := t.Elt
+		if pointer, ok := elem.(*ast.StarExpr); ok {
+			elem = pointer.X
+		}
+		return typeRefs(elem, aliases, self)
 	case *ast.InterfaceType:
 		var out []TypeRef
 		for _, embedded := range t.Methods.List {
