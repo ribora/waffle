@@ -26,6 +26,10 @@ func Extract(root string) (Surface, error) {
 	if err != nil {
 		return Surface{}, err
 	}
+	cfg, err := LoadConfig(root)
+	if err != nil {
+		return Surface{}, err
+	}
 	fset := token.NewFileSet()
 	pkgs, err := packages.Load(&packages.Config{
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes | packages.NeedTypesInfo,
@@ -50,7 +54,10 @@ func Extract(root string) (Surface, error) {
 	for _, p := range own {
 		roots = append(roots, p.Types)
 	}
-	x := &extraction{root: root, fset: fset, callers: map[*types.Func][]site{}, libs: reachable(roots)}
+	x := &extraction{root: root, module: module, fset: fset, callers: map[*types.Func][]site{}, libs: reachable(roots), configured: map[string]bool{}}
+	for _, key := range cfg.Prefixes {
+		x.configured[key] = false
+	}
 	for _, p := range own {
 		for _, f := range p.Syntax {
 			ast.Inspect(f, func(n ast.Node) bool {
@@ -63,7 +70,7 @@ func Extract(root string) (Surface, error) {
 			})
 		}
 	}
-	out := Surface{Version: Version, Service: service(module)}
+	out := Surface{Specrig: Format, Service: service(module)}
 	for _, p := range own {
 		for _, f := range p.Syntax {
 			for _, d := range f.Decls {
@@ -127,6 +134,11 @@ func Extract(root string) (Surface, error) {
 			}
 		}
 	}
+	for key, read := range x.configured {
+		if !read {
+			x.lost = append(x.lost, ConfigFile+": flows.prefixes names "+key+", which no group prefix reads")
+		}
+	}
 	if len(x.lost) > 0 {
 		slices.Sort(x.lost)
 		return Surface{}, fmt.Errorf("%s", strings.Join(slices.Compact(x.lost), "\n"))
@@ -149,11 +161,13 @@ func suite(root, file string) bool {
 }
 
 type extraction struct {
-	root    string
-	fset    *token.FileSet
-	callers map[*types.Func][]site
-	libs    map[string]*types.Package
-	lost    []string
+	root       string
+	module     string
+	fset       *token.FileSet
+	callers    map[*types.Func][]site
+	libs       map[string]*types.Package
+	configured map[string]bool // flows.prefixes, each true once a group prefix reads it
+	lost       []string
 }
 
 type site struct {

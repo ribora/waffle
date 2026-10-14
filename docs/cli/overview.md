@@ -27,8 +27,8 @@ go install gitlab.com/gorib/waffle/cmd/waffle@latest
 | `waffle make:outbox --driver <id>` | Enable the transactional outbox: the table, its migration runner, the module and the named broker driver under `config/tools/outbox`. See [tools/outbox](../tools/outbox.md) |
 | `waffle tests:harness` | Regenerate the component harness from the container; the first run also scaffolds the suite ([details](../conventions/component-harness.md)) |
 | `waffle tests:replacements [check] [--container=<path>]` | List everything the containers expose and what `replacements.allow` grants; `check` fails if a test replaces a field the list does not name |
-| `waffle flows record` | Write `tests/surface.yaml`: what the service publishes, consumes, serves and calls, from its code ([details](../conventions/flows.md#the-codes-record)) |
-| `waffle flows [check] <root> <index.yaml>` | Assemble the flows of every service below `root` into an index and pages; `check` fails on a stale page and on what the services' records leave unclosed ([details](../conventions/flows.md#the-projects-flows)) |
+| `waffle surface` | Write `tests/surface.yaml`: what the service publishes, consumes, serves and calls, from its code; the `generate` target runs it ([details](../conventions/flows.md#the-codes-record)) |
+| `waffle flows <root> <index.yaml>` | Assemble the flows of every service below `root` into an index and pages; fails on what the services' records leave unclosed ([details](../conventions/flows.md#the-projects-flows)) |
 | `waffle agents` | Regenerate `AGENTS.md` after a waffle upgrade ([details](agents.md)) |
 | `waffle agents:guard <mode> <path>`, `waffle agents:mode <mode>`, `waffle agents:grant <mode>` | Rule #11's modes, areas and grants, for a tool that enforces them ([details](agents.md#modes-areas-and-grants)) |
 
@@ -149,10 +149,11 @@ Project-level conventions live in `waffle.yaml`, next to `go.mod`. `init:service
 | `proto_dir` | `api/proto` | Where `.proto` sources are written |
 | `mapper` | `"goverter"` | `"goverter"` scaffolds a goverter `convert/convert.go`; `"dto"` scaffolds nothing extra (hand-written conversions) |
 | `replacements.allow` | empty | Interfaces a test may supply on the container's `Replacements`, keyed by import path: `gitlab.com/gorib/sql: [Db]`. A permission list — an empty one allows nothing |
-| `flows.clients` | empty | An HTTP client's host, by its key in `tests/surface.yaml`, where the set cannot tell it: a party outside the set (`…adapter.bladeRunner.client: bladerunner`), or the last resort on a tie. The check refuses one it does not need. See [flows](../conventions/flows.md#the-codes-record) |
 | `agents.areas` | `model`, `gomod` | Named sets of paths that Rule #11's modes open, or that the human grants on top of a mode; paths may leave the service. See [agents](agents.md#modes-areas-and-grants) |
 
 `<service>` is the last path segment of the module name. A missing `waffle.yaml`, or one missing some keys, behaves exactly like a file containing only the defaults above — the two are indistinguishable to every command. An unknown key (e.g. a typo) is a hard error, and an invalid `mapper` value (anything other than `dto` or `goverter`) is a hard error.
+
+What a record of the service cannot learn from its code — `flows.clients`, `flows.prefixes` — is not here but in `specrig.yaml`, beside it, and only where there is something to declare. See [flows](../conventions/flows.md#the-codes-record).
 
 The whisk generator keeps its own `whisk.yaml` beside it, on the same missing-is-defaults rule. `make:domain:http` and `make:domain:scribus` write it the first time they pull whisk in, and never overwrite one you have edited; the keys are documented in [whisk's README](https://gitlab.com/gorib/whisk#whiskyaml).
 

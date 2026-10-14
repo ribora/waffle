@@ -187,7 +187,7 @@ Standard targets:
 
 | Target | Description |
 |--------|-------------|
-| `make generate` | Run all code generators (DI, store) |
+| `make generate` | Run all code generators (DI, store), then write `tests/surface.yaml` and `AGENTS.md` |
 | `make .tidy` | `go mod tidy` |
 | `make test` | `go test ./...` — before a commit, and in CI |
 | `make build` | Build the binary into `bin/` |

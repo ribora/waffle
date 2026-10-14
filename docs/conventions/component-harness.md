@@ -25,7 +25,6 @@ The first run — the one that finds no `harness.go` — also writes the suite a
 | `tests/migrations_test.go` | `CheckMigrations` as an ordinary test, for a service with a database |
 | `config/diogen/replacements_test.go` | `replacements.Check()` as an ordinary test |
 | `config/diogen/boundaries_test.go` | `boundaries.Check()` as an ordinary test |
-| `tests/surface_test.go` | `surface.Check()` as an ordinary test: the service's record of what it sends and receives, see [flows](flows.md) |
 
 A scaffold deleted on purpose stays deleted; `harness_gen.go` is the only file a later run touches.
 

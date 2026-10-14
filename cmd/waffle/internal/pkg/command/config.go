@@ -10,7 +10,6 @@ import (
 
 	"gitlab.com/gorib/waffle/internal/gomod"
 	"gitlab.com/gorib/waffle/replacements"
-	"gitlab.com/gorib/waffle/surface"
 )
 
 // Config mirrors waffle.yaml.
@@ -20,7 +19,6 @@ type Config struct {
 	Mapper       string              `yaml:"mapper"`
 	Replacements replacements.Config `yaml:"replacements"`
 	Agents       AgentsConfig        `yaml:"agents"`
-	Flows        surface.Config      `yaml:"flows"`
 }
 
 type AgentsConfig struct {
@@ -73,9 +71,6 @@ func (c *Command) ProjectConfig(projectName string) (Config, error) {
 		return Config{}, fmt.Errorf("waffle.yaml: mapper must be \"dto\" or \"goverter\", got %q", cfg.Mapper)
 	}
 	if err := cfg.Replacements.Validate(); err != nil {
-		return Config{}, err
-	}
-	if err := cfg.Flows.Validate(); err != nil {
 		return Config{}, err
 	}
 

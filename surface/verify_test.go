@@ -60,11 +60,12 @@ func TestVerifyMatchesRequestsToRoutesAndLetsTheRestLeave(t *testing.T) {
 	r, err := Verify([]Surface{
 		{Service: "herald", Calls: []string{
 			"POST /api/render/text", "GET /documents/{}", "GET /elsewhere", "GET payments/{}",
-			"POST https://api.acquirer.test/v3/payments", "GET external",
+			"POST https://api.acquirer.test/v3/payments", "GET external", "GET /s/links/{}",
 		}},
 		{Service: "renderer", Serves: []string{"POST /api/render/text", "GET /documents/{id}"}},
 		{Service: "archive", Serves: []string{"GET /documents/{id}"}},
 		{Service: "media", Serves: []string{"GET /*"}},
+		{Service: "shortener", Serves: []string{"GET {}/links/{code}"}},
 		{Service: "apostle", Serves: []string{"GET /admin/users/{userId}"}},
 	})
 	if err != nil {
@@ -74,6 +75,7 @@ func TestVerifyMatchesRequestsToRoutesAndLetsTheRestLeave(t *testing.T) {
 		Ambiguous: []string{"GET /documents/{} (by herald, routed by archive, renderer)"},
 		Outside: []string{
 			"GET /elsewhere (by herald)",
+			"GET /s/links/{} (by herald)",
 			"GET external (by herald)",
 			"GET payments/{} (by herald)",
 			"POST https://api.acquirer.test/v3/payments (by herald)",
@@ -184,8 +186,8 @@ func TestConfigRefusesAClientWithoutAHost(t *testing.T) {
 
 func TestLoadConfigReadsTheFlowsGroupAlone(t *testing.T) {
 	dir := t.TempDir()
-	body := "mapper: dto\nflows:\n  clients:\n    adapter.archive.client: archive\n"
-	if err := os.WriteFile(filepath.Join(dir, "waffle.yaml"), []byte(body), 0o644); err != nil {
+	body := "agents:\n  areas: {}\nflows:\n  clients:\n    adapter.archive.client: archive\n"
+	if err := os.WriteFile(filepath.Join(dir, ConfigFile), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := LoadConfig(dir)

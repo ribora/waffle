@@ -99,8 +99,8 @@ os.Exit(1)
 trace.Enable("{{.Service}}")
 
 code := m.Run()
-if code == 0 && flows.Complete() {
-if err := flows.Check("flows.yaml", "{{.Service}}", trace.Records()); err != nil {
+if flows.Complete() {
+if err := flows.Write("flows.yaml", "{{.Service}}", trace.Records()); err != nil {
 _, _ = fmt.Fprintln(os.Stderr, err)
 code = 1
 }

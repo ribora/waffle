@@ -16,13 +16,15 @@ import (
 	"gitlab.com/gorib/waffle/tools/trace"
 )
 
-var update = flag.Bool("flows.update", false, "rewrite tests/flows.yaml from this run instead of checking it")
-
 // A suite may move the working directory to isolate its files; the package
 // directory is where the test binary started.
 var home, _ = os.Getwd()
 
+// Format is what this waffle writes under specrig: and the newest it reads.
+const Format = "flows/1"
+
 type Doc struct {
+	Specrig  string   `yaml:"specrig"`
 	Service  string   `yaml:"service"`
 	Inputs   []Input  `yaml:"inputs"`
 	Outputs  []Output `yaml:"outputs,omitempty"`
@@ -54,7 +56,8 @@ type Output struct {
 
 type Orphan struct {
 	Anchor      string `yaml:"anchor"`
-	Description string `yaml:"description"`
+	Title       string `yaml:"title,omitempty"`
+	Description string `yaml:"description,omitempty"`
 }
 
 func message(kind, name string) string { return kind + " " + name }
@@ -153,7 +156,7 @@ func build(service string, records []trace.Record, cases features) Doc {
 		}
 	}
 
-	doc := Doc{Service: service}
+	doc := Doc{Specrig: Format, Service: service}
 	for _, m := range sorted(keys(inputs)) {
 		in := *inputs[m]
 		in.Fields = sorted(fields[m])
@@ -277,7 +280,8 @@ func scenarios(records []trace.Record) [][]trace.Record {
 	return out
 }
 
-// Carries the prose of old onto fresh by anchor; what finds no anchor is orphaned.
+// Carries the prose of old onto fresh by anchor, the orphaned included: a failing
+// run loses an anchor the passing one brings back. What finds none is orphaned.
 func reconcile(old, fresh Doc) Doc {
 	prose := map[string]string{}
 	for _, in := range old.Inputs {
@@ -288,6 +292,13 @@ func reconcile(old, fresh Doc) Doc {
 			if b.Description != "" {
 				prose[b.anchor(in)] = b.Description
 			}
+		}
+	}
+	for _, o := range old.Orphaned {
+		if _, live := prose[o.Anchor]; live {
+			fresh.Orphaned = append(fresh.Orphaned, o)
+		} else {
+			prose[o.Anchor] = o.Description
 		}
 	}
 	used := map[string]bool{}
@@ -303,7 +314,6 @@ func reconcile(old, fresh Doc) Doc {
 			}
 		}
 	}
-	fresh.Orphaned = slices.Clone(old.Orphaned)
 	for _, a := range sorted(keys(prose)) {
 		if !used[a] {
 			fresh.Orphaned = append(fresh.Orphaned, Orphan{Anchor: a, Description: prose[a]})
@@ -312,8 +322,8 @@ func reconcile(old, fresh Doc) Doc {
 	return fresh
 }
 
-const header = "# Generated from the component suite by waffle. The structure is rewritten by\n" +
-	"# `go test ./tests/... -args -flows.update`; only the description fields are yours.\n"
+const header = "# Generated from the component suite by waffle: every whole run rewrites the\n" +
+	"# structure; only the description fields are yours.\n"
 
 func encode(v any) []byte {
 	var b bytes.Buffer
@@ -337,9 +347,9 @@ func Complete() bool {
 	})
 }
 
-// Check compares what the suite traced with the document at path, or rewrites
-// the document under -flows.update. The cases are read from ./feature.
-func Check(path, service string, records []trace.Record) error {
+// Write rewrites the document at path from what the suite traced, keeping its
+// prose. The cases are read from ./feature.
+func Write(path, service string, records []trace.Record) error {
 	path = filepath.Join(home, path)
 	fresh := build(service, records, readFeatures(filepath.Join(home, "feature")))
 	var old Doc
@@ -356,64 +366,15 @@ func Check(path, service string, records []trace.Record) error {
 	}
 	merged := reconcile(old, fresh)
 	body := append([]byte(header), encode(merged)...)
-
-	if *update {
+	if !bytes.Equal(current, body) {
 		if err := os.WriteFile(path, body, 0o644); err != nil {
 			return err
 		}
-		if len(merged.Orphaned) > 0 {
-			return fmt.Errorf("%s: rewritten, and %d descriptions lost their anchor — see orphaned", path, len(merged.Orphaned))
-		}
-		return nil
-	}
-	if !bytes.Equal(current, body) {
-		return fmt.Errorf("%s does not match what the suite traced:\n%s\nrewrite it with `go test ./tests/... -args -flows.update` and review the diff",
-			path, summary(old, merged))
 	}
 	if len(merged.Orphaned) > 0 {
 		return fmt.Errorf("%s: %d descriptions lost their anchor — delete them or move them under the input or branch they belong to now", path, len(merged.Orphaned))
 	}
 	return nil
-}
-
-// What changed, by anchor: enough to see a renamed key or a case gone without
-// reading the whole file.
-func summary(old, fresh Doc) string {
-	anchors := func(d Doc) map[string]bool {
-		out := map[string]bool{}
-		for _, in := range d.Inputs {
-			out["input "+in.anchor()] = true
-			for _, b := range in.Branches {
-				out["branch "+b.anchor(in)] = true
-				for _, c := range b.Cases {
-					out["case "+c+"  ["+b.anchor(in)+"]"] = true
-				}
-			}
-		}
-		for _, o := range d.Outputs {
-			out["output "+o.Message] = true
-		}
-		return out
-	}
-	was, now := anchors(old), anchors(fresh)
-	var lines []string
-	for _, a := range sorted(was) {
-		if !now[a] {
-			lines = append(lines, "  - "+a)
-		}
-	}
-	for _, a := range sorted(now) {
-		if !was[a] {
-			lines = append(lines, "  + "+a)
-		}
-	}
-	if len(lines) == 0 {
-		lines = append(lines, "  (the fields of a message changed)")
-	}
-	if len(lines) > 40 {
-		lines = append(lines[:40], fmt.Sprintf("  … and %d more", len(lines)-40))
-	}
-	return strings.Join(lines, "\n")
 }
 
 func keys[V any](m map[string]V) map[string]bool {

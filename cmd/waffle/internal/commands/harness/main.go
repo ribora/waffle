@@ -118,7 +118,6 @@ func scaffold(params map[string]any, found found) map[string]string {
 		tpl("harness.go.tpl"):           filepath.Join(harnessDir, "harness.go"),
 		tpl("suite_test.go.tpl"):        filepath.Join("tests", "suite_test.go"),
 		tpl("boot_test.go.tpl"):         filepath.Join("tests", "boot_test.go"),
-		tpl("surface_test.go.tpl"):      filepath.Join("tests", "surface_test.go"),
 		tpl("replacements_test.go.tpl"): filepath.Join(container, "replacements_test.go"),
 		tpl("boundaries_test.go.tpl"):   filepath.Join(container, "boundaries_test.go"),
 	}

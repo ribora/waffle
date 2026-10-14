@@ -1,6 +1,7 @@
 package surface
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -14,7 +15,7 @@ func TestExtractReadsWhatCrossesTheEdge(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := Surface{
-		Version:   Version,
+		Specrig:   Format,
 		Service:   "shop",
 		Publishes: []string{"orders.canceled", "orders.created", "orders.placed", "orders.updated", "refunds.issued"},
 		Consumes:  []string{"payments.refunded", "payments.succeeded", "stock.#"},
@@ -67,16 +68,81 @@ func send(ctx context.Context, p outbox.Publisher) error { return p.Enqueue(ctx,
 	}
 }
 
-func TestReadRefusesANewerFormat(t *testing.T) {
+func TestExtractWritesAPrefixNamedInFlowsPrefixes(t *testing.T) {
+	got, err := Extract(shortener(t, "flows:\n  prefixes:\n    - web.router.path\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"GET {}/*"}; !reflect.DeepEqual(got.Serves, want) {
+		t.Errorf("got %v, want %v", got.Serves, want)
+	}
+}
+
+func TestExtractRefusesAPrefixFlowsPrefixesMisses(t *testing.T) {
+	_, err := Extract(shortener(t, "flows:\n  prefixes:\n    - web.router.gone\n"))
+	for _, want := range []string{
+		"web/web.go:8 (web.router.path): routes under a mux whose group prefix cannot be told",
+		"specrig.yaml: flows.prefixes names web.router.gone, which no group prefix reads",
+	} {
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("got %v, want %q", err, want)
+		}
+	}
+}
+
+func shortener(t *testing.T, config string) string {
+	t.Helper()
+	dir := t.TempDir()
+	http, err := filepath.Abs(filepath.Join("testdata", "cases", "shop", "fake", "http"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(dir, "web"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(dir, "go.mod"), "module example.com/shortener\n\ngo 1.27.0\n\n"+
+		"require gitlab.com/gorib/http v0.0.0\n\nreplace gitlab.com/gorib/http => "+http+"\n")
+	write(t, filepath.Join(dir, "specrig.yaml"), config)
+	write(t, filepath.Join(dir, "web", "web.go"), `package web
+
+import "gitlab.com/gorib/http/server"
+
+type router struct{ path string }
+
+func (r *router) Setup(mux server.Mux) {
+	g := mux.Group(r.path)
+	g.Get("/*")
+}
+`)
+	return dir
+}
+
+func TestReadRefusesANewerFormatAndAnotherKind(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "surface.yaml")
-	write(t, file, "version: 2\nservice: shop\n")
-	if _, err := Read(file); err == nil || !strings.Contains(err.Error(), "newer than this waffle reads") {
-		t.Fatalf("got %v, want a refusal of version 2", err)
+	for body, want := range map[string]string{
+		"specrig: surface/2\nservice: shop\n": "newer than this waffle reads",
+		"specrig: flows/1\nservice: shop\n":   "not a surface record",
+		"<<<<<<< HEAD\nspecrig: surface/1\n":  "yaml:",
+	} {
+		write(t, file, body)
+		if _, err := Read(file); err == nil || !strings.Contains(err.Error(), want) || errors.Is(err, ErrForeign) {
+			t.Errorf("%q: got %v, want %q", body, err, want)
+		}
+	}
+}
+
+func TestReadTellsAFileThatDoesNotSayItIsARecord(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "surface.yaml")
+	for _, body := range []string{"version: 1\nservice: shop\n", "- a list\n", ""} {
+		write(t, file, body)
+		if _, err := Read(file); !errors.Is(err, ErrForeign) {
+			t.Errorf("%q: got %v, want ErrForeign", body, err)
+		}
 	}
 }
 
 func TestEncodeReadsBack(t *testing.T) {
-	s := Surface{Version: Version, Service: "shop", Publishes: []string{"a.b"}, Calls: []string{"/x.Y/Z"}}
+	s := Surface{Specrig: Format, Service: "shop", Publishes: []string{"a.b"}, Calls: []string{"/x.Y/Z"}}
 	file := filepath.Join(t.TempDir(), "surface.yaml")
 	write(t, file, string(s.Encode()))
 	got, err := Read(file)

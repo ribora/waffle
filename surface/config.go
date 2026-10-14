@@ -10,17 +10,21 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// ConfigFile holds what a record cannot learn from the code, at the service's root.
+const ConfigFile = "specrig.yaml"
+
 type Config struct {
-	Clients map[string]string `yaml:"clients"`
+	Clients  map[string]string `yaml:"clients"`
+	Prefixes []string          `yaml:"prefixes"`
 }
 
 func (c Config) Validate() error {
 	for client, host := range c.Clients {
 		if strings.TrimSpace(client) == "" {
-			return errors.New("waffle.yaml: flows.clients has a client with no key")
+			return errors.New(ConfigFile + ": flows.clients has a client with no key")
 		}
 		if strings.TrimSpace(host) == "" {
-			return fmt.Errorf("waffle.yaml: flows.clients names no host for %s", client)
+			return fmt.Errorf("%s: flows.clients names no host for %s", ConfigFile, client)
 		}
 	}
 	return nil
@@ -31,17 +35,17 @@ type projectFile struct {
 }
 
 func LoadConfig(dir string) (Config, error) {
-	body, err := os.ReadFile(filepath.Join(dir, "waffle.yaml"))
+	body, err := os.ReadFile(filepath.Join(dir, ConfigFile))
 	if errors.Is(err, os.ErrNotExist) {
 		return Config{}, nil
 	}
 	if err != nil {
 		return Config{}, err
 	}
-	// Not KnownFields: the rest of the file belongs to the generators.
+	// Not KnownFields: waffle reads only the flows group of a file specrig shares.
 	var file projectFile
 	if err := yaml.Unmarshal(body, &file); err != nil {
-		return Config{}, fmt.Errorf("%s: %w", filepath.Join(dir, "waffle.yaml"), err)
+		return Config{}, fmt.Errorf("%s: %w", filepath.Join(dir, ConfigFile), err)
 	}
 	return file.Flows, file.Flows.Validate()
 }

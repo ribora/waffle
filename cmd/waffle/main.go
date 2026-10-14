@@ -25,6 +25,7 @@ import (
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/repository"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/scribus"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/service"
+	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/surface"
 	cmdpkg "gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
 )
 
@@ -82,6 +83,7 @@ func newCommands() commands {
 	cmds.Add(cmdcommand.New())
 	cmds.Add(converter.New())
 	cmds.Add(harness.New())
+	cmds.Add(surface.New())
 	cmds.Add(flows.New())
 	cmds.Add(replacements.New())
 	cmds.Add(agents.New())

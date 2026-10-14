@@ -61,7 +61,7 @@ func (x *extraction) routes(p *packages.Package, fd *ast.FuncDecl, call *ast.Cal
 	x.fail(lost, "routes a path that is not a constant — it is a contract, give it one")
 	sel, _ := call.Fun.(*ast.SelectorExpr)
 	prefixes, lost := x.prefixes(p, fd, sel.X, 3)
-	x.fail(lost, "routes under a mux whose group prefix cannot be told")
+	x.fail(lost, "routes under a mux whose group prefix cannot be told — a field configuration sets goes under flows.prefixes in "+ConfigFile)
 	var out []string
 	for _, m := range x.verbs(p, fd, call, s) {
 		for _, pre := range prefixes {
@@ -88,7 +88,10 @@ func (x *extraction) fail(lost []string, why string) {
 	}
 }
 
-const external = "external"
+const (
+	external     = "external"
+	configPrefix = "{}"
+)
 
 var verbs = regexp.MustCompile(`%%|%[-+# 0]*[0-9*]*(\.[0-9*]+)?[a-zA-Z]`)
 
@@ -123,7 +126,7 @@ func (x *extraction) prefixes(p *packages.Package, fd *ast.FuncDecl, e ast.Expr,
 			return nil, lost
 		}
 		outer, l1 := x.prefixes(p, fd, sel.X, depth)
-		own, l2 := x.resolve(p, fd, v.Args[0], depth)
+		own, l2 := x.prefix(p, fd, v.Args[0], depth)
 		return concat(outer, own), append(l1, l2...)
 	case *ast.Ident:
 		variable, ok := p.TypesInfo.Uses[v].(*types.Var)
@@ -181,6 +184,37 @@ func (x *extraction) prefixes(p *packages.Package, fd *ast.FuncDecl, e ast.Expr,
 	return nil, lost
 }
 
+func (x *extraction) prefix(p *packages.Package, fd *ast.FuncDecl, e ast.Expr, depth int) ([]string, []string) {
+	if s, ok := stringConstant(p.TypesInfo, e); ok {
+		return []string{s}, nil
+	}
+	key, ok := x.fieldKey(p, e)
+	if !ok {
+		return x.follow(p, fd, e, depth, x.prefix)
+	}
+	if _, named := x.configured[key]; !named {
+		return nil, []string{x.at(e.Pos()) + " (" + key + ")"}
+	}
+	x.configured[key] = true
+	return []string{configPrefix}, nil
+}
+
+func (x *extraction) fieldKey(p *packages.Package, e ast.Expr) (string, bool) {
+	sel, ok := e.(*ast.SelectorExpr)
+	if !ok {
+		return "", false
+	}
+	s := p.TypesInfo.Selections[sel]
+	if s == nil || s.Kind() != types.FieldVal {
+		return "", false
+	}
+	named, ok := deref(s.Recv()).(*types.Named)
+	if !ok || named.Obj().Pkg() == nil {
+		return "", false
+	}
+	return strings.TrimPrefix(named.Obj().Pkg().Path(), x.module+"/") + "." + named.Obj().Name() + "." + sel.Sel.Name, true
+}
+
 // Setup on a server.Router is where the mux comes from outside — waffle hands it
 // the root. Any other function nobody in the module calls is a mux of unknown
 // prefix, not the root.
@@ -226,10 +260,13 @@ func known(request string) bool {
 	return strings.HasPrefix(path, "/")
 }
 
-// /* or /{x} takes anything and so names nothing: it cannot be the evidence that
-// a request lands on its service.
+// /* or /{x} takes anything and so names nothing, and under a prefix configuration
+// sets nothing can be told: neither is evidence that a request lands on its service.
 func names(route string) bool {
 	_, path, _ := strings.Cut(route, " ")
+	if strings.HasPrefix(path, configPrefix) {
+		return false
+	}
 	for _, s := range segments(path) {
 		if s != "" && s != "*" && !strings.HasPrefix(s, "{") {
 			return true

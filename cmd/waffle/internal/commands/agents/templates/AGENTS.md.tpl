@@ -570,9 +570,8 @@ something to fill in by hand without saying so. Operands and flags are in
 | Put the component harness in place | `./waffle tests:harness` |
 | See what a test may replace | `./waffle tests:replacements` |
 | Check what the tests replace | `./waffle tests:replacements check` |
-| Record what the service publishes, consumes, serves and calls | `./waffle flows record` |
-| Rewrite `tests/flows.yaml` after the cases change | `go test ./tests/... -args -flows.update` |
-| Assemble the project's flows and check its services against each other; `<root>` is the project's, not the service's | `./waffle flows [check] <root> <index.yaml>` |
+| Record what the service publishes, consumes, serves and calls (`make generate` does) | `./waffle surface` |
+| Assemble the project's flows and check its services against each other; `<root>` is the project's, not the service's | `./waffle flows <root> <index.yaml>` |
 | Refresh AGENTS.md | `./waffle agents` |
 
 Outbound adapters are the hole: there is **no** command for a client of another

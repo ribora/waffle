@@ -16,6 +16,7 @@ test:
 
 generate:
 	@go generate ./...
+	@./waffle surface
 	@./waffle agents -q
 
 # Fails when a test replaces something waffle.yaml does not allow, and says what
