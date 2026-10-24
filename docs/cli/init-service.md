@@ -177,7 +177,7 @@ Standard Go gitignore plus `.env`.
 
 **`waffle`**
 
-A one-line script running `go tool waffle`, so `make replacements` and anything
+A one-line script running `go tool waffle`, so `make generate` and anything
 else in the repository calls the version pinned in `go.mod` rather than whatever
 is on the developer's `PATH`.
 
@@ -187,13 +187,12 @@ Standard targets:
 
 | Target | Description |
 |--------|-------------|
-| `make generate` | Run all code generators (DI, store), then write `tests/surface.yaml` and `AGENTS.md` |
+| `make generate` | Run all code generators (DI, store), then write `waffle.md` |
 | `make .tidy` | `go mod tidy` |
 | `make test` | `go test ./...` — before a commit, and in CI |
 | `make build` | Build the binary into `bin/` |
 | `make run ARGS=<command>` | `.tidy generate`, then `go run ./cmd/app <command>` |
 | `make audit` | `golangci-lint run` |
-| `make replacements` | Refuse any seam a test replaces that `waffle.yaml` does not allow |
 | `make all` (the default) | `.tidy generate build` |
 
 `run` tidies and regenerates first — the same pair every scaffolding command
@@ -204,11 +203,9 @@ subcommand goes in `ARGS` because make reads a bare word as a target of its own.
 edit, and the component suite boots the real container over real infrastructure
 — too slow for that loop. `make test` belongs before a commit and in CI.
 
-The consequence is worth knowing, because two checks ride in that suite:
-`replacements.Check()` and `boundaries.Check()` sit in `config/diogen`, so a
-green `make` says the service builds, not that the seams and the domain
-boundaries are clean. `make replacements` answers the first of those on demand
-without the rest of the suite.
+The consequence is worth knowing, because a check rides in that suite:
+`boundaries.Check()` sits in `config/diogen`, so a green `make` says the service
+builds, not that the domain boundaries are clean.
 
 ## Post-generation steps
 
@@ -225,9 +222,9 @@ the waffle that scaffolded it, not on whatever was released since. A waffle
 built from a checkout carries no version anyone can fetch and installs
 `@latest`.
 
-This installs the DI code generator, puts `waffle` behind the scaffolded `./waffle` script that `make replacements` calls, and produces the initial `diogen/di_gen.go` so the project compiles immediately. It also writes `AGENTS.md` (+ symlinks `CLAUDE.md`, `.cursorrules`) with the current framework conventions for AI coding agents — see [agents](agents.md).
+This installs the DI code generator, puts `waffle` behind the scaffolded `./waffle` script that `make generate` calls, and produces the initial `diogen/di_gen.go` so the project compiles immediately. It also writes `waffle.md` with the current framework conventions for AI coding agents, and an `AGENTS.md` that brings it in (+ symlinks `CLAUDE.md`, `.cursorrules`) — see [agents](agents.md).
 
-## Keeping AGENTS.md in sync
+## Keeping waffle.md in sync
 
 After every waffle upgrade (`go get gitlab.com/gorib/waffle@latest`) run:
 
@@ -235,7 +232,7 @@ After every waffle upgrade (`go get gitlab.com/gorib/waffle@latest`) run:
 waffle agents
 ```
 
-This rewrites `AGENTS.md` with the conventions of the new waffle version. Commit the diff. AGENTS.md is fully waffle-managed — hand edits are lost on regeneration. Put service-specific notes in `CONTRIBUTING.md` instead.
+This rewrites `waffle.md` with the conventions of the new waffle version. Commit the diff. `waffle.md` is fully waffle-managed — hand edits are lost on regeneration; `AGENTS.md` is the service's own.
 
 ## What to do next
 

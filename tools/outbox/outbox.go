@@ -8,7 +8,7 @@ import (
 	"gitlab.com/gorib/hilton"
 	"gitlab.com/gorib/session"
 
-	"gitlab.com/gorib/waffle/tools/trace"
+	"gitlab.com/gorib/waffle/tools/tap"
 )
 
 const instrumentationName = "gitlab.com/gorib/waffle/tools/outbox"
@@ -134,6 +134,6 @@ func (p *publisher) Enqueue(ctx context.Context, subject string, document any) (
 	if err := p.store.Add(ctx, entry); err != nil {
 		return err
 	}
-	trace.Event("out", subject, payload)
+	tap.Message("out", subject, payload)
 	return nil
 }

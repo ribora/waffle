@@ -10,7 +10,7 @@ import (
 
 	"gitlab.com/gorib/whisk/scan"
 
-	"gitlab.com/gorib/waffle/tools/trace"
+	"gitlab.com/gorib/waffle/tools/tap"
 )
 
 // No Reset: clearing the wiring would drop the handler the container installed.
@@ -102,7 +102,7 @@ func (r *ConsumerRecorder) Deliver(msgs ...scan.Source) error {
 			RoutingKey() string
 			Body() []byte
 		}); ok {
-			trace.Event("in", m.RoutingKey(), m.Body())
+			tap.Message("in", m.RoutingKey(), m.Body())
 		}
 	}
 	return handler(msgs)

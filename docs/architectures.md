@@ -107,7 +107,7 @@ service with two containers gets both wherever they sit, and a domain that
 registers itself is exempt inside its own tree.
 
 That finds a root by the generator's own contract, so the test `waffle
-tests:harness` writes names nothing at all:
+init:service` writes names nothing at all:
 
 ```go
 func TestDomainsStayBehindTheirAdapters(t *testing.T) {
@@ -181,7 +181,7 @@ at the price of a `go.mod` and a `replace` per domain inside one repository.
 
 So the boundary is a check over the import graph, with the layer table above as
 its rule. `boundaries.Check()` runs it as an ordinary test from
-`config/diogen/boundaries_test.go`, which `waffle tests:harness` writes.
+`config/diogen/boundaries_test.go`, which `waffle init:service` writes.
 
 There is no exception list, and that is deliberate. `replacements.allow` has one
 because a replacement is legitimately different from service to service; a
@@ -246,7 +246,7 @@ marked as reaching outward.
 
 ### Testing
 
-The [component harness](conventions/component-harness.md) boots the real
+The [component harness](https://github.com/specrig/specrig-go/blob/main/waffle/docs/harness.md) boots the real
 container over real infrastructure and replaces only the leaves. In a monolith
 that is per-module component tests against the same binary — the thing everybody
 wants from a modular monolith and rarely gets, because there is usually no seam

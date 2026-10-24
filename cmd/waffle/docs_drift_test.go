@@ -13,7 +13,7 @@ import (
 // could be turned into a failure. What they have in common: each was true when
 // written and went wrong later, in a place no reader would think to re-check.
 
-// docFiles is markdownFiles plus AGENTS.md.tpl, which is documentation that
+// docFiles is markdownFiles plus waffle.md.tpl, which is documentation that
 // ships into every service and was outside every check here.
 func docFiles(t *testing.T) []string {
 	t.Helper()
@@ -39,7 +39,7 @@ func TestDocsLinkToFilesThatExist(t *testing.T) {
 }
 
 // TestDocsAnchorsResolve reads markdown links. A path in backticks is not one,
-// and that is how `overview.md#waffle.yaml` survived in AGENTS.md.tpl: the slug
+// and that is how `overview.md#waffle.yaml` survived in the agents template: the slug
 // drops the dot, so the link lands at the top of the page instead of failing.
 // The anchor may hold a dot, because that is the failure: `#waffle.yaml` is
 // what somebody types and `#waffleyaml` is what the heading produces.
@@ -172,11 +172,10 @@ func TestBareMakeDoesNotRunTheSuite(t *testing.T) {
 		t.Fatal("Makefile.tpl has no `all` target")
 	}
 	// If this is ever wanted, it is a deliberate change — and the pages saying a
-	// green `make` does not cover the seams and the boundaries have to change
-	// with it: init-service.md, first-component-test.md, and Rule #2 and #12 in
-	// AGENTS.md.tpl.
+	// green `make` does not cover the boundaries have to change with it:
+	// init-service.md, and Rule #2 and #12 in waffle.md.tpl.
 	if strings.Contains(all, "test") {
 		t.Errorf("`all` now runs the suite (%q) — update the pages that say a green `make` "+
-			"does not cover replacements.Check and boundaries.Check", strings.TrimSpace(all))
+			"does not cover boundaries.Check", strings.TrimSpace(all))
 	}
 }

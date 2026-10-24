@@ -39,18 +39,19 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 	}
 
 	sources := map[string]string{
-		filepath.Join("templates", "api", "init.go.tpl"):            filepath.Join("api", "init.go"),
-		filepath.Join("templates", "api", "proto", "gitignore.tpl"): filepath.Join("api", "proto", ".gitignore"),
-		filepath.Join("templates", "cmd", "app", "main.go.tpl"):     filepath.Join("cmd", "app", "main.go"),
-		filepath.Join("templates", "config", "config.go.tpl"):       filepath.Join("config", "config.go"),
-		filepath.Join("templates", "config", "di.go.tpl"):           filepath.Join("config", "di", "di.go"),
-		filepath.Join("templates", "config", "modules.go.tpl"):      command.ModulesFile,
-		filepath.Join("templates", "config", "diogen.go.tpl"):       filepath.Join("config", "diogen", "di.go"),
-		filepath.Join("templates", "gitignore.tpl"):                 filepath.Join(".gitignore"),
-		filepath.Join("templates", "Makefile.tpl"):                  filepath.Join("Makefile"),
-		filepath.Join("templates", "env.tpl"):                       filepath.Join(".env"),
-		filepath.Join("templates", "waffle.tpl"):                    "waffle",
-		filepath.Join("templates", "waffle.yaml.tpl"):               "waffle.yaml",
+		filepath.Join("templates", "api", "init.go.tpl"):               filepath.Join("api", "init.go"),
+		filepath.Join("templates", "api", "proto", "gitignore.tpl"):    filepath.Join("api", "proto", ".gitignore"),
+		filepath.Join("templates", "cmd", "app", "main.go.tpl"):        filepath.Join("cmd", "app", "main.go"),
+		filepath.Join("templates", "config", "config.go.tpl"):          filepath.Join("config", "config.go"),
+		filepath.Join("templates", "config", "di.go.tpl"):              filepath.Join("config", "di", "di.go"),
+		filepath.Join("templates", "config", "modules.go.tpl"):         command.ModulesFile,
+		filepath.Join("templates", "config", "diogen.go.tpl"):          filepath.Join("config", "diogen", "di.go"),
+		filepath.Join("templates", "config", "boundaries_test.go.tpl"): filepath.Join("config", "diogen", "boundaries_test.go"),
+		filepath.Join("templates", "gitignore.tpl"):                    filepath.Join(".gitignore"),
+		filepath.Join("templates", "Makefile.tpl"):                     filepath.Join("Makefile"),
+		filepath.Join("templates", "env.tpl"):                          filepath.Join(".env"),
+		filepath.Join("templates", "waffle.tpl"):                       "waffle",
+		filepath.Join("templates", "waffle.yaml.tpl"):                  "waffle.yaml",
 	}
 
 	if err := p.Write(templates, sources, params); err != nil {

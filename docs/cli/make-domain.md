@@ -328,7 +328,7 @@ interfaces at once.
 Leaving the management without a seam is usually right: a component test drives
 the service through a transport and wants the real one. Declare an interface for
 it when something below it has to be cut and the repository is not where the cut
-belongs. [Component harness](../conventions/component-harness.md) covers what may
+belongs. [Component harness](https://github.com/specrig/specrig-go/blob/main/waffle/docs/harness.md) covers what may
 be replaced; `gitlab.com/gorib/di` covers how a seam is derived.
 
 ## Post-generation steps

@@ -151,7 +151,7 @@ func TestDocsAnchorsResolve(t *testing.T) {
 	}
 }
 
-const agentsTemplate = "internal/commands/agents/templates/AGENTS.md.tpl"
+const agentsTemplate = "internal/commands/agents/templates/waffle.md.tpl"
 
 func TestAgentsTemplateRuleNumbering(t *testing.T) {
 	body := read(t, filepath.Join(repoRoot(t), "cmd/waffle", agentsTemplate))
@@ -164,10 +164,11 @@ func TestAgentsTemplateRuleNumbering(t *testing.T) {
 	if len(rules) == 0 {
 		t.Fatal("no rules found — the template lost its structure")
 	}
-	// The numbers are identifiers, not a reading order — Rule #11 is deliberately
-	// first, because it decides whether the rest apply. What still has to hold is
-	// that every number from 1 to N appears exactly once, so an edit cannot lose
-	// a rule or leave two with the same name.
+	// The numbers are identifiers, not a reading order, and #11 left the framework
+	// with its number. What still has to hold is that every other number from 1 to N
+	// appears exactly once, so an edit cannot lose a rule or leave two with the same
+	// name.
+	const retired = 11
 	seen := make(map[int]bool, len(rules))
 	for _, n := range rules {
 		if seen[n] {
@@ -175,8 +176,11 @@ func TestAgentsTemplateRuleNumbering(t *testing.T) {
 		}
 		seen[n] = true
 	}
-	for n := 1; n <= len(rules); n++ {
-		if !seen[n] {
+	if seen[retired] {
+		t.Errorf("Rule #%d is back in the template, but its number is retired", retired)
+	}
+	for n := 1; n <= len(rules)+1; n++ {
+		if n != retired && !seen[n] {
 			t.Errorf("Rule #%d is missing, but the template carries %d rules", n, len(rules))
 		}
 	}
@@ -227,7 +231,7 @@ func TestAgentsTemplateListsEveryCommand(t *testing.T) {
 	cmds := newCommands()
 	for code := range cmds.All() {
 		if !cited[code] {
-			t.Errorf("`waffle %s` is registered but AGENTS.md never mentions it — "+
+			t.Errorf("`waffle %s` is registered but waffle.md never mentions it — "+
 				"add it to Rule #1's table", code)
 		}
 	}

@@ -17,8 +17,7 @@ up for.
 | starting a service | [Getting Started](getting-started.md) → [Recommended architectures](architectures.md) → [Running locally](reference/running-locally.md) |
 | adding a transport to one that exists | [Commands](core/commands.md) → the tool page → the matching handler page |
 | wiring something up | [DI overview](di/overview.md) → [Tags](di/tags.md) |
-| setting a service's tests up | [Your first component test](first-component-test.md) → [Component harness](conventions/component-harness.md) → [tests:replacements](cli/overview.md#testsreplacements) |
-| deciding how changes get made | [AI-native development](conventions/ai-native.md) → [cli/agents](cli/agents.md#what-is-in-the-file) |
+| setting a service's tests up, and how changes get made | [the waffle adapter of specrig-go](https://github.com/specrig/specrig-go/tree/main/waffle) |
 | deciding whether to adopt waffle | [Introduction](introduction.md) → [What is optional](opting-out.md) → [Recommended architectures](architectures.md) |
 | debugging a service that will not start | [Running locally](reference/running-locally.md#when-it-does-not-start) → [Environment Variables](reference/environment.md) |
 
@@ -27,7 +26,6 @@ up for.
 - [Introduction](introduction.md) — What waffle is, ecosystem map, architecture overview
 - [Recommended architectures](architectures.md) — Single service, modular monolith, service fleet, and what it takes to change your mind
 - [Getting Started](getting-started.md) — Install the CLI, scaffold a service, first route answering `curl`
-- [Your first component test](first-component-test.md) — From `tests:harness` to one green scenario and one red one
 - [What is optional](opting-out.md) — What each tool replaces, the mandatory core, and the cost of skipping
 
 ## Core
@@ -38,13 +36,13 @@ up for.
 
 ## CLI scaffolding
 
-- [Overview](cli/overview.md) — Every command, naming rules, `waffle.yaml`, `tests:replacements`
+- [Overview](cli/overview.md) — Every command, naming rules, `waffle.yaml`
 - [init:service](cli/init-service.md) — Bootstrap a new microservice project
 - [make:domain](cli/make-domain.md) — Model, service, postgres adapter, stored struct
 - [make:domain:http](cli/make-domain-http.md) — Router, handler, request DTOs, convert package
 - [make:domain:grpc](cli/make-domain-grpc.md) — Proto definition, gRPC handler, error mapping
 - [make:domain:migrate](cli/make-domain-migrate.md) — Migration runner, SQL files, goose format
-- [agents](cli/agents.md) — Regenerate AGENTS.md (run after every waffle upgrade)
+- [agents](cli/agents.md) — Regenerate waffle.md (run after every waffle upgrade)
 
 ## Tools
 
@@ -69,10 +67,9 @@ Each tool is a `Command` pulled in by one blank import in `config/di/modules.go`
 
 - [Input Parsing](conventions/input-parsing.md) — Binding and validation by codegen, custom tags, escape hatches
 - [DTO Conversion](conventions/dto-conversion.md) — goverter pattern, project-wide whitelist of conversion helpers
-- [AI-native development](conventions/ai-native.md) — Specification before code, the component-test cut, and what is not built yet
-- [AI-native field notes](conventions/ai-native-field-notes.md) — The incidents behind Rule #11 and its modes, dated
-- [Component harness](conventions/component-harness.md) — The resource seam, real postgres and elasticsearch, recorders instead of silent stand-ins
-- [Flows](conventions/flows.md) — What happens after each way in, from the code and the suite, and what the two leave uncovered
+
+Component tests, the records a suite writes and the specification-first workflow
+are specrig's: [the waffle adapter of specrig-go](https://github.com/specrig/specrig-go/tree/main/waffle) has their pages.
 
 ## Reference
 

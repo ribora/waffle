@@ -37,8 +37,7 @@ waffle init:service
 ```
 waffle/
 ├── app/           Core application lifecycle and command system
-├── resource/      The component-harness seam — external systems a test runs against
-├── replacements/  The check behind `waffle tests:replacements check`
+├── container/     Reads a service's diogen container from source: seams, env reads
 ├── boundaries/    The check behind the modular monolith's boundary rule
 ├── tools/
 │   ├── http/      HTTP server command and middleware registry
@@ -46,6 +45,7 @@ waffle/
 │   ├── migrate/   Database migration command (goose)
 │   ├── cron/      Scheduler that runs other commands
 │   ├── outbox/    Transactional outbox: rows, relay and drivers
+│   ├── tap/       Hook where the tools report messages and routes; silent unless a test listens
 │   └── scribus/   Event consumer command, over a broker driver
 ├── config/        The modules a service pulls in by blank import
 └── cmd/waffle/    Scaffolding CLI (waffle init:service, make:domain, …)

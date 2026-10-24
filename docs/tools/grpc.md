@@ -157,7 +157,7 @@ rather than the raw error — outside them, every failure is recorded as
 the process.
 
 That is also why `UnaryChain` is exported: a component test chains the
-container's own interceptor list with the same function the daemon uses. See [conventions/component-harness](../conventions/component-harness.md#the-in-process-server).
+container's own interceptor list with the same function the daemon uses. See [conventions/component-harness](https://github.com/specrig/specrig-go/blob/main/waffle/docs/harness.md#the-in-process-server).
 
 The full table, with what each one puts on the context and which methods skip
 tracing, is [Interceptor order](https://gitlab.com/gorib/grpc#interceptor-order)
@@ -265,4 +265,4 @@ On `SIGINT` / `SIGTERM`, the gRPC server calls `GracefulStop()`, which waits for
 | `ServiceTag` and the three other collections | [di/tags](../di/tags.md#grpcservicetag) |
 | `ServiceHandler`, `Interceptor`, `ErrorMapper` in full | [reference/interfaces](../reference/interfaces.md#toolsgrpc-package) |
 | What has to be in `.env`, and running http and grpc at once | [reference/running-locally](../reference/running-locally.md#two-servers-at-once) |
-| Calling the real server from a component test | [conventions/component-harness](../conventions/component-harness.md#the-in-process-server) |
+| Calling the real server from a component test | [conventions/component-harness](https://github.com/specrig/specrig-go/blob/main/waffle/docs/harness.md#the-in-process-server) |

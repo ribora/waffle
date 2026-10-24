@@ -174,4 +174,4 @@ domain/user/cmd/migrate/
 | Adding one more `.sql` to a domain that has them | `waffle make:domain:migration <domain> <description>` — [cli/overview](../cli/overview.md#commands) |
 | The table a scaffolded entity gets, and the `stored<X>` struct it pairs with | [cli/make:domain](../cli/make-domain.md#migrations) |
 | `DB_DRIVER` and `DB_DSN` | [reference/environment](../reference/environment.md#configservicesql) |
-| Applying the same migrations in a component test | [conventions/component-harness](../conventions/component-harness.md#postgres) |
+| Applying the same migrations in a component test | [conventions/component-harness](https://github.com/specrig/specrig-go/blob/main/waffle/docs/harness.md#postgres) |

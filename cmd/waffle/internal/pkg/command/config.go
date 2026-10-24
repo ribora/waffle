@@ -8,29 +8,13 @@ import (
 	"path/filepath"
 
 	"gopkg.in/yaml.v3"
-
-	"gitlab.com/gorib/waffle/replacements"
 )
 
 // Config mirrors waffle.yaml.
 type Config struct {
-	ApiImport    string              `yaml:"api_import"`
-	ProtoDir     string              `yaml:"proto_dir"`
-	Mapper       string              `yaml:"mapper"`
-	Replacements replacements.Config `yaml:"replacements"`
-	Agents       AgentsConfig        `yaml:"agents"`
-}
-
-type AgentsConfig struct {
-	Areas map[string]AreaConfig `yaml:"areas"`
-}
-
-// An area's paths are relative to the service and may leave it; a trailing
-// slash means everything below.
-type AreaConfig struct {
-	Paths []string `yaml:"paths"`
-	Modes []string `yaml:"modes"`
-	Grant []string `yaml:"grant"`
+	ApiImport string `yaml:"api_import"`
+	ProtoDir  string `yaml:"proto_dir"`
+	Mapper    string `yaml:"mapper"`
 }
 
 func loadConfig(root, module string) (Config, error) {
@@ -65,9 +49,5 @@ func loadConfig(root, module string) (Config, error) {
 	if cfg.Mapper != "dto" && cfg.Mapper != "goverter" {
 		return Config{}, fmt.Errorf("waffle.yaml: mapper must be \"dto\" or \"goverter\", got %q", cfg.Mapper)
 	}
-	if err := cfg.Replacements.Validate(); err != nil {
-		return Config{}, err
-	}
-
 	return cfg, nil
 }

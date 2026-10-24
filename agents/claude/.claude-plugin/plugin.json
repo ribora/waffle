@@ -1,4 +1,0 @@
-{
-  "name": "waffle",
-  "description": "Rule #11 modes for waffle services: the human switches the mode, a hook refuses the edits it does not allow"
-}

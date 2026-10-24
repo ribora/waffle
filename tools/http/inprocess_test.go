@@ -11,7 +11,7 @@ import (
 
 	"gitlab.com/gorib/http/server"
 
-	"gitlab.com/gorib/waffle/tools/trace"
+	"gitlab.com/gorib/waffle/tools/tap"
 )
 
 // Answers with a value of its own: probeReq.Parse is a stub here, so anything
@@ -178,14 +178,25 @@ func (slashRouter) Setup(mux server.Mux) {
 	))
 }
 
-func TestTheTraceNamesARouteAsItWasRegistered(t *testing.T) {
-	trace.Enable("shop")
-	inproc := serve(t, slashRouter{})
+func TestAWrapLearnsTheRouteAsItWasRegistered(t *testing.T) {
+	var routes []string
+	named := func(next nethttp.Handler) nethttp.Handler {
+		return nethttp.HandlerFunc(func(w nethttp.ResponseWriter, r *nethttp.Request) {
+			route := new(string)
+			next.ServeHTTP(w, r.WithContext(tap.WithRoute(r.Context(), route)))
+			routes = append(routes, r.Method+" "+*route)
+		})
+	}
+	inproc, err := Serve(server.New(), nil, []server.Router{slashRouter{}}, named)
+	if err != nil {
+		t.Fatalf("serve: %v", err)
+	}
+	t.Cleanup(inproc.Close)
 
 	post(t, inproc, "/admin/goods/")
 
-	if !slices.ContainsFunc(trace.Records(), func(r trace.Record) bool { return r.Name == "POST /admin/goods/" }) {
-		t.Errorf("no record of POST /admin/goods/: %+v", trace.Records())
+	if want := []string{"POST /admin/goods/"}; !slices.Equal(routes, want) {
+		t.Errorf("routes %v, want %v", routes, want)
 	}
 }
 

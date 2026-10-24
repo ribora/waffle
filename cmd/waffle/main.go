@@ -14,18 +14,14 @@ import (
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/cmdcommand"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/converter"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/domain"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/flows"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/grpc"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/harness"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/http"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/migrate"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/migration"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/outbox"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/replacements"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/repository"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/scribus"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/service"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/surface"
 	cmdpkg "gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
 )
 
@@ -82,14 +78,7 @@ func newCommands() commands {
 	cmds.Add(outbox.New())
 	cmds.Add(cmdcommand.New())
 	cmds.Add(converter.New())
-	cmds.Add(harness.New())
-	cmds.Add(surface.New())
-	cmds.Add(flows.New())
-	cmds.Add(replacements.New())
 	cmds.Add(agents.New())
-	cmds.Add(agents.NewGuard())
-	cmds.Add(agents.NewMode())
-	cmds.Add(agents.NewGrant())
 	return cmds
 }
 

@@ -22,7 +22,7 @@ Run it with no arguments to see what it can do:
 ```
 $ waffle
 Available commands:
-	agents                	Regenerate AGENTS.md with project conventions and auto-detected service context
+	agents                	Regenerate waffle.md with the framework's conventions and auto-detected service context
 	init:service          	Initialize empty service
 	make:converter        	Scaffold a goverter dto/convert.go at the given path (creates pkg/goverter/convert.go too if missing)
 	make:domain           	Make domain with entity, repository and management
@@ -34,8 +34,6 @@ Available commands:
 	make:domain:migration 	Add a new .sql migration to an existing domain
 	make:domain:scribus   	Make scribus handler for the specified domain (use --batch for BatchHandler)
 	make:outbox           	Enable the transactional outbox and write its table
-	tests:harness         	Regenerate the component harness from the container; the first run also scaffolds the suite
-	tests:replacements    	Report every seam the containers expose and what waffle.yaml allows; check refuses the rest
 ```
 
 ## Create a service

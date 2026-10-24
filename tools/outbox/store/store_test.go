@@ -6,13 +6,13 @@ import (
 	"errors"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 	"unicode/utf8"
 
 	"gitlab.com/gorib/sql"
 	"gitlab.com/gorib/sql/sqltest"
-	"gitlab.com/gorib/waffle/resource"
 	"gitlab.com/gorib/waffle/tools/migrate"
 	"gitlab.com/gorib/waffle/tools/outbox"
 	"gitlab.com/gorib/waffle/tools/outbox/outboxtest"
@@ -35,11 +35,26 @@ var postgres = sqltest.New(
 	sqltest.Migrations(migrate.Up(migrations)),
 )
 
-var resources = resource.New(postgres)
+var (
+	provisioned sync.Once
+	upErr       error
+)
+
+func reset(ctx context.Context) error {
+	provisioned.Do(func() {
+		if upErr = postgres.Provision(ctx); upErr == nil {
+			upErr = postgres.Migrate(ctx)
+		}
+	})
+	if upErr != nil {
+		return upErr
+	}
+	return postgres.Reset(ctx)
+}
 
 func TestMain(m *testing.M) {
 	code := m.Run()
-	_ = resources.Down(context.Background())
+	_ = postgres.Down(context.Background())
 	os.Exit(code)
 }
 
@@ -143,7 +158,7 @@ const held = time.Hour
 
 func up(t *testing.T) {
 	t.Helper()
-	if err := resources.Reset(context.Background()); err != nil {
+	if err := reset(context.Background()); err != nil {
 		t.Skipf("no postgres for the outbox store: %v", err)
 	}
 }

@@ -1,22 +1,22 @@
-// Package agents scaffolds AGENTS.md with project-wide AI-agent instructions
-// for gorib/waffle services. Generated content is the same across services
-// (framework conventions); service-specific context (module path, domains,
-// modules, env vars) is auto-detected from the project state.
+// Package agents writes waffle.md, the framework's conventions for a service and
+// what the service is made of — module path, domains, modules, env vars, read off
+// the project — and keeps the line in the service's AGENTS.md that brings it in.
 //
-// AGENTS.md is regenerated on every run — any hand edits will be lost. Put
-// service-specific instructions in CONTRIBUTING.md instead.
+// waffle.md is rewritten on every run, and an edit there is lost; AGENTS.md is the
+// service's own.
 package agents
 
 import (
 	"embed"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/envread"
+	"gitlab.com/gorib/waffle/container"
 	"gitlab.com/gorib/waffle/internal/gomod"
 )
 
@@ -25,34 +25,69 @@ var templateFiles embed.FS
 
 var templates = command.NewTemplates(templateFiles)
 
-// Generate writes AGENTS.md at the module root, auto-detecting the service
-// context (domains, active waffle modules, env vars). quiet leaves out the files
-// that were already current. It reports whether anything on disk changed.
+const reference = "Read @waffle.md before the first edit: the framework's conventions, and what this service is made of."
+
+// What every waffle.md before it wrote into AGENTS.md: such a file was waffle's,
+// and it is the service's stub from now on.
+const managed = "**managed by `./waffle agents`**"
+
+// Generate writes waffle.md at the module root, auto-detecting the service
+// context (domains, active waffle modules, env vars), and brings it into
+// AGENTS.md. quiet leaves out the files that were already current. It reports
+// whether anything on disk changed.
 func Generate(p *command.Project, quiet bool) (bool, error) {
-	cfg, err := p.Config()
-	if err != nil {
-		return false, err
-	}
-	areas, err := Areas(cfg)
-	if err != nil {
-		return false, err
-	}
-	out, err := templates.Render(filepath.Join("templates", "AGENTS.md.tpl"), scanContext(p, areas))
+	out, err := templates.Render(filepath.Join("templates", "waffle.md.tpl"), scanContext(p))
 	if err != nil {
 		return false, err
 	}
 
-	changed, err := command.WriteIfChanged(p.Path("AGENTS.md"), out)
+	changed, err := command.WriteIfChanged(p.Path("waffle.md"), out)
 	if err != nil {
-		return false, fmt.Errorf("write AGENTS.md: %w", err)
+		return false, fmt.Errorf("write waffle.md: %w", err)
 	}
 	if changed {
-		command.ReportCreated("AGENTS.md")
+		command.ReportCreated("waffle.md")
 	} else if !quiet {
-		command.ReportUnchanged("AGENTS.md")
+		command.ReportUnchanged("waffle.md")
+	}
+	brought, err := bringIn(p, quiet)
+	if err != nil {
+		return false, err
 	}
 	linked, err := ensureSymlinks(p, quiet)
-	return changed || linked, err
+	return changed || brought || linked, err
+}
+
+// AGENTS.md is the service's: written as a stub where there is none, given the
+// line that brings waffle.md in where it lacks it, and otherwise left alone.
+func bringIn(p *command.Project, quiet bool) (bool, error) {
+	file := p.Path("AGENTS.md")
+	text, err := os.ReadFile(file)
+	switch {
+	case os.IsNotExist(err), err == nil && strings.Contains(string(text), managed):
+		stub := fmt.Sprintf("# AGENTS.md\n\nInstructions for AI coding agents working in %s.\n\n%s\n", path.Base(p.Module()), reference)
+		if err := os.WriteFile(file, []byte(stub), 0o644); err != nil {
+			return false, fmt.Errorf("write AGENTS.md: %w", err)
+		}
+		command.ReportCreated("AGENTS.md")
+		return true, nil
+	case err != nil:
+		return false, err
+	case strings.Contains(string(text), "@waffle.md"):
+		if !quiet {
+			command.ReportKept("AGENTS.md")
+		}
+		return false, nil
+	}
+	gap := "\n"
+	if !strings.HasSuffix(string(text), "\n") {
+		gap = "\n\n"
+	}
+	if err := os.WriteFile(file, append(text, []byte(gap+reference+"\n")...), 0o644); err != nil {
+		return false, fmt.Errorf("write AGENTS.md: %w", err)
+	}
+	command.ReportAction("AGENTS.md: the line that brings waffle.md in, at its end")
+	return true, nil
 }
 
 type serviceContext struct {
@@ -61,11 +96,9 @@ type serviceContext struct {
 	Domains       []string
 	Modules       []string
 	EnvVars       []string
-	Modes         []Mode
-	Areas         []Area
 }
 
-func scanContext(p *command.Project, areas []Area) serviceContext {
+func scanContext(p *command.Project) serviceContext {
 	modules := scanModules(p)
 	return serviceContext{
 		ModulePath:    p.Module(),
@@ -73,8 +106,6 @@ func scanContext(p *command.Project, areas []Area) serviceContext {
 		Domains:       scanDomains(p),
 		Modules:       modules,
 		EnvVars:       scanEnvVars(p.Root(), modules),
-		Modes:         modes,
-		Areas:         areas,
 	}
 }
 
@@ -124,7 +155,7 @@ func scanEnvVars(root string, modules []string) []string {
 			seen[name] = true
 		}
 	}
-	for _, read := range envread.Module(root) {
+	for _, read := range container.EnvReads(root) {
 		seen[read.Key] = true
 	}
 	var vars []string

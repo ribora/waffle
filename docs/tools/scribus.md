@@ -371,4 +371,4 @@ that is not acceptable for what your queues carry.
 | `CommandTag` | [di/tags](../di/tags.md#scribuscommandtag) |
 | Publishing an event that must not be lost | [tools/outbox](outbox.md) |
 | What has to be running and in `.env` | [reference/running-locally](../reference/running-locally.md#by-module) |
-| Delivering an event through the real consumer in a test | [conventions/component-harness](../conventions/component-harness.md#delivering-an-event) |
+| Delivering an event through the real consumer in a test | [conventions/component-harness](https://github.com/specrig/specrig-go/blob/main/waffle/docs/harness.md#delivering-an-event) |

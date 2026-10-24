@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
@@ -27,6 +28,38 @@ func TestGenerateReportsOnlyAChange(t *testing.T) {
 	}
 	if changed, _ := Generate(p, true); !changed {
 		t.Error("a missing symlink was restored without reporting it")
+	}
+}
+
+func TestWaffleMdIsWrittenAndAGENTSmdBringsItIn(t *testing.T) {
+	stub := "# AGENTS.md\n\nInstructions for AI coding agents working in svc.\n\n" + reference + "\n"
+	for name, c := range map[string]struct{ before, after string }{
+		"none":                      {"", stub},
+		"the one waffle once wrote": {"# AGENTS.md\n\nThis file is\n" + managed + " — hand edits are lost.\n\n## Rule #11\n", stub},
+		"the service's, without":    {"# AGENTS.md\n\nOurs.\n", "# AGENTS.md\n\nOurs.\n\n" + reference + "\n"},
+		"the service's, with":       {"# AGENTS.md\n\n" + reference + "\n\nOurs.\n", "# AGENTS.md\n\n" + reference + "\n\nOurs.\n"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			p := commandtest.Project(t, "example.com/svc")
+			if c.before != "" {
+				if err := os.WriteFile(p.Path("AGENTS.md"), []byte(c.before), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := Generate(p, true); err != nil {
+				t.Fatal(err)
+			}
+			if got, _ := os.ReadFile(p.Path("AGENTS.md")); string(got) != c.after {
+				t.Errorf("AGENTS.md:\n%s\nwant\n%s", got, c.after)
+			}
+			waffle, err := os.ReadFile(p.Path("waffle.md"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.HasPrefix(string(waffle), "# waffle.md\n") || strings.Contains(string(waffle), "Rule #11") {
+				t.Errorf("waffle.md:\n%s", waffle[:200])
+			}
+		})
 	}
 }
 

@@ -324,7 +324,7 @@ func InitAppWith(replacements Replacements) (*Application, error)
 
 The hand-written `config/diogen/di.go` calls `InitApp()` and exposes a clean `InitDi() (app.App, error)`.
 
-A parameter of a markup function — the initialization context, configuration fetched before the container exists — becomes a parameter of both, ahead of `replacements`: `InitApp(ctx context.Context, cfg *config.Config)`. The waffle modules declare none, so `InitApp()` stays bare until a service adds one; `di.go` then passes it, and the component harness asks its [`params` hook](../conventions/component-harness.md#hooks). See [Parameters](https://gitlab.com/gorib/di/-/blob/main/README.md#parameters) in the diogen README.
+A parameter of a markup function — the initialization context, configuration fetched before the container exists — becomes a parameter of both, ahead of `replacements`: `InitApp(ctx context.Context, cfg *config.Config)`. The waffle modules declare none, so `InitApp()` stays bare until a service adds one; `di.go` then passes it, and the component harness asks its [`params` hook](https://github.com/specrig/specrig-go/blob/main/waffle/docs/harness.md#hooks). See [Parameters](https://gitlab.com/gorib/di/-/blob/main/README.md#parameters) in the diogen README.
 
 ### Automatic resource cleanup
 
@@ -367,11 +367,11 @@ func TestUserFlow(t *testing.T) {
 }
 ```
 
-The connection under a replaced client is not built: a replacement prunes what only it fed. A client a test leaves real still needs its connection, and the harness fills that with `grpcClient.Dead` for you. Where to cut, and why, is [Choosing where to cut](../conventions/component-harness.md#choosing-where-to-cut).
+The connection under a replaced client is not built: a replacement prunes what only it fed. A client a test leaves real still needs its connection, and the harness fills that with `grpcClient.Dead` for you. Where to cut, and why, is [Choosing where to cut](https://github.com/specrig/specrig-go/blob/main/waffle/docs/harness.md#choosing-where-to-cut).
 
 The field's type is the interface the value is wired as, so a fake that stops satisfying it fails to compile at the line that supplies it. Nothing is asserted at run time.
 
-Which fields a test may supply is a separate question, and the answer is `replacements.allow` in `waffle.yaml` — enforced by `TestReplacementsStayInsideTheList`, which `waffle tests:harness` scaffolds beside the container. See [tests:replacements](../cli/overview.md#testsreplacements).
+Which fields a test may supply is a separate question, and waffle leaves it to the suite: specrig answers it with `replacements.allow` in `specrig.yaml`, enforced by a test its [waffle adapter](https://github.com/specrig/specrig-go/tree/main/waffle) scaffolds beside the container.
 
 Note that `InitDi()` in `config/diogen/di.go` calls `InitApp()`, which passes no replacements — production behaviour is unchanged. Tests call `InitAppWith` directly.
 

@@ -8,17 +8,21 @@ import (
 	"github.com/go-chi/chi/v5"
 	"gitlab.com/gorib/http/server"
 
-	"gitlab.com/gorib/waffle/tools/trace"
+	"gitlab.com/gorib/waffle/tools/tap"
 )
 
 // Setup is what the daemon calls too, so the routes and the middleware under
-// test are the ones that ship.
-func Serve(mux server.Mux, global Global, routers []server.Router) (*InProcess, error) {
+// test are the ones that ship. wrap goes around the whole server, outermost last.
+func Serve(mux server.Mux, global Global, routers []server.Router, wrap ...func(nethttp.Handler) nethttp.Handler) (*InProcess, error) {
 	if err := Setup(mux, global, routers); err != nil {
 		return nil, err
 	}
 	mux.Use(matched)
-	srv := httptest.NewServer(trace.HTTP(mux))
+	var handler nethttp.Handler = mux
+	for _, w := range wrap {
+		handler = w(handler)
+	}
+	srv := httptest.NewServer(handler)
 	return &InProcess{URL: srv.URL, Client: srv.Client(), server: srv}, nil
 }
 
@@ -30,7 +34,7 @@ func matched(next server.Handler) server.Handler {
 		ctx := src.Request().Context()
 		if rc := chi.RouteContext(ctx); rc != nil {
 			if p := pattern(rc.RoutePatterns); p != "" && p != "/" {
-				trace.Route(ctx, p)
+				tap.Route(ctx, p)
 			}
 		}
 		return resp, err

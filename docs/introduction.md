@@ -90,8 +90,7 @@ and the same `--help`. See [core/commands](core/commands.md#writing-a-custom-com
 ```
 waffle/
 ├── app/           Core application lifecycle and command system
-├── resource/      The component-harness seam — external systems a test runs against
-├── replacements/  The check behind `waffle tests:replacements check`
+├── container/     Reads a service's diogen container from source: seams, env reads
 ├── boundaries/    The check behind the modular monolith's boundary rule
 ├── tools/
 │   ├── http/      HTTP server command and middleware registry
@@ -99,6 +98,7 @@ waffle/
 │   ├── migrate/   Database migration command (goose)
 │   ├── cron/      Scheduler that runs other commands
 │   ├── outbox/    Transactional outbox: rows, relay and drivers
+│   ├── tap/       Hook where the tools report messages and routes; silent unless a test listens
 │   └── scribus/   Event consumer command, over a broker driver
 ├── config/        The modules a service pulls in by blank import
 └── cmd/waffle/    Scaffolding CLI (waffle init:service, make:domain, …)
@@ -107,8 +107,8 @@ waffle/
 ## Testing
 
 A component test boots the real container over real infrastructure and replaces
-only the leaves. The shared pieces live next to what they describe — `sql/sqltest`,
-`redis/redistest`, `elastic/elastictest`, `pry.Recorder()`, `scribus.Recorder()`,
-`tools/grpc.Serve`, `tools/http.Serve` — behind the three-method seam in
-`waffle/resource`. See
-[conventions/component-harness](conventions/component-harness.md).
+only the leaves. The pieces it stands on live next to what they describe —
+`sql/sqltest`, `redis/redistest`, `elastic/elastictest`, `pry.Recorder()`,
+`scribus.Recorder()`, `tools/grpc.Serve`, `tools/http.Serve` — and the harness that
+puts them together from the container is specrig's: see
+[the waffle adapter of specrig-go](https://github.com/specrig/specrig-go/tree/main/waffle).

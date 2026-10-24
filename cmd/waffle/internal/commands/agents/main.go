@@ -9,7 +9,7 @@ import (
 func New() *cmd {
 	return &cmd{
 		base: command.New("agents",
-			"Regenerate AGENTS.md with project conventions and auto-detected service context").
+			"Regenerate waffle.md with the framework's conventions and auto-detected service context").
 			WithUsage("[-q]\n" +
 				"  -q reports only what changed; make generate runs it on every build"),
 	}

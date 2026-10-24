@@ -225,7 +225,7 @@ type Server interface {
 }
 ```
 
-The listening half of the command, as the command sees it. `grpcCommand.Run` builds one with `grpc.NewServer` and hands it the chained interceptors and the address; the interface is what keeps `tools/grpc` from naming the concrete server type. Nothing registers it in DI, so this is a type you read, not one you implement — an in-process server for a test comes from [`Serve`](../conventions/component-harness.md#the-in-process-server) instead.
+The listening half of the command, as the command sees it. `grpcCommand.Run` builds one with `grpc.NewServer` and hands it the chained interceptors and the address; the interface is what keeps `tools/grpc` from naming the concrete server type. Nothing registers it in DI, so this is a type you read, not one you implement — an in-process server for a test comes from [`Serve`](https://github.com/specrig/specrig-go/blob/main/waffle/docs/harness.md#the-in-process-server) instead.
 
 ### Interceptor
 
@@ -372,7 +372,7 @@ type Consumer interface {
 }
 ```
 
-The consumer the driver supplies — `gitlab.com/gorib/amqp` for RabbitMQ. Configured and started by `scribusCommand.Run`, with `Bind` called once per subject a handler declares. Paging, flushing and reconnection are here because every broker has them; connecting is behind `Transport` because none of them spell it the same way. In production you do not implement this — it comes from the registrations in `config/tools/scribus/amqp/init.go` (see [Scribus Tool](../tools/scribus.md) for setup). A component test replaces it with `scribus.Recorder()`, which keeps that wiring and delivers through the handler the command installed (see [Component harness](../conventions/component-harness.md)).
+The consumer the driver supplies — `gitlab.com/gorib/amqp` for RabbitMQ. Configured and started by `scribusCommand.Run`, with `Bind` called once per subject a handler declares. Paging, flushing and reconnection are here because every broker has them; connecting is behind `Transport` because none of them spell it the same way. In production you do not implement this — it comes from the registrations in `config/tools/scribus/amqp/init.go` (see [Scribus Tool](../tools/scribus.md) for setup). A component test replaces it with `scribus.Recorder()`, which keeps that wiring and delivers through the handler the command installed (see [Component harness](https://github.com/specrig/specrig-go/blob/main/waffle/docs/harness.md)).
 
 ---
 
@@ -436,42 +436,6 @@ type Relay interface {
 ```
 
 Drains the outbox. Replace it to change how draining is paced; `outbox.NewRelay` takes the pacing as options.
-
----
-
-## resource package
-
-### Resource
-
-```go
-type Resource interface {
-    Provision(ctx context.Context) error
-    Migrate(ctx context.Context) error
-    Reset(ctx context.Context) error
-}
-```
-
-An external system a component test runs against for real. The package names no system and imports no client, so an implementation can live anywhere — `sql/sqltest`, `redis/redistest`, `elastic/elastictest`, or next to a client of your own. `Set` (from `resource.New`) runs `Up` once per run and `Reset` between scenarios. See [Component harness](../conventions/component-harness.md).
-
-### Named
-
-```go
-type Named interface {
-    Name() string
-}
-```
-
-Optional. A resource with a name gets it quoted in errors, which matters once a suite lists several.
-
-### Ephemeral
-
-```go
-type Ephemeral interface {
-    Down(ctx context.Context) error
-}
-```
-
-Optional. A resource with something to remove when the run ends — `sqltest.Ephemeral()` drops its database. Call `Set.Down` once per process, from `TestMain`.
 
 ---
 
