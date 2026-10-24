@@ -176,7 +176,9 @@ func (r *userRepository) Get(ctx context.Context, userId int) (*model.User, erro
         if errors.Is(err, sql.ErrNoRows) {
             return nil, failure.Parse(model.ErrUserNotFound)
         }
-        r.logger.Error(err, pry.Ctx(ctx))
+        if ctx.Err() == nil {
+            r.logger.Error(err, pry.Ctx(ctx))
+        }
         return nil, failure.Parse(sql.ErrQueryFailed)
     }
     return stored.Unwrap(), nil
@@ -196,6 +198,10 @@ is logged and becomes `sql.ErrQueryFailed`.** A driver error carries the query
 and sometimes its parameters, and the service above has no use for either — so
 the detail goes to the log and the caller gets an error it can act on. This is
 the one place a repository logs; see [No logging in handlers](../tools/http-handler.md#guidelines).
+A query whose context had already ended is not logged here: whoever ended it
+reports it. When the caller left, the transport answers `Canceled` quietly; when
+the service cancelled its own context, the `ErrQueryFailed` reaches the
+transport while the request's context is still alive, and is logged there.
 
 **A sentinel is thrown through `failure.Parse`.** `failure.New` declares it
 without a stack, and `Parse` returns a copy that carries one from the place it

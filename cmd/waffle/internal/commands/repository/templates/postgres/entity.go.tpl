@@ -43,7 +43,9 @@ func (r *{{ camel .Entity }}Repository) Get(ctx context.Context, {{ camel .Entit
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, failure.Parse(model.Err{{ title .Entity }}NotFound)
 		}
-		r.logger.Error(err, pry.Ctx(ctx))
+		if ctx.Err() == nil {
+			r.logger.Error(err, pry.Ctx(ctx))
+		}
 		return nil, failure.Parse(sql.ErrQueryFailed)
 	}
 	return stored.Unwrap(), nil
@@ -58,7 +60,9 @@ func (r *{{ camel .Entity }}Repository) Save(ctx context.Context, {{ camel .Enti
 		stored, err = r.repo.Get(ctx, sql.Insert(fields...).Into({{ camel .Entity }}Table).Values(values...))
 	}
 	if err != nil {
-		r.logger.Error(err, pry.Ctx(ctx))
+		if ctx.Err() == nil {
+			r.logger.Error(err, pry.Ctx(ctx))
+		}
 		return nil, failure.Parse(sql.ErrQueryFailed)
 	}
 	return stored.Unwrap(), nil
@@ -67,7 +71,9 @@ func (r *{{ camel .Entity }}Repository) Save(ctx context.Context, {{ camel .Enti
 func (r *{{ camel .Entity }}Repository) List(ctx context.Context, expr criteria.Expression, sort []string, page int, count int) ([]*model.{{ title .Entity }}, error) {
 	stored, err := r.repo.Select(ctx, sql.Select().From({{ camel .Entity }}Table).Where(expr).Sort(sort...).Page(page, count))
 	if err != nil {
-		r.logger.Error(err, pry.Ctx(ctx))
+		if ctx.Err() == nil {
+			r.logger.Error(err, pry.Ctx(ctx))
+		}
 		return nil, failure.Parse(sql.ErrQueryFailed)
 	}
 	return lo.Map(stored, func(stored *stored{{ title .Entity }}, _ int) *model.{{ title .Entity }} {
