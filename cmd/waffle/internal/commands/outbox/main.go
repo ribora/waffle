@@ -4,9 +4,8 @@ import (
 	"context"
 	"embed"
 	"errors"
-	"fmt"
-	"os/exec"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/migrate"
@@ -14,7 +13,9 @@ import (
 )
 
 //go:embed templates/*
-var templates embed.FS
+var templateFiles embed.FS
+
+var templates = command.NewTemplates(templateFiles)
 
 const domain = "outbox"
 
@@ -30,7 +31,7 @@ const migrationSuffix = "_create_outbox_table.sql"
 var errNoDriver = errors.New("--driver is required: it names the broker module under config/tools/outbox, e.g. --driver amqp")
 
 func New() *cmd {
-	return &cmd{command.New("make:outbox", "Enable the transactional outbox and write its table", templates, nil).
+	return &cmd{command.New("make:outbox", "Enable the transactional outbox and write its table").
 		WithUsage("--driver <id>\n" +
 			"  driver is the broker module under config/tools/outbox, e.g. --driver amqp")}
 }
@@ -50,42 +51,36 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 	if driver == "" {
 		return errNoDriver
 	}
-	if err := c.RequireModules(); err != nil {
-		return err
-	}
-	if err := command.RequireDriver(driverPrefix, driver); err != nil {
-		return err
-	}
-	projectName, err := c.FindProjectName()
+	p, err := command.OpenProject()
 	if err != nil {
 		return err
 	}
-
-	if err := migrate.Runner(domain, projectName); err != nil {
-		return err
-	}
-	if err := c.migration(); err != nil {
-		return err
-	}
-	if err := c.EnableStorage(); err != nil {
-		return err
-	}
 	// The driver only: it blank-imports the module, so modules.go carries one line.
-	if err := c.UncommentModule(driverPrefix + driver); err != nil {
+	if err := p.RequireModules(slices.Concat(command.MigrationModules, []string{driverPrefix + driver})...); err != nil {
+		return err
+	}
+
+	if err := migrate.Runner(p, domain); err != nil {
+		return err
+	}
+	if err := migration(p); err != nil {
+		return err
+	}
+	if err := p.EnableStorage(); err != nil {
+		return err
+	}
+	if err := p.EnableModule(driverPrefix + driver); err != nil {
 		return err
 	}
 	reportWiring()
 
-	info, err := exec.Command("make", ".tidy", "generate").CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%v: %v", err, string(info))
-	}
-	return nil
+	_, err = p.Run("make", ".tidy", "generate")
+	return err
 }
 
-func (c *cmd) migration() error {
+func migration(p *command.Project) error {
 	dir := migrate.Dir(domain)
-	found, err := filepath.Glob(filepath.Join(dir, "*"+migrationSuffix))
+	found, err := p.Glob(filepath.Join(dir, "*"+migrationSuffix))
 	if err != nil {
 		return err
 	}
@@ -94,7 +89,7 @@ func (c *cmd) migration() error {
 		return nil
 	}
 	name := time.Now().Format("20060102150405") + migrationSuffix
-	return c.Write(map[string]string{
+	return p.Write(templates, map[string]string{
 		filepath.Join("templates", "migration.sql.tpl"): filepath.Join(dir, name),
 	}, nil)
 }

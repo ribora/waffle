@@ -15,7 +15,7 @@ func TestTemplateMatchesTheStoreSchema(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tpl, err := templates.ReadFile(filepath.Join("templates", "migration.sql.tpl"))
+	tpl, err := templateFiles.ReadFile(filepath.Join("templates", "migration.sql.tpl"))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -10,8 +10,7 @@ import (
 
 func NewMode() *mode {
 	return &mode{base: command.New("agents:mode",
-		"Print what a Rule #11 mode allows and which part of AGENTS.md it follows; switches nothing",
-		noTemplates, nil).
+		"Print what a Rule #11 mode allows and which part of AGENTS.md it follows; switches nothing").
 		WithUsage("<mode>\n" +
 			"  mode is one of: " + strings.Join(modeNames(), ", "))}
 }

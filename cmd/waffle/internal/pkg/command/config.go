@@ -3,12 +3,12 @@ package command
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 
-	"gitlab.com/gorib/waffle/internal/gomod"
 	"gitlab.com/gorib/waffle/replacements"
 )
 
@@ -33,13 +33,7 @@ type AreaConfig struct {
 	Grant []string `yaml:"grant"`
 }
 
-// ProjectConfig loads waffle.yaml; a missing file is identical to all-defaults.
-func (c *Command) ProjectConfig(projectName string) (Config, error) {
-	root, err := gomod.Root()
-	if err != nil {
-		return Config{}, err
-	}
-
+func loadConfig(root, module string) (Config, error) {
 	var cfg Config
 	fh, err := os.Open(filepath.Join(root, "waffle.yaml"))
 	if err == nil {
@@ -47,7 +41,8 @@ func (c *Command) ProjectConfig(projectName string) (Config, error) {
 		defer fh.Close()
 		dec := yaml.NewDecoder(fh)
 		dec.KnownFields(true)
-		if err := dec.Decode(&cfg); err != nil {
+		// io.EOF is yaml.v3's answer to a file with no document: empty, or comments only.
+		if err := dec.Decode(&cfg); err != nil && !errors.Is(err, io.EOF) {
 			return Config{}, fmt.Errorf("failed to parse waffle.yaml: %w", err)
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
@@ -55,7 +50,7 @@ func (c *Command) ProjectConfig(projectName string) (Config, error) {
 	}
 
 	if cfg.ApiImport == "" {
-		cfg.ApiImport = projectName + "/api/pb"
+		cfg.ApiImport = module + "/api/pb"
 	}
 	if cfg.ProtoDir == "" {
 		cfg.ProtoDir = "api/proto"

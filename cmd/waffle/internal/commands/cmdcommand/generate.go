@@ -8,17 +8,16 @@ import (
 
 // Generate writes the command's package and its DI registration. Separate from
 // Run so a test can call it without a Makefile or a module proxy.
-func Generate(domain string, name command.CommandName, projectName string) error {
-	c := command.New("command-internal", "", templates, nil)
+func Generate(p *command.Project, domain string, name command.CommandName) error {
 	params := map[string]any{
 		"Domain":  domain,
 		"Command": name,
-		"Project": projectName,
+		"Project": p.Module(),
 	}
 
 	sources := map[string]string{
 		filepath.Join("templates", "main.go.tpl"): filepath.Join("domain", domain, "cmd", name.Raw, "main.go"),
 		filepath.Join("templates", "di.go.tpl"):   filepath.Join("config", "di", "di_"+domain+"_"+name.Snake+".go"),
 	}
-	return c.Write(sources, params)
+	return p.Write(templates, sources, params)
 }

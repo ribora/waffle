@@ -11,8 +11,7 @@ import (
 
 func NewGrant() *grant {
 	return &grant{base: command.New("agents:grant",
-		"Print the areas a Rule #11 mode opens on their own and those it takes as a grant, or check one grant and say what it opens; grants nothing",
-		noTemplates, nil).
+		"Print the areas a Rule #11 mode opens on their own and those it takes as a grant, or check one grant and say what it opens; grants nothing").
 		WithUsage("<mode> [name]\n" +
 			"  mode is one of: " + strings.Join(modeNames(), ", ") + "\n" +
 			"  name is an area — the defaults, and any waffle.yaml declares under agents.areas")}
@@ -34,19 +33,23 @@ func (c *grant) Run(_ context.Context, args ...string) error {
 	if err != nil {
 		return err
 	}
-	rules, err := serviceRules(c.base)
+	rules, err := serviceRules()
 	if err != nil {
 		return err
 	}
 
 	if len(args) == 1 {
-		fmt.Print(listing(mode, rules.Areas))
+		fmt.Print(listing(mode, rules))
 		return nil
 	}
 
 	for _, a := range rules.Areas {
 		if a.Name != args[1] {
 			continue
+		}
+		paths := rules.claimed(a)
+		if len(paths) == 0 {
+			return fmt.Errorf("the %s area opens nothing: another area names each of its paths alike and decides there", a.Name)
 		}
 		if slices.Contains(a.Modes, mode.Name) {
 			return fmt.Errorf("the %s area is open in %s mode already and takes no grant there", a.Name, mode.Name)
@@ -56,7 +59,7 @@ func (c *grant) Run(_ context.Context, args ...string) error {
 				a.Name, mode.Name, orNone(a.Grant))
 		}
 		fmt.Printf("Grant: %s, on top of %s mode, until the mode changes.\nMay also be edited: %s.\n",
-			a.Name, mode.Name, strings.Join(a.Paths, ", "))
+			a.Name, mode.Name, strings.Join(paths, ", "))
 		return nil
 	}
 	return fmt.Errorf("no area is named %q", args[1])
@@ -64,10 +67,14 @@ func (c *grant) Run(_ context.Context, args ...string) error {
 
 // Areas that follow the mode table are left to `agents:mode`, which prints what
 // the table opens.
-func listing(mode Mode, areas []Area) string {
+func listing(mode Mode, rules Rules) string {
 	var open, grants []string
-	for _, a := range areas {
-		line := fmt.Sprintf("  %s — %s", a.Name, strings.Join(a.Paths, ", "))
+	for _, a := range rules.Areas {
+		paths := rules.claimed(a)
+		if len(paths) == 0 {
+			continue
+		}
+		line := fmt.Sprintf("  %s — %s", a.Name, strings.Join(paths, ", "))
 		if slices.Contains(a.Modes, mode.Name) {
 			open = append(open, line)
 		}

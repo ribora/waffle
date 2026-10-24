@@ -1,4 +1,5 @@
 -- +goose Up
+-- +goose StatementBegin
 do $create$
     begin
         create function update_updated_at()
@@ -14,5 +15,6 @@ exception
             null;
     end;
 $create$;
+-- +goose StatementEnd
 
 -- +goose Down

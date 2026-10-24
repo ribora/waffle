@@ -10,22 +10,22 @@ import (
 )
 
 //go:embed templates/*
-var templates embed.FS
+var templateFiles embed.FS
 
-// Generate scaffolds the convert package at targetDir. projectName must be the
-// full module path — it lands in the generated goverter:extend import.
-func Generate(targetDir, projectName string) error {
-	c := command.New("converter-internal", "", templates, nil)
+var templates = command.NewTemplates(templateFiles)
+
+// Generate scaffolds the convert package at targetDir, relative to the root.
+func Generate(p *command.Project, targetDir string) error {
 	params := map[string]string{
 		"Package": filepath.Base(targetDir),
-		"Project": projectName,
+		"Project": p.Module(),
 	}
 	sources := map[string]string{
 		filepath.Join("templates", "whitelist.go.tpl"): filepath.Join("pkg", "goverter", "convert.go"),
 		filepath.Join("templates", "convert.go.tpl"):   filepath.Join(targetDir, "convert.go"),
 	}
-	if err := c.Write(sources, params); err != nil {
+	if err := p.Write(templates, sources, params); err != nil {
 		return err
 	}
-	return c.EnsureTool("gitlab.com/gorib/convert/cmd/goverter")
+	return p.EnsureTool("gitlab.com/gorib/convert/cmd/goverter")
 }

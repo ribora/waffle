@@ -5,7 +5,6 @@ import (
 	"embed"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/agents"
@@ -13,10 +12,12 @@ import (
 )
 
 //go:embed templates/*
-var templates embed.FS
+var templateFiles embed.FS
+
+var templates = command.NewTemplates(templateFiles)
 
 func New() *cmd {
-	return &cmd{command.New("init:service", "Initialize empty service", templates, nil)}
+	return &cmd{command.New("init:service", "Initialize empty service")}
 }
 
 type cmd struct {
@@ -27,15 +28,14 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 	if err := c.Operands(args, 0, 0); err != nil {
 		return err
 	}
-	projectName, err := c.FindProjectName()
+	p, err := command.OpenProject()
 	if err != nil {
 		return err
 	}
-	service := filepath.Base(projectName)
 
 	params := map[string]string{
-		"Project": projectName,
-		"Service": service,
+		"Project": p.Module(),
+		"Service": filepath.Base(p.Module()),
 	}
 
 	sources := map[string]string{
@@ -44,7 +44,7 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 		filepath.Join("templates", "cmd", "app", "main.go.tpl"):     filepath.Join("cmd", "app", "main.go"),
 		filepath.Join("templates", "config", "config.go.tpl"):       filepath.Join("config", "config.go"),
 		filepath.Join("templates", "config", "di.go.tpl"):           filepath.Join("config", "di", "di.go"),
-		filepath.Join("templates", "config", "modules.go.tpl"):      filepath.Join("config", "di", "modules.go"),
+		filepath.Join("templates", "config", "modules.go.tpl"):      command.ModulesFile,
 		filepath.Join("templates", "config", "diogen.go.tpl"):       filepath.Join("config", "diogen", "di.go"),
 		filepath.Join("templates", "gitignore.tpl"):                 filepath.Join(".gitignore"),
 		filepath.Join("templates", "Makefile.tpl"):                  filepath.Join("Makefile"),
@@ -53,25 +53,21 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 		filepath.Join("templates", "waffle.yaml.tpl"):               "waffle.yaml",
 	}
 
-	err = c.Write(sources, params)
-	if err != nil {
+	if err := p.Write(templates, sources, params); err != nil {
 		return err
 	}
-	if err := os.Chmod("waffle", 0755); err != nil {
+	if err := os.Chmod(p.Path("waffle"), 0755); err != nil {
 		return fmt.Errorf("failed to chmod waffle: %w", err)
 	}
-	if _, err := agents.Generate(projectName, false); err != nil {
+	if _, err := agents.Generate(p, false); err != nil {
 		return err
 	}
-	if err := c.EnsureBuiltTool("gitlab.com/gorib/di/cmd/diogen", "gitlab.com/gorib/di"); err != nil {
+	if err := p.EnsureBuiltTool("gitlab.com/gorib/di/cmd/diogen", "gitlab.com/gorib/di"); err != nil {
 		return err
 	}
-	if err := c.EnsureBuiltTool("gitlab.com/gorib/waffle/cmd/waffle", "gitlab.com/gorib/waffle"); err != nil {
+	if err := p.EnsureBuiltTool("gitlab.com/gorib/waffle/cmd/waffle", "gitlab.com/gorib/waffle"); err != nil {
 		return err
 	}
-	info, err := exec.Command("make", ".tidy", "generate").CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%v: %v", err, string(info))
-	}
-	return nil
+	_, err = p.Run("make", ".tidy", "generate")
+	return err
 }

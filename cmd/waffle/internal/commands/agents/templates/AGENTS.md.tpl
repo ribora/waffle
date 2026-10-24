@@ -757,12 +757,12 @@ whitelist are in `docs/conventions/dto-conversion.md` in waffle.
 - `failure.Wrap(format, ...args)` / `failure.New(format, ...args)` — for errors that **cross service boundaries** (gRPC, AMQP, HTTP response bodies). Stable JSON wire format
 - `errors.New("...")` / `fmt.Errorf("%w: ...", parent, ...)` — internal errors that don't leave the process
 - **Domain-level sentinel errors: `failure.New`, never `errors.New`.** This is
-  what `./waffle make:domain` writes into `model/errors.go`, and the reason is the
+  what `./waffle make:domain` writes into `model/<entity>.go`, and the reason is the
   wire: `failure.New` registers a slug, and the slug is the `type` the HTTP
   error renderer puts in the body.
 
 ```go
-// domain/user/model/errors.go
+// domain/user/model/user.go
 var ErrUserNotFound = failure.New("user is not found")
 // → {"code":500,"message":"user is not found","payload":{},"type":"user_is_not_found"}
 ```

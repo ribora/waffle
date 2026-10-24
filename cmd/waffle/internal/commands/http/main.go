@@ -3,8 +3,6 @@ package http
 import (
 	"context"
 	"embed"
-	"fmt"
-	"os/exec"
 	"path/filepath"
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/converter"
@@ -13,10 +11,14 @@ import (
 )
 
 //go:embed templates/*
-var templates embed.FS
+var templateFiles embed.FS
+
+var templates = command.NewTemplates(templateFiles)
+
+const module = "gitlab.com/gorib/waffle/config/tools/http"
 
 func New() *cmd {
-	return &cmd{command.New("make:domain:http", "Make HTTP router for the specified domain", templates, nil).
+	return &cmd{command.New("make:domain:http", "Make HTTP router for the specified domain").
 		WithUsage("<domain>")}
 }
 
@@ -32,19 +34,24 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 		return err
 	}
 	domain := args[0]
-	projectName, err := c.FindProjectName()
+	p, err := command.OpenProject()
 	if err != nil {
 		return err
 	}
-
-	cfg, err := c.ProjectConfig(projectName)
+	if err := p.RequireDomain(domain); err != nil {
+		return err
+	}
+	if err := p.RequireModules(module); err != nil {
+		return err
+	}
+	cfg, err := p.Config()
 	if err != nil {
 		return err
 	}
 
 	params := map[string]string{
 		"Domain":  domain,
-		"Project": projectName,
+		"Project": p.Module(),
 	}
 
 	path := filepath.Join("domain", domain)
@@ -53,28 +60,25 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 		filepath.Join("templates", "di.go.tpl"):   filepath.Join("config", "di", "di_"+domain+"_http.go"),
 	}
 
-	if err := c.Write(sources, params); err != nil {
+	if err := p.Write(templates, sources, params); err != nil {
 		return err
 	}
 	if cfg.Mapper == "goverter" {
-		if err := converter.Generate(filepath.Join(path, "cmd", "http", "convert"), projectName); err != nil {
+		if err := converter.Generate(p, filepath.Join(path, "cmd", "http", "convert")); err != nil {
 			return err
 		}
 	}
 
-	if err := c.UncommentModule("gitlab.com/gorib/waffle/config/tools/http"); err != nil {
+	if err := p.EnableModule(module); err != nil {
 		return err
 	}
 
 	// Request DTOs in cmd/http are whisk-generated, and the author writes the
 	// go:generate line by hand — so the tool has to be in place before they do.
-	if err := whisk.Ensure(c.Command); err != nil {
+	if err := whisk.Ensure(p); err != nil {
 		return err
 	}
 
-	info, err := exec.Command("make", ".tidy", "generate").CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%v: %v", err, string(info))
-	}
-	return nil
+	_, err = p.Run("make", ".tidy", "generate")
+	return err
 }

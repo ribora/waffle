@@ -3,17 +3,17 @@ package cmdcommand
 import (
 	"context"
 	"embed"
-	"fmt"
-	"os/exec"
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
 )
 
 //go:embed templates/*
-var templates embed.FS
+var templateFiles embed.FS
+
+var templates = command.NewTemplates(templateFiles)
 
 func New() *cmd {
-	return &cmd{command.New("make:domain:command", "Add a CLI command (app.Command) scoped to a domain", templates, nil).
+	return &cmd{command.New("make:domain:command", "Add a CLI command (app.Command) scoped to a domain").
 		WithUsage("<domain> <command>")}
 }
 
@@ -34,18 +34,18 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 	if err != nil {
 		return err
 	}
-	projectName, err := c.FindProjectName()
+	p, err := command.OpenProject()
 	if err != nil {
 		return err
 	}
-
-	if err := Generate(domain, name, projectName); err != nil {
+	if err := p.RequireDomain(domain); err != nil {
 		return err
 	}
 
-	info, err := exec.Command("make", ".tidy", "generate").CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%v: %v", err, string(info))
+	if err := Generate(p, domain, name); err != nil {
+		return err
 	}
-	return nil
+
+	_, err = p.Run("make", ".tidy", "generate")
+	return err
 }

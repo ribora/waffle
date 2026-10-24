@@ -121,7 +121,6 @@ waffle make:domain --no-repository product
 
 ```
   + config/di/di_product_domain.go
-  + domain/product/model/errors.go
   + domain/product/service/service.go
   + domain/product/model/product.go
   + AGENTS.md
@@ -132,8 +131,8 @@ waffle make:domain --no-repository product
       waffle make:domain:command product <command>
 ```
 
-`--no-repository` stops the chain at its first link: a model, a management and
-its errors, but no postgres adapter, no table and no database module — which is
+`--no-repository` stops the chain at its first link: a model and a management,
+but no postgres adapter, no table and no database module — which is
 why nothing has to be running. Drop the flag when you want the storage half; see
 [make:domain](cli/make-domain.md).
 

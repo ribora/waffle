@@ -44,15 +44,15 @@ type Variables struct {
 Custom map[string]string
 }
 
-// A Need* variable holds a placeholder that parses as its type; one read with a
-// fallback holds the fallback.
+// A variable read anywhere without a fallback holds a placeholder that parses as
+// its type, and a list holds one; any other holds its fallback.
 func variables() Variables {
 return Variables{
 {{range .Variables}}{{if .Default}}{{.Key}}: {{.Default}},
 {{end}}{{end}}}
 }
 
-// A Need* variable is always set, a fallback only when the env hook changed it.
+// A placeholder is always set, a fallback only when the env hook changed it.
 // The environment the tests run in wins over both.
 func Env() {
 v := variables()

@@ -2,24 +2,17 @@ package replacements
 
 import (
 	"context"
-	"embed"
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
-	"strings"
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
 	check "gitlab.com/gorib/waffle/replacements"
 )
 
-// No templates: this command reads and reports, it writes nothing.
-var templates embed.FS
-
 func New() *cmd {
 	return &cmd{command.New("tests:replacements",
-		"Report every seam the containers expose and what waffle.yaml allows; check refuses the rest",
-		templates, nil).
+		"Report every seam the containers expose and what waffle.yaml allows; check refuses the rest").
 		WithUsage("[check] [--container=<path>]\n" +
 			"  check        fail if a test replaces a seam replacements.allow does not grant\n" +
 			"  --container  read this generated container instead of the ones //go:generate names")}
@@ -30,14 +23,10 @@ type cmd struct {
 }
 
 func (c *cmd) Run(_ context.Context, args ...string) error {
-	var containers []string
-	args = slices.DeleteFunc(args, func(a string) bool {
-		value, ok := strings.CutPrefix(a, "--container=")
-		if ok {
-			containers = append(containers, value)
-		}
-		return ok
-	})
+	containers, args, err := command.TakeValues(args, "--container", "a generated container's path")
+	if err != nil {
+		return err
+	}
 
 	if err := c.Operands(args, 0, 1); err != nil {
 		return err
@@ -49,32 +38,28 @@ func (c *cmd) Run(_ context.Context, args ...string) error {
 		return fmt.Errorf("unknown subcommand %q\n%s", args[0], c.Usage())
 	}
 
-	project, err := c.FindProjectName()
+	p, err := command.OpenProject()
 	if err != nil {
 		return err
 	}
-	cfg, err := c.ProjectConfig(project)
+	cfg, err := p.Config()
 	if err != nil {
 		return err
 	}
-	root, err := command.ModuleRoot()
+	read, err := targets(p.Root(), containers)
 	if err != nil {
 		return err
 	}
-	read, err := targets(root, containers)
-	if err != nil {
-		return err
-	}
-	found, err := check.Inspect(root, read)
+	found, err := check.Inspect(p.Root(), read)
 	if err != nil {
 		return err
 	}
 
 	if !verify {
-		fmt.Print(suggestion(found.Seams, cfg, project))
+		fmt.Print(suggestion(found.Seams, cfg, p.Module()))
 		return nil
 	}
-	return report(check.Verify(root, found, cfg.Replacements))
+	return report(check.Verify(p.Root(), found, cfg.Replacements))
 }
 
 // A named container is taken at its word — that is what the flag is for.

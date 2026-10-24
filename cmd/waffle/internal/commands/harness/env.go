@@ -2,26 +2,25 @@ package harness
 
 import (
 	"bytes"
+	"cmp"
+	"fmt"
 	"go/ast"
 	"go/format"
 	"go/parser"
 	"go/token"
-	"os"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 
+	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/envread"
 	"gitlab.com/gorib/waffle/internal/diogenfile"
 )
 
-const envPath = "gitlab.com/gorib/env"
-
-// One variable, as a field of the generated Variables. A Need* read has no
-// value of its own, so the harness always sets one; a read with a fallback is
-// set only when the env hook changed it, because the fallback is the container's
-// own answer and writing it back does not always round-trip — an empty
-// []string{} comes back from the environment as [""].
+// One variable, as a field of the generated Variables. A read with no fallback
+// has no value of its own, so the harness always sets one; a variable only read
+// with a fallback is set only when the env hook changed it, because the fallback
+// is the container's own answer and writing it back does not always round-trip —
+// an empty []string{} comes back from the environment as [""].
 type variable struct {
 	Key     string
 	Type    string
@@ -34,18 +33,22 @@ type variable struct {
 type envRead struct {
 	variable
 	guards []string // Replacements fields whose constructor makes the read
+	at     token.Position
 }
 
 var (
-	needReaders     = map[string]bool{"NeedValue": true, "NeedArray": true, "NeedJson": true}
+	requiredReaders = map[string]bool{
+		"NeedValue": true, "NeedArray": true, "NeedJson": true,
+		"MustValue": true, "MustArray": true, "MustJson": true,
+	}
 	fallbackReaders = map[string]bool{"Value": true, "Array": true, "Json": true}
 	durationUnits   = map[string]bool{"Nanosecond": true, "Microsecond": true, "Millisecond": true, "Second": true, "Minute": true, "Hour": true}
 )
 
 // Walked with the guards that enclose each read, so a read under a filled seam
 // is known to be skipped. owners is nil when only the keys are wanted.
-func envReads(file *ast.File, root ast.Node, owners func([]string) []string) []envRead {
-	aliases := diogenfile.ImportAliases(file)
+func envReads(fset *token.FileSet, file *ast.File, root ast.Node, owners func([]string) []string) []envRead {
+	imports := diogenfile.ImportAliases(file)
 	var out []envRead
 	var walk func(n ast.Node, guards []string)
 	walk = func(n ast.Node, guards []string) {
@@ -65,9 +68,11 @@ func envReads(file *ast.File, root ast.Node, owners func([]string) []string) []e
 					return false
 				}
 			}
-			if read, ok := readEnv(node, aliases); ok {
-				read.guards = guards
-				out = append(out, read)
+			if read, ok := envread.Of(fset, node, imports); ok {
+				if typed, ok := readEnv(read); ok {
+					typed.guards = guards
+					out = append(out, typed)
+				}
 			}
 			return true
 		})
@@ -76,86 +81,48 @@ func envReads(file *ast.File, root ast.Node, owners func([]string) []string) []e
 	return out
 }
 
-// Every read in the module the container does not make: config, domain and cmd,
-// the directories `waffle agents` reads its list from too.
-func moduleReads() []envRead {
+func moduleReads(root string) []envRead {
 	var out []envRead
-	for _, root := range []string{"config", "domain", "cmd"} {
-		_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-			switch {
-			case err != nil, info.IsDir(), !strings.HasSuffix(path, ".go"):
-				return nil
-			case strings.HasSuffix(path, "_gen.go"), strings.HasSuffix(path, "_test.go"):
-				return nil
-			}
-			file, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.SkipObjectResolution)
-			if err != nil {
-				return nil
-			}
-			out = append(out, envReads(file, file, nil)...)
-			return nil
-		})
+	for _, read := range envread.Module(root) {
+		if typed, ok := readEnv(read); ok {
+			out = append(out, typed)
+		}
 	}
 	return out
 }
 
-func readEnv(node ast.Node, aliases map[string]string) (envRead, bool) {
-	call, ok := node.(*ast.CallExpr)
-	if !ok || len(call.Args) == 0 {
-		return envRead{}, false
-	}
-	fun, typeArg := call.Fun, ast.Expr(nil)
-	if index, ok := fun.(*ast.IndexExpr); ok {
-		fun, typeArg = index.X, index.Index
-	}
-	selector, ok := fun.(*ast.SelectorExpr)
-	if !ok {
-		return envRead{}, false
-	}
-	if x, ok := selector.X.(*ast.Ident); !ok || aliases[x.Name] != envPath {
-		return envRead{}, false
-	}
-	lit, ok := call.Args[0].(*ast.BasicLit)
-	if !ok || lit.Kind != token.STRING {
-		return envRead{}, false
-	}
-	key, err := strconv.Unquote(lit.Value)
+func readEnv(read envread.Read) (envRead, bool) {
 	// Custom is the field for what has no field of its own.
-	if err != nil || !token.IsIdentifier(key) || key == "Custom" {
+	if !token.IsIdentifier(read.Key) || read.Key == "Custom" {
 		return envRead{}, false
 	}
-	name := selector.Sel.Name
-	v := variable{Key: key, List: strings.HasSuffix(name, "Array"), Always: needReaders[name], imports: map[string]string{}}
+	name, imports := read.Reader, read.Imports
+	v := variable{Key: read.Key, List: strings.HasSuffix(name, "Array"), Always: requiredReaders[name], imports: map[string]string{}}
 
 	switch {
-	case name == "NeedJson":
+	case requiredReaders[name] && strings.HasSuffix(name, "Json"):
 		v.Type, v.Default = "string", `"null"`
-		return envRead{variable: v}, true
 	case name == "Json":
 		// The raw JSON; empty is not JSON, so the container keeps its fallback.
 		v.Type = "string"
-		return envRead{variable: v}, true
-	case needReaders[name]:
-		elem, ok := v.source(typeArg, aliases)
+	case requiredReaders[name]:
+		elem, ok := v.source(read.Type, imports)
 		if !ok {
 			return envRead{}, false
 		}
-		v.Type, v.Default = elem, placeholder(key, elem)
+		v.Type, v.Default = elem, placeholder(read.Key, elem)
 		if v.List {
 			v.Type = "[]" + elem
-			if v.Default != "" {
-				v.Default = v.Type + "{" + v.Default + "}"
-			}
+			v.Default = v.Type + "{" + v.Default + "}"
 		}
-		return envRead{variable: v}, true
-	case fallbackReaders[name] && len(call.Args) == 2:
-		fallback := call.Args[1]
-		if !v.contained(fallback, aliases) {
+	case fallbackReaders[name] && len(read.Call.Args) == 2:
+		fallback := read.Call.Args[1]
+		if !v.contained(fallback, imports) {
 			return envRead{}, false
 		}
-		typ, ok := v.source(typeArg, aliases)
+		typ, ok := v.source(read.Type, imports)
 		if !ok {
-			typ, ok = v.infer(fallback, aliases)
+			typ, ok = v.infer(fallback, imports)
 		}
 		if !ok {
 			return envRead{}, false
@@ -164,9 +131,10 @@ func readEnv(node ast.Node, aliases map[string]string) (envRead, bool) {
 		if v.List && !strings.HasPrefix(typ, "[]") {
 			v.Type = "[]" + typ
 		}
-		return envRead{variable: v}, true
+	default:
+		return envRead{}, false
 	}
-	return envRead{}, false
+	return envRead{variable: v, at: read.Pos}, true
 }
 
 // The type as source, with whatever package it names imported.
@@ -182,34 +150,32 @@ func (v *variable) infer(expr ast.Expr, aliases map[string]string) (string, bool
 	if composite, ok := expr.(*ast.CompositeLit); ok && composite.Type != nil {
 		return v.source(composite.Type, aliases)
 	}
-	duration := false
+	typed, untyped := "", ""
 	ast.Inspect(expr, func(n ast.Node) bool {
-		if selector, ok := n.(*ast.SelectorExpr); ok {
-			if x, ok := selector.X.(*ast.Ident); ok && aliases[x.Name] == "time" && durationUnits[selector.Sel.Name] {
-				duration = true
-			}
+		if typed != "" {
+			return false
 		}
-		return !duration
-	})
-	if duration {
-		for alias, p := range aliases {
-			if p == "time" {
-				return alias + ".Duration", true
-			}
-		}
-	}
-	var out string
-	ast.Inspect(expr, func(n ast.Node) bool {
 		switch t := n.(type) {
+		case *ast.CallExpr:
+			typed, _ = v.source(t.Fun, aliases)
+			return false
+		case *ast.SelectorExpr:
+			if x, ok := t.X.(*ast.Ident); ok && aliases[x.Name] == "time" && durationUnits[t.Sel.Name] {
+				typed = x.Name + ".Duration"
+			}
+			return false
 		case *ast.BasicLit:
-			out = map[token.Token]string{token.STRING: "string", token.INT: "int", token.FLOAT: "float64", token.CHAR: "rune"}[t.Kind]
+			if untyped == "" {
+				untyped = map[token.Token]string{token.STRING: "string", token.INT: "int", token.FLOAT: "float64", token.CHAR: "rune"}[t.Kind]
+			}
 		case *ast.Ident:
-			if t.Name == "true" || t.Name == "false" {
-				out = "bool"
+			if untyped == "" && (t.Name == "true" || t.Name == "false") {
+				untyped = "bool"
 			}
 		}
-		return out == ""
+		return true
 	})
+	out := cmp.Or(typed, untyped)
 	return out, out != ""
 }
 
@@ -253,10 +219,13 @@ var predeclared = map[string]bool{
 // A string names its own key, so a call that reaches it says which variable it
 // came from. Everything else is its zero value, which parses as its type.
 func placeholder(key, typ string) string {
-	if typ != "string" {
-		return ""
+	switch typ {
+	case "string":
+		return strconv.Quote(strings.ToLower(strings.ReplaceAll(key, "_", "-")) + ".harness.invalid")
+	case "bool":
+		return "false"
 	}
-	return strconv.Quote(strings.ToLower(strings.ReplaceAll(key, "_", "-")) + ".harness.invalid")
+	return "0"
 }
 
 func render(expr ast.Expr) string {
@@ -267,28 +236,56 @@ func render(expr ast.Expr) string {
 	return out.String()
 }
 
-// The container's reads decide a key they make, skipped or not; a key only the
-// rest of the module reads is always read.
-func (g graph) variables(filled map[string]bool, module []envRead) []variable {
-	var out []variable
-	seen := map[string]bool{}
-	for _, read := range g.reads {
-		seen[read.Key] = true
+// Two files may import one package under different aliases.
+func (v variable) qualified() string {
+	expr, err := parser.ParseExpr(v.Type)
+	if err != nil {
+		return v.Type
 	}
-	taken := map[string]bool{}
-	for _, read := range g.reads {
-		if taken[read.Key] || slices.ContainsFunc(read.guards, func(seam string) bool { return filled[seam] }) {
-			continue
+	ast.Inspect(expr, func(n ast.Node) bool {
+		if selector, ok := n.(*ast.SelectorExpr); ok {
+			if x, ok := selector.X.(*ast.Ident); ok && v.imports[x.Name] != "" {
+				x.Name = v.imports[x.Name]
+			}
 		}
-		taken[read.Key] = true
-		out = append(out, read.variable)
+		return true
+	})
+	return render(expr)
+}
+
+// A key the container reads only under seams Boot fills stays out wherever else
+// it is spelled: config/ holds the markup's copy of the container's own reads.
+func (g graph) variables(filled map[string]bool, module []envRead) ([]variable, error) {
+	made, live := map[string]bool{}, map[string]bool{}
+	var reads []envRead
+	for _, read := range g.reads {
+		made[read.Key] = true
+		if !slices.ContainsFunc(read.guards, func(seam string) bool { return filled[seam] }) {
+			live[read.Key] = true
+			reads = append(reads, read)
+		}
 	}
 	for _, read := range module {
-		if !seen[read.Key] {
-			seen[read.Key] = true
-			out = append(out, read.variable)
+		if !made[read.Key] || live[read.Key] {
+			reads = append(reads, read)
 		}
 	}
+
+	byKey := map[string]envRead{}
+	for _, read := range reads {
+		kept, seen := byKey[read.Key]
+		if seen && kept.qualified() != read.qualified() {
+			return nil, fmt.Errorf("%s is read as %s at %s and as %s at %s: Variables has one field for it, so the reads have to agree on its type",
+				read.Key, kept.Type, kept.at, read.Type, read.at)
+		}
+		if !seen || read.Always && !kept.Always {
+			byKey[read.Key] = read
+		}
+	}
+	out := make([]variable, 0, len(byKey))
+	for _, read := range byKey {
+		out = append(out, read.variable)
+	}
 	slices.SortFunc(out, func(a, b variable) int { return strings.Compare(a.Key, b.Key) })
-	return out
+	return out, nil
 }

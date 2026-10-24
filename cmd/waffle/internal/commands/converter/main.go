@@ -2,7 +2,6 @@ package converter
 
 import (
 	"context"
-	"embed"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -10,15 +9,10 @@ import (
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
 )
 
-// converter command has no per-command templates of its own — the shared
-// templates live next to generate.go in this same package.
-var noTemplates embed.FS
-
 func New() *cmd {
 	return &cmd{
 		base: command.New("make:converter",
-			"Scaffold a goverter dto/convert.go at the given path (creates pkg/goverter/convert.go too if missing)",
-			noTemplates, nil).
+			"Scaffold a goverter dto/convert.go at the given path (creates pkg/goverter/convert.go too if missing)").
 			WithUsage("<path>\n  e.g. waffle make:converter domain/users/cmd/grpc/convert\n" +
 				"       waffle make:converter domain/orders/adapter/external-api/dto"),
 	}
@@ -42,12 +36,11 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 	}
 	targetDir := strings.TrimRight(args[0], string(filepath.Separator))
 
-	projectName, err := c.base.FindProjectName()
+	p, err := command.OpenProject()
 	if err != nil {
 		return err
 	}
-
-	if err := Generate(targetDir, projectName); err != nil {
+	if err := Generate(p, targetDir); err != nil {
 		return err
 	}
 

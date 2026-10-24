@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"text/template"
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
+	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command/commandtest"
 	"gitlab.com/gorib/waffle/tools/scribus"
 )
 
@@ -21,7 +23,7 @@ import (
 func render(t *testing.T, mode, subject string) string {
 	t.Helper()
 
-	body, err := templates.ReadFile(filepath.Join("templates", mode, "handler.go.tpl"))
+	body, err := templateFiles.ReadFile(filepath.Join("templates", mode, "handler.go.tpl"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +85,7 @@ func TestHandlerTemplatesSatisfyTheirInterfaces(t *testing.T) {
 
 func renderFile(t *testing.T, path, event string) string {
 	t.Helper()
-	body, err := templates.ReadFile(path)
+	body, err := templateFiles.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,6 +126,79 @@ func TestTwoHandlersOfADomainShareOneManagement(t *testing.T) {
 			}
 			if wired != 1 {
 				t.Errorf("the management is wired %d times, want once", wired)
+			}
+		})
+	}
+}
+
+// Each case is a service whose binary would stop at startup, so each is refused
+// before the first file is written.
+func TestASecondConsumerShapeIsRefused(t *testing.T) {
+	cases := []struct {
+		name    string
+		modules string
+		di      string
+		args    []string
+		names   string
+	}{
+		{
+			name:    "batch beside an active single",
+			modules: "\t// _ \"" + driverPrefix + "amqp\"\n\t_ \"" + driverPrefix + "single\"\n\t// _ \"" + driverPrefix + "batch\"\n",
+			args:    []string{"--driver", "amqp", "--batch", "user", "order_paid"},
+			names:   driverPrefix + "single",
+		},
+		{
+			name:    "single beside an active batch",
+			modules: "\t// _ \"" + driverPrefix + "amqp\"\n\t// _ \"" + driverPrefix + "single\"\n\t_ \"" + driverPrefix + "batch\"\n",
+			args:    []string{"--driver", "amqp", "user", "order_paid"},
+			names:   driverPrefix + "batch",
+		},
+		{
+			name:    "a second driver",
+			modules: "\t// _ \"" + driverPrefix + "amqp\"\n\t_ \"" + driverPrefix + "nats\"\n\t// _ \"" + driverPrefix + "single\"\n",
+			args:    []string{"--driver", "amqp", "user", "order_paid"},
+			names:   driverPrefix + "nats",
+		},
+		{
+			name:    "a mode given as the driver",
+			modules: "\t// _ \"" + driverPrefix + "single\"\n\t// _ \"" + driverPrefix + "batch\"\n",
+			args:    []string{"--driver", "batch", "user", "order_paid"},
+			names:   "batch is a mode",
+		},
+		{
+			name:    "a second BatchHandler",
+			modules: "\t_ \"" + driverPrefix + "amqp\"\n\t_ \"" + driverPrefix + "batch\"\n",
+			di:      "package di\n\nfunc InitDi() {\n\tdi.Wire[wscribus.BatchHandler](scribusUser.NewOrderPaidCommand)\n}\n",
+			args:    []string{"--driver", "amqp", "--batch", "user", "order_cancelled"},
+			names:   "config/di/di.go",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			p := commandtest.Project(t, "example.com/svc")
+			files := map[string]string{
+				command.ModulesFile:         "package di\n\nimport (\n" + c.modules + ")\n",
+				"domain/user/model/user.go": "package model\n",
+			}
+			if c.di != "" {
+				files["config/di/di.go"] = c.di
+			}
+			for name, body := range files {
+				if err := os.MkdirAll(filepath.Dir(p.Path(name)), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(p.Path(name), []byte(body), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			err := New().Run(t.Context(), c.args...)
+
+			if err == nil || !strings.Contains(err.Error(), c.names) {
+				t.Fatalf("err = %v, want a refusal naming %s", err, c.names)
+			}
+			if _, err := os.Stat(p.Path("domain", "user", "cmd")); err == nil {
+				t.Error("the refusal came after the handler was written")
 			}
 		})
 	}

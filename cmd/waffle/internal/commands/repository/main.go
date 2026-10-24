@@ -3,8 +3,6 @@ package repository
 import (
 	"context"
 	"fmt"
-	"os/exec"
-	"strings"
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/migrate"
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
@@ -13,7 +11,7 @@ import (
 const defaultStorage = "sql"
 
 func New() *cmd {
-	return &cmd{command.New("make:domain:entity", "Add an entity with its repository to an existing domain", templates, nil).
+	return &cmd{command.New("make:domain:entity", "Add an entity with its repository to an existing domain").
 		WithUsage("[--storage=<type>, default sql] <domain> <entity>")}
 }
 
@@ -22,16 +20,14 @@ type cmd struct {
 }
 
 func (c *cmd) Run(ctx context.Context, args ...string) error {
-	storage := defaultStorage
-	for i, arg := range args {
-		if after, found := strings.CutPrefix(arg, "--storage="); found {
-			storage = after
-			args = append(args[:i], args[i+1:]...)
-			break
-		}
+	storages, args, err := command.TakeValues(args, "--storage", "the adapter's type, e.g. --storage sql")
+	if err != nil {
+		return err
 	}
-	if storage != defaultStorage {
-		return fmt.Errorf("storage %q is not supported (only %s for now)", storage, defaultStorage)
+	for _, storage := range storages {
+		if storage != defaultStorage {
+			return fmt.Errorf("storage %q is not supported (only %s for now)", storage, defaultStorage)
+		}
 	}
 
 	if err := c.Operands(args, 2, 2); err != nil {
@@ -44,28 +40,39 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 	if err := command.ValidateName("entity", entity); err != nil {
 		return err
 	}
-	projectName, err := c.FindProjectName()
+	p, err := command.OpenProject()
 	if err != nil {
+		return err
+	}
+	if err := p.RequireDomain(domain); err != nil {
+		return err
+	}
+	if err := p.RequireModules(command.MigrationModules...); err != nil {
 		return err
 	}
 
 	// The same three calls, in the same order, that make:domain makes for the
 	// domain's own entity.
-	if err := GenerateEntity(domain, entity, projectName); err != nil {
+	if err := GenerateEntity(p, domain, entity); err != nil {
 		return err
 	}
-	if err := migrate.Generate(domain, entity, projectName); err != nil {
+	if err := migrate.Generate(p, domain, entity); err != nil {
 		return err
 	}
-	if err := c.EnableStorage(); err != nil {
+	if err := p.EnableStorage(); err != nil {
 		return err
+	}
+	// Not `make generate`, for make:domain's reason: until the management reads
+	// the repository, diogen rightly refuses the container.
+	for _, step := range [][]string{
+		{"make", ".tidy"},
+		{"go", "generate", "./domain/" + domain + "/..."},
+	} {
+		if _, err := p.Run(step[0], step[1:]...); err != nil {
+			return err
+		}
 	}
 	reportWiring(domain, entity)
-
-	info, err := exec.Command("make", ".tidy", "generate").CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%v: %v", err, string(info))
-	}
 	return nil
 }
 
@@ -75,7 +82,7 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 func reportWiring(domain, entity string) {
 	name := command.Title(entity)
 	command.ReportBlock(
-		fmt.Sprintf("to reach it from the management, add to New%sManagement in domain/%s/service/service.go:", command.Title(domain), domain),
+		fmt.Sprintf("diogen refuses the container until something reads the repository — to reach it from the management, add to New%sManagement in domain/%s/service/service.go, then run make generate:", command.Title(domain), domain),
 		fmt.Sprintf("%sRepository %sRepository", entity, name),
 	)
 }

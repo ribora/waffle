@@ -4,25 +4,23 @@
 package whisk
 
 import (
-	"fmt"
 	"os"
-	"os/exec"
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
 )
 
 const module = "gitlab.com/gorib/whisk/cmd/whisk"
 
-func Ensure(c *command.Command) error {
-	if err := c.EnsureTool(module); err != nil {
+func Ensure(p *command.Project) error {
+	if err := p.EnsureTool(module); err != nil {
 		return err
 	}
 	// whisk writes whisk.yaml itself rather than waffle carrying a second copy of
 	// its defaults; it leaves an existing file alone and reports which happened.
-	initCmd := exec.Command("go", "tool", "whisk", "init")
-	initCmd.Stderr = os.Stderr
-	if err := initCmd.Run(); err != nil {
-		return fmt.Errorf("whisk init: %w", err)
+	report, err := p.Run("go", "tool", "whisk", "init")
+	if err != nil {
+		return err
 	}
+	_, _ = os.Stderr.Write(report)
 	return nil
 }

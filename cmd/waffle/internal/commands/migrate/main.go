@@ -8,10 +8,12 @@ import (
 )
 
 //go:embed templates/*
-var templates embed.FS
+var templateFiles embed.FS
+
+var templates = command.NewTemplates(templateFiles)
 
 func New() *cmd {
-	return &cmd{command.New("make:domain:migrate", "Set up migrations to the specified domain", templates, nil).
+	return &cmd{command.New("make:domain:migrate", "Set up migrations to the specified domain").
 		WithUsage("<domain>")}
 }
 
@@ -27,14 +29,20 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 		return err
 	}
 	domain := args[0]
-	projectName, err := c.FindProjectName()
+	p, err := command.OpenProject()
 	if err != nil {
+		return err
+	}
+	if err := p.RequireDomain(domain); err != nil {
+		return err
+	}
+	if err := p.RequireModules(command.MigrationModules...); err != nil {
 		return err
 	}
 	// The runner belongs to the domain, and the table it starts with is the
 	// domain's own entity — the one make:domain would have written.
-	if err := Generate(domain, domain, projectName); err != nil {
+	if err := Generate(p, domain, domain); err != nil {
 		return err
 	}
-	return c.EnableMigrations()
+	return p.EnableMigrations()
 }

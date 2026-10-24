@@ -8,32 +8,28 @@
 package agents
 
 import (
-	"bytes"
 	"embed"
 	"fmt"
-	"go/ast"
-	"go/parser"
-	"go/token"
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
+	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/envread"
 	"gitlab.com/gorib/waffle/internal/gomod"
 )
 
 //go:embed templates/*
-var templates embed.FS
+var templateFiles embed.FS
 
-// Generate writes AGENTS.md in the current working directory, auto-detecting
-// the service context (domains, active waffle modules, env vars). projectName
-// is the module path. quiet leaves out the files that were already current. It
-// reports whether anything on disk changed.
-func Generate(projectName string, quiet bool) (bool, error) {
-	c := command.New("agents-internal", "", templates, nil)
-	cfg, err := c.ProjectConfig(projectName)
+var templates = command.NewTemplates(templateFiles)
+
+// Generate writes AGENTS.md at the module root, auto-detecting the service
+// context (domains, active waffle modules, env vars). quiet leaves out the files
+// that were already current. It reports whether anything on disk changed.
+func Generate(p *command.Project, quiet bool) (bool, error) {
+	cfg, err := p.Config()
 	if err != nil {
 		return false, err
 	}
@@ -41,22 +37,21 @@ func Generate(projectName string, quiet bool) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	out, err := c.Render(filepath.Join("templates", "AGENTS.md.tpl"), scanContext(projectName, areas))
+	out, err := templates.Render(filepath.Join("templates", "AGENTS.md.tpl"), scanContext(p, areas))
 	if err != nil {
 		return false, err
 	}
 
-	changed := false
-	if current, err := os.ReadFile("AGENTS.md"); err != nil || !bytes.Equal(current, out) {
-		if err := os.WriteFile("AGENTS.md", out, 0644); err != nil {
-			return false, fmt.Errorf("write AGENTS.md: %w", err)
-		}
+	changed, err := command.WriteIfChanged(p.Path("AGENTS.md"), out)
+	if err != nil {
+		return false, fmt.Errorf("write AGENTS.md: %w", err)
+	}
+	if changed {
 		command.ReportCreated("AGENTS.md")
-		changed = true
 	} else if !quiet {
 		command.ReportUnchanged("AGENTS.md")
 	}
-	linked, err := ensureSymlinks(quiet)
+	linked, err := ensureSymlinks(p, quiet)
 	return changed || linked, err
 }
 
@@ -70,21 +65,21 @@ type serviceContext struct {
 	Areas         []Area
 }
 
-func scanContext(projectName string, areas []Area) serviceContext {
-	modules := scanModules()
+func scanContext(p *command.Project, areas []Area) serviceContext {
+	modules := scanModules(p)
 	return serviceContext{
-		ModulePath:    projectName,
-		WaffleVersion: gomod.Requires(".", wafflePath),
-		Domains:       scanDomains(),
+		ModulePath:    p.Module(),
+		WaffleVersion: gomod.Requires(p.Root(), wafflePath),
+		Domains:       scanDomains(p),
 		Modules:       modules,
-		EnvVars:       scanEnvVars(modules),
+		EnvVars:       scanEnvVars(p.Root(), modules),
 		Modes:         modes,
 		Areas:         areas,
 	}
 }
 
-func scanDomains() []string {
-	entries, err := os.ReadDir("domain")
+func scanDomains(p *command.Project) []string {
+	entries, err := os.ReadDir(p.Path("domain"))
 	if err != nil {
 		return nil
 	}
@@ -103,24 +98,14 @@ const (
 	modulePrefix = wafflePath + "/config/"
 )
 
-// Parsed, not matched: the scaffolded modules.go ships with seven commented-out
-// blank imports, and a regexp counts them as active.
-func scanModules() []string {
-	file, err := parser.ParseFile(token.NewFileSet(), filepath.Join("config", "di", "modules.go"), nil,
-		parser.ImportsOnly|parser.SkipObjectResolution)
+func scanModules(p *command.Project) []string {
+	active, err := p.ActiveModules()
 	if err != nil {
 		return nil
 	}
 	seen := map[string]bool{}
 	var modules []string
-	for _, spec := range file.Imports {
-		if spec.Name == nil || spec.Name.Name != "_" {
-			continue
-		}
-		path, err := strconv.Unquote(spec.Path.Value)
-		if err != nil {
-			continue
-		}
+	for _, path := range active {
 		name, ok := strings.CutPrefix(path, modulePrefix)
 		if !ok || seen[name] {
 			continue
@@ -132,40 +117,15 @@ func scanModules() []string {
 	return modules
 }
 
-const envPackage = "gitlab.com/gorib/env"
-
-// Every reader takes the key first, so the list is the package's, not a selection.
-var envReaders = map[string]bool{
-	"Value": true, "Array": true, "Json": true,
-	"NeedValue": true, "NeedArray": true, "NeedJson": true,
-	"MustValue": true, "MustArray": true, "MustJson": true,
-}
-
-// Parsed, not matched, for the same reason as scanModules.
-func scanEnvVars(modules []string) []string {
+func scanEnvVars(root string, modules []string) []string {
 	seen := map[string]bool{}
 	for _, module := range modules {
 		for _, name := range command.ModuleEnv(module) {
 			seen[name] = true
 		}
 	}
-	for _, root := range []string{"config", "domain", "cmd"} {
-		_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-			switch {
-			case err != nil, info.IsDir(), !strings.HasSuffix(path, ".go"):
-				return nil
-			case strings.HasSuffix(path, "_gen.go"), strings.HasSuffix(path, "_test.go"):
-				return nil
-			}
-			// A file mid-edit was skipped before this parsed too; AGENTS.md is
-			// not the place to report that it does not compile.
-			file, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.SkipObjectResolution)
-			if err != nil {
-				return nil
-			}
-			readEnvVars(file, seen)
-			return nil
-		})
+	for _, read := range envread.Module(root) {
+		seen[read.Key] = true
 	}
 	var vars []string
 	for k := range seen {
@@ -175,56 +135,11 @@ func scanEnvVars(modules []string) []string {
 	return vars
 }
 
-func readEnvVars(file *ast.File, seen map[string]bool) {
-	local := ""
-	for _, spec := range file.Imports {
-		if p, err := strconv.Unquote(spec.Path.Value); err != nil || p != envPackage {
-			continue
-		}
-		local = "env"
-		if spec.Name != nil {
-			local = spec.Name.Name
-		}
-	}
-	if local == "" || local == "_" {
-		return
-	}
-
-	ast.Inspect(file, func(n ast.Node) bool {
-		call, ok := n.(*ast.CallExpr)
-		if !ok || len(call.Args) == 0 {
-			return true
-		}
-		// env.NeedValue[string]("X") instantiates before it calls.
-		fun := call.Fun
-		switch indexed := fun.(type) {
-		case *ast.IndexExpr:
-			fun = indexed.X
-		case *ast.IndexListExpr:
-			fun = indexed.X
-		}
-		sel, ok := fun.(*ast.SelectorExpr)
-		if !ok || !envReaders[sel.Sel.Name] {
-			return true
-		}
-		if qualifier, ok := sel.X.(*ast.Ident); !ok || qualifier.Name != local {
-			return true
-		}
-		key, ok := call.Args[0].(*ast.BasicLit)
-		if !ok || key.Kind != token.STRING {
-			return true
-		}
-		if name, err := strconv.Unquote(key.Value); err == nil && name != "" {
-			seen[name] = true
-		}
-		return true
-	})
-}
-
-func ensureSymlinks(quiet bool) (bool, error) {
+func ensureSymlinks(p *command.Project, quiet bool) (bool, error) {
 	changed := false
 	for _, name := range []string{"CLAUDE.md", ".cursorrules"} {
-		if info, err := os.Lstat(name); err == nil {
+		link := p.Path(name)
+		if info, err := os.Lstat(link); err == nil {
 			// Only replace existing symlinks; never overwrite real files.
 			if info.Mode()&os.ModeSymlink == 0 {
 				if !quiet {
@@ -232,15 +147,15 @@ func ensureSymlinks(quiet bool) (bool, error) {
 				}
 				continue
 			}
-			if target, err := os.Readlink(name); err == nil && target == "AGENTS.md" {
+			if target, err := os.Readlink(link); err == nil && target == "AGENTS.md" {
 				if !quiet {
 					command.ReportUnchanged(name)
 				}
 				continue
 			}
-			_ = os.Remove(name)
+			_ = os.Remove(link)
 		}
-		if err := os.Symlink("AGENTS.md", name); err != nil {
+		if err := os.Symlink("AGENTS.md", link); err != nil {
 			return changed, fmt.Errorf("symlink %s: %w", name, err)
 		}
 		command.ReportCreated(name + " → AGENTS.md")

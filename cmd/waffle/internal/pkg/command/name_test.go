@@ -1,8 +1,6 @@
 package command
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -177,31 +175,12 @@ func TestIsHelp(t *testing.T) {
 }
 
 func TestUsage(t *testing.T) {
-	bare := New("make:agents", "", testTemplates, nil)
+	bare := New("make:agents", "")
 	if got := bare.Usage(); got != "usage: waffle make:agents" {
 		t.Errorf("usage = %q", got)
 	}
-	withOperands := New("make:domain", "", testTemplates, nil).WithUsage("[--no-repository] <domain>")
+	withOperands := New("make:domain", "").WithUsage("[--no-repository] <domain>")
 	if got := withOperands.Usage(); got != "usage: waffle make:domain [--no-repository] <domain>" {
 		t.Errorf("usage = %q", got)
-	}
-}
-
-// UncommentModule used to be reached last, after eleven files and a go.mod edit.
-func TestRequireModules(t *testing.T) {
-	c, _ := scaffoldIn(t)
-
-	if err := c.RequireModules(); err == nil {
-		t.Error("a project without config/di/modules.go passed the precondition")
-	}
-
-	if err := os.MkdirAll(filepath.Join("config", "di"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join("config", "di", "modules.go"), []byte("package di\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := c.RequireModules(); err != nil {
-		t.Errorf("err = %v", err)
 	}
 }

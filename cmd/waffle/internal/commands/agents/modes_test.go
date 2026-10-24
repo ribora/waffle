@@ -12,19 +12,28 @@ func config(protoDir string, areas map[string]command.AreaConfig) command.Config
 	return command.Config{ProtoDir: protoDir, Agents: command.AgentsConfig{Areas: areas}}
 }
 
+func rulesAt(t *testing.T, root string, cfg command.Config) Rules {
+	t.Helper()
+	areas, err := Areas(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := newRules(root, areas)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return r
+}
+
 // A monorepo service at /repo/services/svc: proto_dir points at the shared
 // contracts, and waffle.yaml declares the rest of shared/ as areas.
 func monorepoRules(t *testing.T) Rules {
 	t.Helper()
-	areas, err := Areas(config("../../shared/api/proto", map[string]command.AreaConfig{
+	return rulesAt(t, "/repo/services/svc", config("../../shared/api/proto", map[string]command.AreaConfig{
 		"events": {Paths: []string{"../../shared/api/events/"}, Modes: []string{"spec", "platform"}},
 		"shared": {Paths: []string{"../../shared/pkg/"}, Modes: []string{"platform"}},
 		"pb":     {Paths: []string{"../../shared/api/pb/"}, Modes: []string{}},
 	}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return Rules{Root: "/repo/services/svc", Areas: areas}
 }
 
 func TestModesAndAreasAllow(t *testing.T) {
@@ -140,11 +149,7 @@ func TestRefusalNamesWhatWouldAllow(t *testing.T) {
 // Inside a single service proto_dir is api/proto, and the contract is still
 // spec's to change.
 func TestProtoFollowsProtoDir(t *testing.T) {
-	areas, err := Areas(config("api/proto", nil))
-	if err != nil {
-		t.Fatal(err)
-	}
-	r := Rules{Root: "/svc", Areas: areas}
+	r := rulesAt(t, "/svc", config("api/proto", nil))
 	for _, c := range []struct {
 		mode string
 		want bool
@@ -157,15 +162,27 @@ func TestProtoFollowsProtoDir(t *testing.T) {
 }
 
 func TestWaffleYamlReplacesADefaultArea(t *testing.T) {
-	areas, err := Areas(config("api/proto", map[string]command.AreaConfig{
+	r := rulesAt(t, "/svc", config("api/proto", map[string]command.AreaConfig{
 		"gomod": {Paths: []string{"go.mod", "go.sum"}, Modes: []string{"redgreen", "platform"}},
 	}))
-	if err != nil {
-		t.Fatal(err)
-	}
 	mode, _ := LookupMode("redgreen")
-	if v, _ := (Rules{Root: "/svc", Areas: areas}).Check(mode, "/svc/go.mod", nil); v != Allowed {
+	if v, _ := r.Check(mode, "/svc/go.mod", nil); v != Allowed {
 		t.Errorf("go.mod in redgreen with gomod redeclared open there: %v", v)
+	}
+}
+
+func TestTheMostSpecificAreaDecides(t *testing.T) {
+	r := rulesAt(t, "/svc", config("api/proto", map[string]command.AreaConfig{
+		"api": {Paths: []string{"api/"}, Modes: []string{"platform"}},
+	}))
+	spec, _ := LookupMode("spec")
+	for p, want := range map[string]Verdict{
+		"/svc/api/proto/price/service.proto": Allowed,
+		"/svc/api/openapi.yaml":              Refused,
+	} {
+		if v, _ := r.Check(spec, p, nil); v != want {
+			t.Errorf("%s in spec mode: verdict %v, want %v", p, v, want)
+		}
 	}
 }
 

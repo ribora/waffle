@@ -52,15 +52,17 @@ collection's own `Replacements` field, all at once.
 
 ### SQL migrations
 
-**`domain/user/cmd/migrate/migrations/<timestamp>00_create_update_at_function.sql`**
+**`domain/user/cmd/migrate/migrations/<timestamp>_create_update_at_function.sql`**
 
 A reusable PostgreSQL function that updates the `updated_at` column on any table
 that installs the trigger. Every domain scaffolds this file, so the creation is
 wrapped in a block that swallows `duplicate_function` — the second domain to be
-added finds the function already there:
+added finds the function already there. The block is one statement full of
+semicolons, which is what `StatementBegin`/`StatementEnd` tell goose:
 
 ```sql
 -- +goose Up
+-- +goose StatementBegin
 do $create$
     begin
         create function update_updated_at()
@@ -76,6 +78,7 @@ exception
             null;
     end;
 $create$;
+-- +goose StatementEnd
 
 -- +goose Down
 ```
@@ -85,7 +88,7 @@ domain's trigger.
 
 **`domain/user/cmd/migrate/migrations/<timestamp>_create_users_table.sql`**
 
-The initial table migration. The timestamp is generated at scaffold time (format `YYYYMMDDHHmmss`; the function above gets `YYYYMMDDHHmm00` so it always sorts first). The table name is the plural of the domain name:
+The initial table migration. The timestamp is generated at scaffold time (format `YYYYMMDDHHmmss`; the function above is stamped a second earlier, so it runs first and the two never share a version, which goose refuses). The table name is the plural of the domain name:
 
 ```sql
 -- +goose Up

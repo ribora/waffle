@@ -69,7 +69,8 @@ type conn struct {
 }
 
 func read(container replacements.Container, importPath string, seams []replacements.Seam) (shape, error) {
-	file, err := parser.ParseFile(token.NewFileSet(), container.File, nil, parser.SkipObjectResolution|parser.ParseComments)
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, container.File, nil, parser.SkipObjectResolution|parser.ParseComments)
 	if err != nil {
 		return shape{}, err
 	}
@@ -113,12 +114,14 @@ func read(container replacements.Container, importPath string, seams []replaceme
 	}
 
 	body := diogenfile.InitAppWithBody(file)
-	graph := readGraph(file, body)
+	graph := readGraph(fset, file, body)
 	for i := range out.Dead {
 		out.Dead[i].Label = graph.label(out.Dead[i].Field, types)
 	}
 	slices.SortFunc(out.Dead, func(a, b conn) int { return strings.Compare(a.Field, b.Field) })
-	out.Variables = graph.variables(out.filled(), moduleReads())
+	if out.Variables, err = graph.variables(out.filled(), moduleReads(".")); err != nil {
+		return shape{}, err
+	}
 
 	fields := containerFields(file)
 	out.Grpc = commandArgs(body, fields, "NewGrpcCommand")
@@ -252,7 +255,7 @@ type block struct {
 	keys   []string
 }
 
-func readGraph(file *ast.File, body *ast.BlockStmt) graph {
+func readGraph(fset *token.FileSet, file *ast.File, body *ast.BlockStmt) graph {
 	g := graph{owner: map[string]string{}}
 	if body != nil {
 		stmts, locals := diogenfile.BuildStatements(body), diogenfile.Locals(body)
@@ -271,13 +274,13 @@ func readGraph(file *ast.File, body *ast.BlockStmt) graph {
 				continue
 			}
 			b := block{guards: guards, reads: diogenfile.ContainerReads(guarded.Body, locals)}
-			for _, read := range envReads(file, guarded.Body, nil) {
+			for _, read := range envReads(fset, file, guarded.Body, nil) {
 				b.keys = append(b.keys, read.Key)
 			}
 			g.blocks = append(g.blocks, b)
 		}
 	}
-	g.reads = envReads(file, file, g.owners)
+	g.reads = envReads(fset, file, file, g.owners)
 	return g
 }
 

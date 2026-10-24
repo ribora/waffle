@@ -3,7 +3,6 @@ package flows
 import (
 	"bytes"
 	"context"
-	"embed"
 	"fmt"
 	"maps"
 	"os"
@@ -17,12 +16,9 @@ import (
 	"gitlab.com/gorib/waffle/tools/flows"
 )
 
-var noTemplates embed.FS
-
 func New() *cmd {
 	return &cmd{base: command.New("flows",
-		"Assemble a project's flows from its services' records and check the services against each other",
-		noTemplates, nil).
+		"Assemble a project's flows from its services' records and check the services against each other").
 		WithUsage("<root> <index.yaml>\n" +
 			"  root is searched for waffle services the way ./... is, and taken as the whole system; index.yaml is\n" +
 			"  the project's index, and the pages are written beside it. Fails on prose that lost its flow and on\n" +
@@ -57,12 +53,14 @@ func (c *cmd) Run(_ context.Context, args ...string) error {
 		}
 	}
 
-	if err := os.MkdirAll(filepath.Dir(index), 0o755); err != nil {
-		return err
-	}
+	written := 0
 	for _, path := range slices.Sorted(maps.Keys(files)) {
-		if err := os.WriteFile(path, files[path], 0o644); err != nil {
+		changed, err := command.WriteIfChanged(path, files[path])
+		if err != nil {
 			return err
+		}
+		if changed {
+			written++
 		}
 	}
 	for _, path := range stale {
@@ -71,7 +69,11 @@ func (c *cmd) Run(_ context.Context, args ...string) error {
 		}
 		command.ReportAction("removed " + path)
 	}
-	command.ReportAction(fmt.Sprintf("wrote %s and %d pages", index, len(files)-1))
+	if summary := fmt.Sprintf("%s and %d pages", index, len(files)-1); written == 0 {
+		command.ReportUnchanged(summary)
+	} else {
+		command.ReportAction(fmt.Sprintf("wrote %d of %s", written, summary))
+	}
 	if orphaned(files[index]) {
 		return fmt.Errorf("%s: some prose lost its flow — see orphaned", index)
 	}

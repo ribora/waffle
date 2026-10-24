@@ -2,9 +2,9 @@
 
 [Docs](../README.md) · CLI scaffolding
 
-Creates a domain and its first entity: errors and a management for the domain,
-then model, repository interface, postgres adapter, stored struct, DI and a table
-for the entity. Every entity added later gets that second list and nothing else —
+Creates a domain and its first entity: a management for the domain, then model,
+repository interface, postgres adapter, stored struct, DI and a table for the
+entity. Every entity added later gets that second list and nothing else —
 see [make:domain:entity](#a-second-entity).
 
 ## Usage
@@ -13,8 +13,8 @@ see [make:domain:entity](#a-second-entity).
 waffle make:domain [--no-repository] <name>
 ```
 
-`--no-repository` stops the chain at its first link: the domain gets its errors,
-its management and the model, and no adapter, table or database module. The model
+`--no-repository` stops the chain at its first link: the domain gets its
+management and the model, and no adapter, table or database module. The model
 is written either way, because a repository needs one and nothing needs a
 repository.
 
@@ -30,21 +30,9 @@ waffle make:domain user
 
 **`domain/user/model/user.go`**
 
-The domain entity. Plain Go struct with no database tags — it represents the business concept, not the storage format:
-
-```go
-package model
-
-type User struct {
-    Id    int
-    Email string
-    Name  string
-}
-```
-
-**`domain/user/model/errors.go`**
-
-Typed sentinel errors for the domain, defined with `gitlab.com/gorib/failure`:
+The domain entity, and the sentinel its adapter returns for a missing row. The
+struct is plain Go with no database tags — it represents the business concept,
+not the storage format:
 
 ```go
 package model
@@ -56,7 +44,16 @@ import (
 var (
     ErrUserNotFound = failure.New("user is not found")
 )
+
+type User struct {
+    Id    int
+    Email string
+    Name  string
+}
 ```
+
+The sentinel belongs to the entity rather than the domain: every entity declares
+its own `Err<Entity>NotFound` beside its struct, the first and the tenth alike.
 
 `failure.New` rather than `errors.New`: it registers a slug for the message, and
 the slug is what the HTTP error renderer puts in the body.
@@ -68,8 +65,7 @@ the slug is what the HTTP error renderer puts in the body.
 A bare `errors.New` reaches the client as `"type":"internal_error"` — one label
 for every failure a service can have. The status is a separate decision: 500
 until the error is wrapped in something that carries one, or mapped by the gRPC
-error handler. Add the rest of the domain's sentinels to this file as they
-appear.
+error handler.
 
 ### Service
 
@@ -112,7 +108,8 @@ scaffolder writes neither, because it cannot tell which one a domain wants.
 ### A second entity
 
 `waffle make:domain:entity user address` gives `address` the same set `user`
-got — model, adapter, stored struct, DI and its own table — and appends
+got — model with its `ErrAddressNotFound`, adapter, stored struct, DI and its
+own table — and appends
 `AddressRepository` to the same `service.go`. The first entity of a domain and
 the tenth differ in nothing.
 
@@ -123,8 +120,11 @@ anything. `--storage` picks the adapter rather than whether there is one, and
 
 What it does not do is add the repository to the management: whether an entity's
 repository belongs there is a design decision, and a read model read only by a
-handler does not. The command prints the parameter to add, and `diogen` wires it
-by type as soon as it is there.
+handler does not. So it ends the way `make:domain` does — `make .tidy` and
+`go generate ./domain/user/...`, not the container, which `diogen` refuses while
+nothing reads the new repository. The command prints the parameter to add;
+`diogen` wires it by type as soon as it is there, and `make generate` then
+succeeds.
 
 ### Postgres adapter
 
@@ -191,7 +191,7 @@ container — so exporting it would only offer a second way to reach it.
 
 **The table is a package-level `sql.Table`,** built once instead of per query.
 
-**`sql.ErrNoRows` becomes the domain's own `ErrUserNotFound`; everything else
+**`sql.ErrNoRows` becomes the entity's own `ErrUserNotFound`; everything else
 is logged and becomes `sql.ErrQueryFailed`.** A driver error carries the query
 and sometimes its parameters, and the service above has no use for either — so
 the detail goes to the log and the caller gets an error it can act on. This is
@@ -260,7 +260,7 @@ The package whose `NewMigrations()` returns the embedded SQL, collected by the
 `migrate` command from every domain that has one. Its DI registration is
 **`config/di/di_user_migrate.go`**.
 
-Two SQL files come with it, both named by the minute they were created:
+Two SQL files come with it, both named by the second they were created:
 
 **`domain/user/cmd/migrate/migrations/<timestamp>_create_update_at_function.sql`**
 

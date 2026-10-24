@@ -7,15 +7,16 @@ import (
 	"testing"
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
+	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command/commandtest"
 )
 
 const project = "example.com/svc"
 
 // A domain as make:domain leaves it before its own entity is written: the
 // package exists, service.go is there, nothing else.
-func domainDir(t *testing.T, domain string) {
+func domainDir(t *testing.T, domain string) *command.Project {
 	t.Helper()
-	t.Chdir(t.TempDir())
+	p := commandtest.Project(t, project)
 	for _, dir := range []string{"model", "service", filepath.Join("adapter", "postgres")} {
 		if err := os.MkdirAll(filepath.Join("domain", domain, dir), 0755); err != nil {
 			t.Fatal(err)
@@ -30,6 +31,7 @@ func domainDir(t *testing.T, domain string) {
 	if err := os.WriteFile(filepath.Join("domain", domain, "service", "service.go"), []byte(body), 0644); err != nil {
 		t.Fatal(err)
 	}
+	return p
 }
 
 // What an entity of a domain is, as a list of paths. Naming it here rather than
@@ -63,11 +65,11 @@ func assertEntity(t *testing.T, domain, entity string) {
 // The invariant the split exists for: which entity of a domain this is changes
 // nothing about what it gets.
 func TestEveryEntityGetsTheSameFiles(t *testing.T) {
-	domainDir(t, "shipment")
-	if err := GenerateEntity("shipment", "shipment", project); err != nil {
+	p := domainDir(t, "shipment")
+	if err := GenerateEntity(p, "shipment", "shipment"); err != nil {
 		t.Fatalf("the domain's own entity: %v", err)
 	}
-	if err := GenerateEntity("shipment", "line", project); err != nil {
+	if err := GenerateEntity(p, "shipment", "line"); err != nil {
 		t.Fatalf("an entity added later: %v", err)
 	}
 
@@ -79,8 +81,8 @@ func TestEveryEntityGetsTheSameFiles(t *testing.T) {
 // not in a file of its own.
 // The file name keeps the underscore, every identifier folds it.
 func TestAMultiWordEntityFolds(t *testing.T) {
-	domainDir(t, "warehouse")
-	if err := GenerateEntity("warehouse", "unit_type", project); err != nil {
+	p := domainDir(t, "warehouse")
+	if err := GenerateEntity(p, "warehouse", "unit_type"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -119,11 +121,11 @@ func TestAMultiWordEntityFolds(t *testing.T) {
 
 // A title that does not fold turns this guard off without failing anything.
 func TestAMultiWordEntityIsNotDeclaredTwice(t *testing.T) {
-	domainDir(t, "warehouse")
-	if err := GenerateEntity("warehouse", "unit_type", project); err != nil {
+	p := domainDir(t, "warehouse")
+	if err := GenerateEntity(p, "warehouse", "unit_type"); err != nil {
 		t.Fatal(err)
 	}
-	if err := GenerateEntity("warehouse", "unit_type", project); err != nil {
+	if err := GenerateEntity(p, "warehouse", "unit_type"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -137,8 +139,8 @@ func TestAMultiWordEntityIsNotDeclaredTwice(t *testing.T) {
 }
 
 func TestTheInterfaceLandsInServiceGo(t *testing.T) {
-	domainDir(t, "order")
-	if err := GenerateEntity("order", "line", project); err != nil {
+	p := domainDir(t, "order")
+	if err := GenerateEntity(p, "order", "line"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -164,13 +166,13 @@ func TestTheInterfaceLandsInServiceGo(t *testing.T) {
 // A model a person wrote in another file of the package is the name being
 // taken, and writing a second declaration would break the build.
 func TestAnExistingModelIsFoundWhereverItIs(t *testing.T) {
-	domainDir(t, "order")
+	p := domainDir(t, "order")
 	mine := "package model\n\ntype Order struct{}\n\ntype Line struct{ Mine bool }\n"
 	if err := os.WriteFile(filepath.Join("domain", "order", "model", "order.go"), []byte(mine), 0644); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := GenerateEntity("order", "line", project); err != nil {
+	if err := GenerateEntity(p, "order", "line"); err != nil {
 		t.Fatal(err)
 	}
 

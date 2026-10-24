@@ -32,7 +32,8 @@ go install gitlab.com/gorib/waffle/cmd/waffle@latest
 | `waffle agents` | Regenerate `AGENTS.md` after a waffle upgrade ([details](agents.md)) |
 | `waffle agents:guard <mode> <path>`, `waffle agents:mode <mode>`, `waffle agents:grant <mode>` | Rule #11's modes, areas and grants, for a tool that enforces them ([details](agents.md#modes-areas-and-grants)) |
 
-`--help` on any of them prints its description and operands. A failing command
+`--help` on any of them prints its description and operands. A flag that takes a
+value takes it either way, `--driver amqp` or `--driver=amqp`. A failing command
 exits non-zero, so a `make` target that calls one stops.
 
 ### Names
@@ -49,10 +50,21 @@ written wherever it is not one. `waffle make:domain:entity warehouse unit_type`
 writes `model/unit_type.go` and `adapter/postgres/stored_unit_type.go`, declaring
 `UnitType` and `storedUnitType`, against a table called `unit_types`.
 
-The check runs before anything is written, together with the check that
-`config/di/modules.go` exists. A command that cannot finish leaves no files
-behind — `waffle make:domain --help` used to scaffold a domain called `--help`
-and stop halfway through.
+The check runs before anything is written, and so do the ones below, each of
+which used to fail at the end of a command with its files already on disk. A
+command that cannot finish leaves no files behind — `waffle make:domain --help`
+used to scaffold a domain called `--help` and stop halfway through.
+
+| Refused when | By |
+|---|---|
+| `config/di/modules.go` is missing, or has no line — commented out or active — for a module the command enables; the refusal prints the lines to add | every command that enables a module |
+| `domain/<domain>` does not exist | `make:domain:http`, `make:domain:grpc`, `make:domain:scribus`, `make:domain:command`, `make:domain:entity`, `make:domain:migrate`, `make:domain:migration` |
+| `domain/<domain>/cmd/migrate/main.go` does not exist, so nothing would apply the file | `make:domain:migration` |
+| the other mode, another driver or, for `--batch`, a second `BatchHandler` is already wired | `make:domain:scribus` — see [tools/scribus](../tools/scribus.md#setup) |
+
+Enabling a module whose line is in neither form is an error rather than a step
+skipped in silence: the module would stay off, and nothing would say so until the
+container or the binary failed.
 
 Two operands are not identifiers and follow their own rules: the `<path>` of
 `make:converter` has to stay inside the project, and the `<description>` of
@@ -100,7 +112,7 @@ emitting a type called `order.paidCommand`.
 
 ### Project root detection
 
-Every scaffolding command walks up the directory tree from the current working directory looking for a `go.mod` file. The module name in that file becomes the base import path used in all generated files. You can run `waffle` from any subdirectory of your project.
+Every scaffolding command walks up the directory tree from the current working directory looking for a `go.mod` file. The module name in that file becomes the base import path used in all generated files. You can run `waffle` from any subdirectory of your project: every path a command writes, reads or reports is relative to that root, and the tools it runs — `make`, `go generate`, `go get` — run there too. `waffle make:domain user` from `domain/order/` writes `domain/user/` beside it, not below it. The `<path>` of `make:converter` is relative to the root for the same reason.
 
 ### Template rendering
 
@@ -114,7 +126,7 @@ Some commands run additional steps after writing files:
 
 - `init:service` — installs the `diogen` and `waffle` tools, then runs `make .tidy generate`
 - `make:domain` — installs the `store` tool and enables `config/service/sql` and `config/tools/migrate` (unless `--no-repository`), then runs `make .tidy` and `go generate ./domain/<domain>/...` — not the container, which refuses the domain until a transport reads it
-- `make:domain:entity` — installs the `store` tool and enables `config/service/sql` and `config/tools/migrate`, then runs `make .tidy generate`
+- `make:domain:entity` — installs the `store` tool and enables `config/service/sql` and `config/tools/migrate`, then runs `make .tidy` and `go generate ./domain/<domain>/...` — not the container, which refuses the new repository until something reads it; the command prints the parameter to add to the management, and `make generate` after that
 - `make:domain:grpc` — enables `config/tools/grpc`, runs `go generate ./api/...`, then `make .tidy generate`; when `proto_dir` is outside the module both runs are skipped and the command prints the steps to do by hand
 - `make:domain:http` — enables `config/tools/http`, installs `whisk` (and `goverter`, under the default mapper) and writes `whisk.yaml`, then runs `make .tidy generate`
 - `make:domain:scribus` — enables `config/tools/scribus/<driver>` and the mode module, installs `whisk`, then runs `make .tidy generate`
@@ -151,7 +163,7 @@ Project-level conventions live in `waffle.yaml`, next to `go.mod`. `init:service
 | `replacements.allow` | empty | Interfaces a test may supply on the container's `Replacements`, keyed by import path: `gitlab.com/gorib/sql: [Db]`. A permission list — an empty one allows nothing |
 | `agents.areas` | `model`, `gomod` | Named sets of paths that Rule #11's modes open, or that the human grants on top of a mode; paths may leave the service. See [agents](agents.md#modes-areas-and-grants) |
 
-`<service>` is the last path segment of the module name. A missing `waffle.yaml`, or one missing some keys, behaves exactly like a file containing only the defaults above — the two are indistinguishable to every command. An unknown key (e.g. a typo) is a hard error, and an invalid `mapper` value (anything other than `dto` or `goverter`) is a hard error.
+`<service>` is the last path segment of the module name. A missing `waffle.yaml`, an empty one, one holding only comments, or one missing some keys, behaves exactly like a file containing only the defaults above — they are indistinguishable to every command. An unknown key (e.g. a typo) or an invalid `mapper` value (anything other than `dto` or `goverter`) is a hard error in the commands that read the file — the transports, `agents` and the two commands that regenerate `AGENTS.md` (`init:service`, `make:domain`), `agents:guard`/`agents:grant` and `tests:replacements`; the others never open it.
 
 What a record of the service cannot learn from its code — `flows.clients`, `flows.prefixes` — is not here but in `specrig.yaml`, beside it, and only where there is something to declare. See [flows](../conventions/flows.md#the-codes-record).
 
@@ -213,7 +225,7 @@ flag, because a flag would close a set the container already knows:
   variables it reads.
 - **the environment.** A typed field of `Variables` for every variable read
   through `gitlab.com/gorib/env`, unless `Boot` replaces the constructor that
-  reads it: a placeholder for a `Need*` read, the fallback for the rest.
+  reads it: a placeholder where some read has no fallback, the fallback otherwise.
 
 A handler whose registration it cannot find is reported by name rather than
 guessed at.

@@ -1,7 +1,6 @@
 package harness
 
 import (
-	"bytes"
 	"context"
 	"embed"
 	"errors"
@@ -19,7 +18,9 @@ import (
 )
 
 //go:embed templates/*
-var templates embed.FS
+var templateFiles embed.FS
+
+var templates = command.NewTemplates(templateFiles)
 
 const generated = "harness_gen.go"
 
@@ -27,8 +28,7 @@ var harnessDir = filepath.Join("tests", "internal", "harness")
 
 func New() *cmd {
 	return &cmd{command.New("tests:harness",
-		"Regenerate the component harness from the container; the first run also scaffolds the suite",
-		templates, nil)}
+		"Regenerate the component harness from the container; the first run also scaffolds the suite")}
 }
 
 type cmd struct {
@@ -41,11 +41,11 @@ func (c *cmd) Run(_ context.Context, args ...string) error {
 	if err := c.Operands(args, 0, 0); err != nil {
 		return err
 	}
-	root, err := command.ModuleRoot()
+	p, err := command.OpenProject()
 	if err != nil {
 		return err
 	}
-	if err := os.Chdir(root); err != nil {
+	if err := os.Chdir(p.Root()); err != nil {
 		return err
 	}
 
@@ -53,7 +53,7 @@ func (c *cmd) Run(_ context.Context, args ...string) error {
 	if err != nil {
 		return err
 	}
-	params, found, err := c.plan(root, own)
+	params, found, err := plan(p, own)
 	if err != nil {
 		return err
 	}
@@ -61,7 +61,7 @@ func (c *cmd) Run(_ context.Context, args ...string) error {
 	// The package's own file is what marks a harness as started, so a scaffold
 	// somebody deleted on purpose is not written back on every generate.
 	if _, err := os.Stat(filepath.Join(harnessDir, "harness.go")); errors.Is(err, os.ErrNotExist) {
-		if err := c.Write(scaffold(params, found), params); err != nil {
+		if err := p.Write(templates, scaffold(params, found), params); err != nil {
 			return err
 		}
 	}
@@ -76,7 +76,7 @@ func (c *cmd) Run(_ context.Context, args ...string) error {
 		command.ReportWarning("App.params is declared, but the container takes no parameter it would supply: delete it")
 	}
 
-	rendered, err := c.Render(tpl(generated+".tpl"), params)
+	rendered, err := templates.Render(tpl(generated+".tpl"), params)
 	if err != nil {
 		return err
 	}
@@ -90,17 +90,8 @@ func (c *cmd) Run(_ context.Context, args ...string) error {
 	for _, member := range found.missed {
 		command.ReportWarning("no Register…Server call found for the handler " + member + ": write its client by hand")
 	}
-	return write(filepath.Join(harnessDir, generated), formatted)
-}
-
-func write(target string, body []byte) error {
-	if current, err := os.ReadFile(target); err == nil && bytes.Equal(current, body) {
-		return nil
-	}
-	if err := os.MkdirAll(filepath.Dir(target), os.ModePerm); err != nil {
-		return err
-	}
-	if err := os.WriteFile(target, body, 0o644); err != nil {
+	target := filepath.Join(harnessDir, generated)
+	if changed, err := command.WriteIfChanged(p.Path(target), formatted); err != nil || !changed {
 		return err
 	}
 	command.ReportAction("generated " + target)
@@ -127,11 +118,8 @@ func scaffold(params map[string]any, found found) map[string]string {
 	return sources
 }
 
-func (c *cmd) plan(root string, own hooks) (map[string]any, found, error) {
-	module, err := c.FindProjectName()
-	if err != nil {
-		return nil, found{}, err
-	}
+func plan(project *command.Project, own hooks) (map[string]any, found, error) {
+	module := project.Module()
 	containers, err := replacements.DiscoverContainers(".")
 	if err != nil {
 		return nil, found{}, err
@@ -147,7 +135,7 @@ func (c *cmd) plan(root string, own hooks) (map[string]any, found, error) {
 	if err != nil {
 		return nil, found{}, err
 	}
-	missed := s.readClients(module, root)
+	missed := s.readClients(module, project.Root())
 	s.nameOutbound()
 
 	service := path.Base(module)

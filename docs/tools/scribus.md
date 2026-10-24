@@ -10,7 +10,12 @@ The tool itself names no broker: a handler receives a `whisk/scan.Source`, and t
 
 A service includes **one driver** and **one mode**. The driver brings the consumer, its `Subjects` and its middlewares; the mode brings the dispatch shape.
 
-`waffle make:domain:scribus` enables both, and takes the driver as a required flag — `--driver amqp` — because picking a broker for you is the one thing this tool avoids. It refuses before writing anything if `config/di/modules.go` has no line for the driver named.
+`waffle make:domain:scribus` enables both, and takes the driver as a required flag — `--driver amqp` — because picking a broker for you is the one thing this tool avoids. It refuses before writing anything, naming the line or the file, if:
+
+- `config/di/modules.go` has no line for the driver or the mode;
+- the other mode is already enabled — `single` and `batch` both register a command named `scribus`, and the binary stops starting;
+- another driver is already enabled — a service consumes through one;
+- with `--batch`, `config/di` already wires a `BatchHandler` — `NewBatchScribusCommand` takes exactly one, so the next subject goes into its `Keys()`.
 
 **Single mode** (each subject dispatched to a dedicated `Handler`):
 

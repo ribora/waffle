@@ -15,8 +15,8 @@ import (
 // model/facility.go declaring Coordinates leaves model/coordinates.go absent
 // and model.Coordinates taken, so writing the second one gives the package two
 // declarations and no build.
-func Declares(dir, name string) (where string, found bool) {
-	entries, err := os.ReadDir(dir)
+func (p *Project) Declares(dir, name string) (where string, found bool) {
+	entries, err := os.ReadDir(p.Path(dir))
 	if err != nil {
 		return "", false
 	}
@@ -28,7 +28,7 @@ func Declares(dir, name string) (where string, found bool) {
 		path := filepath.Join(dir, entry.Name())
 		// A file that does not parse is the compiler's to report. Claiming the
 		// name is taken here would skip a file the caller needs.
-		file, err := parser.ParseFile(set, path, nil, parser.SkipObjectResolution)
+		file, err := parser.ParseFile(set, p.Path(path), nil, parser.SkipObjectResolution)
 		if err != nil {
 			continue
 		}

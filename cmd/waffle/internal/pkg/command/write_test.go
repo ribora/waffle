@@ -10,38 +10,33 @@ import (
 )
 
 //go:embed testdata/*
-var testTemplates embed.FS
+var testFiles embed.FS
 
-func scaffoldIn(t *testing.T) (*Command, *bytes.Buffer) {
+var testTemplates = NewTemplates(testFiles)
+
+func scaffoldIn(t *testing.T) (*Project, *bytes.Buffer) {
 	t.Helper()
 
 	dir := t.TempDir()
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chdir(dir); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chdir(cwd) })
+	t.Chdir(dir)
 
 	var log bytes.Buffer
 	output = &log
 	t.Cleanup(func() { output = os.Stderr })
 
-	return New("make:thing", "", testTemplates, nil), &log
+	return &Project{root: dir}, &log
 }
 
 // The whole contract is that your files are not touched, so the second run has to
 // name what it did not touch. Silence there is indistinguishable from success.
 func TestSecondRunSaysWhatItKept(t *testing.T) {
-	c, log := scaffoldIn(t)
+	p, log := scaffoldIn(t)
 	sources := map[string]string{
 		filepath.Join("testdata", "entity.go.tpl"): filepath.Join("domain", "user", "model", "user.go"),
 	}
 	params := map[string]any{"Domain": "user"}
 
-	if err := c.Write(sources, params); err != nil {
+	if err := p.Write(testTemplates, sources, params); err != nil {
 		t.Fatal(err)
 	}
 	if got := log.String(); !strings.Contains(got, "+ domain/user/model/user.go") {
@@ -56,7 +51,7 @@ func TestSecondRunSaysWhatItKept(t *testing.T) {
 	}
 
 	log.Reset()
-	if err := c.Write(sources, params); err != nil {
+	if err := p.Write(testTemplates, sources, params); err != nil {
 		t.Fatal(err)
 	}
 	got := log.String()
@@ -93,7 +88,7 @@ func TestKeptDeclarationIsMarkedKept(t *testing.T) {
 // A target that cannot be read is the one case where skipping is wrong: it used to
 // count as "already there" and pass in silence.
 func TestUnreadableTargetIsAnError(t *testing.T) {
-	c, _ := scaffoldIn(t)
+	p, _ := scaffoldIn(t)
 
 	// A file where a directory has to go: Stat on the target fails with ENOTDIR,
 	// which is neither "exists" nor "does not exist".
@@ -101,7 +96,7 @@ func TestUnreadableTargetIsAnError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := c.Write(map[string]string{
+	err := p.Write(testTemplates, map[string]string{
 		filepath.Join("testdata", "entity.go.tpl"): filepath.Join("domain", "user", "model", "user.go"),
 	}, map[string]any{"Domain": "user"})
 	if err == nil {
@@ -109,5 +104,54 @@ func TestUnreadableTargetIsAnError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "domain/user/model/user.go") {
 		t.Errorf("the error does not name the target: %v", err)
+	}
+}
+
+func TestAProjectOpenedBelowTheRootWritesAtTheRoot(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "go.mod", "module example.test\n")
+	if err := os.MkdirAll(filepath.Join(root, "domain", "user"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(filepath.Join(root, "domain", "user"))
+	p, err := OpenProject()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var log bytes.Buffer
+	output = &log
+	t.Cleanup(func() { output = os.Stderr })
+	err = p.Write(testTemplates, map[string]string{
+		filepath.Join("testdata", "entity.go.tpl"): filepath.Join("domain", "user", "model", "user.go"),
+	}, map[string]any{"Domain": "user"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := os.Stat(filepath.Join(root, "domain", "user", "model", "user.go")); err != nil {
+		t.Errorf("the file is not under the root: %v", err)
+	}
+	if _, err := os.Stat("domain"); err == nil {
+		t.Error("a nested domain/ was written below the working directory")
+	}
+	if got := log.String(); !strings.Contains(got, "+ domain/user/model/user.go\n") {
+		t.Errorf("the report does not name the root-relative path:\n%s", got)
+	}
+}
+
+func TestWriteIfChanged(t *testing.T) {
+	target := filepath.Join(t.TempDir(), "tests", "surface.yaml")
+	for i, want := range []bool{true, false} {
+		changed, err := WriteIfChanged(target, []byte("body\n"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if changed != want {
+			t.Errorf("run %d: changed = %v, want %v", i+1, changed, want)
+		}
+	}
+	if changed, _ := WriteIfChanged(target, []byte("other\n")); !changed {
+		t.Error("a different body was not written")
 	}
 }

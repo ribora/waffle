@@ -138,6 +138,15 @@ contract another service reads belongs in spec mode, because changing it is part
 of what gets approved. A path outside the service that no area names is not this
 service's to decide.
 
+Where areas overlap, the one that names more of the path before its first
+wildcard decides — `api/proto/` inside an `api/` area is proto's — then the
+deeper pattern, then the name that sorts first. A path is matched as it is on
+disk: each name spelled as its directory lists it, so on a case-insensitive
+filesystem `Go.mod` is `go.mod`, and an area that is a symlink claims what it
+points at. A path through a symlink is checked where it is written and where it
+leads, and refused if either is: a symlink neither opens what its target's
+table closes nor takes a path out of the service it sits in.
+
 ```
 waffle agents:guard <mode> <path> [--grant <name>]
 waffle agents:mode <mode>

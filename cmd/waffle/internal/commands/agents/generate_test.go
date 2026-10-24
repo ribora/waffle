@@ -5,13 +5,16 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+
+	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
+	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command/commandtest"
 )
 
 // make generate runs this on every build, so a second run must report nothing.
 func TestGenerateReportsOnlyAChange(t *testing.T) {
-	service(t)
+	p := commandtest.Project(t, "example.com/svc")
 	for i, want := range []bool{true, false} {
-		changed, err := Generate("example.com/svc", true)
+		changed, err := Generate(p, true)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -22,13 +25,13 @@ func TestGenerateReportsOnlyAChange(t *testing.T) {
 	if err := os.Remove(".cursorrules"); err != nil {
 		t.Fatal(err)
 	}
-	if changed, _ := Generate("example.com/svc", true); !changed {
+	if changed, _ := Generate(p, true); !changed {
 		t.Error("a missing symlink was restored without reporting it")
 	}
 }
 
 func TestScanModulesSkipsCommentedImports(t *testing.T) {
-	inModule(t, `package di
+	p := inModule(t, `package di
 
 import (
 	_ "gitlab.com/gorib/waffle/config/app"
@@ -49,13 +52,13 @@ import (
 `)
 
 	want := []string{"app", "service/pry", "tools/grpc"}
-	if got := scanModules(); !slices.Equal(got, want) {
+	if got := scanModules(p); !slices.Equal(got, want) {
 		t.Errorf("modules = %v, want %v", got, want)
 	}
 }
 
 func TestScanModulesTakesOnlyBlankWaffleImports(t *testing.T) {
-	inModule(t, `package di
+	p := inModule(t, `package di
 
 import (
 	"fmt"
@@ -68,15 +71,15 @@ import (
 var _ = fmt.Sprint
 `)
 
-	if got := scanModules(); len(got) != 0 {
+	if got := scanModules(p); len(got) != 0 {
 		t.Errorf("modules = %v, want none", got)
 	}
 }
 
 func TestScanModulesWithoutTheFile(t *testing.T) {
-	inModule(t, "")
+	p := inModule(t, "")
 
-	if got := scanModules(); got != nil {
+	if got := scanModules(p); got != nil {
 		t.Errorf("modules = %v, want nil", got)
 	}
 }
@@ -98,7 +101,7 @@ func Init() {
 `)
 
 	want := []string{"ARRAY", "INSTANTIATED", "JSON", "MUST", "NEED_JSON", "PLAIN"}
-	if got := scanEnvVars(nil); !slices.Equal(got, want) {
+	if got := scanEnvVars(".", nil); !slices.Equal(got, want) {
 		t.Errorf("vars = %v, want %v", got, want)
 	}
 }
@@ -121,7 +124,7 @@ func Init() {
 `)
 
 	want := []string{"REAL"}
-	if got := scanEnvVars(nil); !slices.Equal(got, want) {
+	if got := scanEnvVars(".", nil); !slices.Equal(got, want) {
 		t.Errorf("vars = %v, want %v", got, want)
 	}
 }
@@ -135,7 +138,7 @@ func Init() { _ = env.Value("OWN", "") }
 `)
 
 	want := []string{"DB_DRIVER", "DB_DSN", "OWN", "RABBIT_DSN", "RABBIT_EXCHANGE"}
-	if got := scanEnvVars([]string{"service/amqp", "service/sql", "app"}); !slices.Equal(got, want) {
+	if got := scanEnvVars(".", []string{"service/amqp", "service/sql", "app"}); !slices.Equal(got, want) {
 		t.Errorf("vars = %v, want %v", got, want)
 	}
 }
@@ -145,7 +148,7 @@ func Init() { _ = env.Value("OWN", "") }
 func TestScanEnvVarsSkipsWhatDoesNotParse(t *testing.T) {
 	inConfig(t, "package config\n\nfunc Init() { this is not go")
 
-	if got := scanEnvVars(nil); got != nil {
+	if got := scanEnvVars(".", nil); got != nil {
 		t.Errorf("vars = %v, want nil", got)
 	}
 }
@@ -162,16 +165,16 @@ func inConfig(t *testing.T, body string) {
 	t.Chdir(dir)
 }
 
-func inModule(t *testing.T, body string) {
+func inModule(t *testing.T, body string) *command.Project {
 	t.Helper()
-	dir := t.TempDir()
+	p := commandtest.Project(t, "example.com/svc")
 	if body != "" {
-		if err := os.MkdirAll(filepath.Join(dir, "config", "di"), 0o755); err != nil {
+		if err := os.MkdirAll(p.Path("config", "di"), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(dir, "config", "di", "modules.go"), []byte(body), 0o644); err != nil {
+		if err := os.WriteFile(p.Path(command.ModulesFile), []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
-	t.Chdir(dir)
+	return p
 }

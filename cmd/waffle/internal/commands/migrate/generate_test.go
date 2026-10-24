@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command/commandtest"
 )
 
 // A migration file name carries a timestamp, so a later run gets a different name
@@ -12,15 +14,7 @@ import (
 // are stamped last year on purpose: sharing a second with the run under test would
 // hide the defect behind the plain name check.
 func TestExistingMigrationIsNotWrittenAgain(t *testing.T) {
-	dir := t.TempDir()
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chdir(dir); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chdir(cwd) })
+	p := commandtest.Project(t, "example.com/svc")
 
 	migrationsDir := filepath.Join("domain", "user", "cmd", "migrate", "migrations")
 	if err := os.MkdirAll(migrationsDir, 0755); err != nil {
@@ -36,7 +30,7 @@ func TestExistingMigrationIsNotWrittenAgain(t *testing.T) {
 		}
 	}
 
-	if err := Generate("user", "user", "example.com/svc"); err != nil {
+	if err := Generate(p, "user", "user"); err != nil {
 		t.Fatal(err)
 	}
 

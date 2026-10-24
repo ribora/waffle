@@ -2,6 +2,7 @@ package agents
 
 import (
 	"fmt"
+	"os"
 	"path"
 	"path/filepath"
 	"slices"
@@ -145,8 +146,44 @@ const (
 
 // Rules answers for one service: root is its resolved directory.
 type Rules struct {
-	Root  string
-	Areas []Area
+	Root   string
+	Areas  []Area
+	claims []claim
+}
+
+// A claim is one path of an area: its names up to the first wildcard as on disk, the rest as written.
+type claim struct {
+	area    Area
+	path    string
+	literal []string
+	glob    []string
+	dir     bool
+}
+
+func newRules(root string, areas []Area) (Rules, error) {
+	root, err := resolveExisting(root)
+	if err != nil {
+		return Rules{}, err
+	}
+	r := Rules{Root: root, Areas: areas}
+	for _, a := range areas {
+		for _, p := range a.Paths {
+			names := strings.Split(path.Clean(p), "/")
+			i := slices.IndexFunc(names, func(name string) bool { return strings.ContainsAny(name, `*?[\`) })
+			if i < 0 {
+				i = len(names)
+			}
+			base := filepath.Join(append([]string{root}, names[:i]...)...)
+			resolved, err := resolveExisting(base)
+			if err != nil {
+				return Rules{}, err
+			}
+			for _, b := range slices.Compact([]string{r.written(base), resolved}) {
+				r.claims = append(r.claims, claim{area: a, path: p, literal: parts(b), glob: names[i:], dir: strings.HasSuffix(p, "/")})
+			}
+		}
+	}
+	return r, nil
 }
 
 func (r Rules) Check(mode Mode, abs string, granted []string) (Verdict, string) {
@@ -209,29 +246,82 @@ func refusal(mode Mode, shown string, ways []string) string {
 }
 
 func (r Rules) area(abs string) (Area, bool) {
-	for _, a := range r.Areas {
-		for _, p := range a.Paths {
-			if matches(filepath.Join(r.Root, p), strings.HasSuffix(p, "/"), abs) {
-				return a, true
-			}
+	names := parts(abs)
+	var won *claim
+	for i, c := range r.claims {
+		if c.matches(names) && (won == nil || c.outranks(*won)) {
+			won = &r.claims[i]
 		}
 	}
-	return Area{}, false
+	if won == nil {
+		return Area{}, false
+	}
+	return won.area, true
 }
 
-// A pattern ending in a slash is a directory, and matches it and everything below it.
-func matches(pattern string, dir bool, abs string) bool {
-	if !dir {
-		ok, _ := filepath.Match(pattern, abs)
-		return ok
+// A path that another area names alike, and outranks, is never answered with a.
+func (r Rules) claimed(a Area) []string {
+	var paths []string
+	for _, c := range r.claims {
+		if c.area.Name != a.Name || slices.Contains(paths, c.path) {
+			continue
+		}
+		if !slices.ContainsFunc(r.claims, func(o claim) bool {
+			return slices.Equal(o.literal, c.literal) && slices.Equal(o.glob, c.glob) && o.outranks(c)
+		}) {
+			paths = append(paths, c.path)
+		}
 	}
-	depth := len(strings.Split(filepath.ToSlash(pattern), "/"))
-	parts := strings.Split(filepath.ToSlash(abs), "/")
-	if len(parts) < depth {
+	return paths
+}
+
+func (c claim) matches(names []string) bool {
+	n := len(c.literal) + len(c.glob)
+	if len(names) < n || (!c.dir && len(names) > n) || !slices.Equal(names[:len(c.literal)], c.literal) {
 		return false
 	}
-	ok, _ := filepath.Match(pattern, filepath.FromSlash(strings.Join(parts[:depth], "/")))
-	return ok
+	for i, g := range c.glob {
+		if ok, _ := path.Match(g, names[len(c.literal)+i]); !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func (c claim) outranks(o claim) bool {
+	if len(c.literal) != len(o.literal) {
+		return len(c.literal) > len(o.literal)
+	}
+	if len(c.glob) != len(o.glob) {
+		return len(c.glob) > len(o.glob)
+	}
+	return c.area.Name < o.area.Name
+}
+
+// written follows only the symlinks that lead to the root, so a path keeps the table of the service it sits in.
+func (r Rules) written(p string) string {
+	parent := filepath.Dir(p)
+	if parent == p {
+		return p
+	}
+	dir := r.written(parent)
+	at := filepath.Join(dir, listed(dir, filepath.Base(p)))
+	if _, below := within(r.Root, dir); below {
+		return at
+	}
+	if fi, err := os.Lstat(at); err != nil || fi.Mode()&os.ModeSymlink == 0 {
+		return at
+	}
+	if resolved, err := resolveExisting(at); err == nil {
+		if _, leads := within(resolved, r.Root); leads {
+			return resolved
+		}
+	}
+	return at
+}
+
+func parts(abs string) []string {
+	return strings.Split(strings.TrimSuffix(filepath.ToSlash(abs), "/"), "/")
 }
 
 func within(root, abs string) (string, bool) {

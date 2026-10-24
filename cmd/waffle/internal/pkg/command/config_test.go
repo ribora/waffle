@@ -1,9 +1,9 @@
 package command
 
 import (
-	"embed"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -49,10 +49,46 @@ func TestProjectConfigRejectsAMalformedAllowList(t *testing.T) {
 			writeFile(t, root, "waffle.yaml", body)
 			t.Chdir(root)
 
-			if _, err := New("t", "", embed.FS{}, nil).ProjectConfig("example.test"); err == nil {
+			if _, err := project(t).Config(); err == nil {
 				t.Fatal("the file loaded")
 			} else if !strings.Contains(err.Error(), "waffle.yaml") {
 				t.Errorf("err = %v, want a message naming the file", err)
+			}
+		})
+	}
+}
+
+func TestAMalformedWaffleYamlStopsOnlyWhatReadsIt(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "go.mod", "module example.test\n\ngo 1.27\n")
+	writeFile(t, root, "waffle.yaml", "mapper: [\n")
+	t.Chdir(root)
+
+	p, err := OpenProject()
+	if err != nil {
+		t.Fatalf("the project did not open: %v", err)
+	}
+	if _, err := p.Config(); err == nil {
+		t.Fatal("the config loaded")
+	}
+}
+
+func TestAWaffleYamlWithNothingInItIsTheDefaults(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "go.mod", "module example.test\n\ngo 1.27\n")
+	t.Chdir(root)
+	defaults, err := project(t).Config()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for name, body := range map[string]string{
+		"empty":         "",
+		"comments only": "# Project conventions for waffle generators.\n\n# mapper: dto\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if got := configFrom(t, body); !reflect.DeepEqual(got, defaults) {
+				t.Errorf("config = %+v, want the defaults %+v", got, defaults)
 			}
 		})
 	}
@@ -65,11 +101,20 @@ func configFrom(t *testing.T, body string) Config {
 	writeFile(t, root, "waffle.yaml", body)
 	t.Chdir(root)
 
-	cfg, err := New("t", "", embed.FS{}, nil).ProjectConfig("example.test")
+	cfg, err := project(t).Config()
 	if err != nil {
 		t.Fatal(err)
 	}
 	return cfg
+}
+
+func project(t *testing.T) *Project {
+	t.Helper()
+	p, err := OpenProject()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p
 }
 
 func writeFile(t *testing.T, root, name, body string) {

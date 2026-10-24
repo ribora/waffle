@@ -15,23 +15,23 @@ const serviceFile = "service.go"
 
 // appendInterface puts the entity's repository interface where a domain keeps
 // them: in service.go, above the management that takes them.
-func appendInterface(c *command.Command, domain, entity string, params map[string]string) error {
+func appendInterface(p *command.Project, domain, entity string, params map[string]string) error {
 	dir := filepath.Join("domain", domain, "service")
 	declared := command.Title(entity) + "Repository"
-	if where, found := command.Declares(dir, declared); found {
+	if where, found := p.Declares(dir, declared); found {
 		command.KeptAs("service."+declared, where)
 		return nil
 	}
 
 	// Not *.go.tpl: that suffix means a whole file, and this is a block appended
 	// to one. TestTemplatesRenderToGo holds the distinction.
-	block, err := c.Render(filepath.Join("templates", "service", "interface.gofrag.tpl"), params)
+	block, err := templates.Render(filepath.Join("templates", "service", "interface.gofrag.tpl"), params)
 	if err != nil {
 		return err
 	}
 
 	target := filepath.Join(dir, serviceFile)
-	body, err := os.ReadFile(target)
+	body, err := os.ReadFile(p.Path(target))
 	if err != nil {
 		// No service.go to append to. Guessing where the block belongs would be
 		// worse than saying so.
@@ -42,11 +42,11 @@ func appendInterface(c *command.Command, domain, entity string, params map[strin
 	merged := insertBeforeFirstFunc(body, block)
 	// The block needs context, criteria and the domain model, and which of them
 	// the file already has depends on how it was scaffolded.
-	formatted, err := imports.Process(target, merged, nil)
+	formatted, err := imports.Process(p.Path(target), merged, nil)
 	if err != nil {
 		return fmt.Errorf("adding %s to %s: %w", declared, target, err)
 	}
-	if err := os.WriteFile(target, formatted, 0644); err != nil {
+	if err := os.WriteFile(p.Path(target), formatted, 0644); err != nil {
 		return err
 	}
 	command.ReportAction("added " + declared + " to " + filepath.ToSlash(target))

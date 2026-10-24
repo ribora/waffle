@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
+	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command/commandtest"
 )
 
 const project = "example.com/svc"
@@ -79,18 +80,18 @@ func TestTheSeparatorTypedIsTheSeparatorRegistered(t *testing.T) {
 
 // The directory keeps the hyphen, the Go file cannot.
 func TestTheWrittenPaths(t *testing.T) {
-	t.Chdir(t.TempDir())
+	p := commandtest.Project(t, project)
 	name, err := command.ParseCommandName("command", "sweep-otp")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := Generate("media", name, project); err != nil {
+	if err := Generate(p, "media", name); err != nil {
 		t.Fatal(err)
 	}
 
 	var written []string
 	err = filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
+		if err != nil || info.IsDir() || path == "go.mod" {
 			return err
 		}
 		written = append(written, filepath.ToSlash(path))
@@ -112,13 +113,13 @@ func TestTheWrittenPaths(t *testing.T) {
 
 func generate(t *testing.T, domain, cmdName string) (main, di string) {
 	t.Helper()
-	t.Chdir(t.TempDir())
+	p := commandtest.Project(t, project)
 
 	name, err := command.ParseCommandName("command", cmdName)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := Generate(domain, name, project); err != nil {
+	if err := Generate(p, domain, name); err != nil {
 		t.Fatal(err)
 	}
 	return read(t, filepath.Join("domain", domain, "cmd", name.Raw, "main.go")),

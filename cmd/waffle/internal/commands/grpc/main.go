@@ -4,7 +4,6 @@ import (
 	"context"
 	"embed"
 	"fmt"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -13,10 +12,14 @@ import (
 )
 
 //go:embed templates/*
-var templates embed.FS
+var templateFiles embed.FS
+
+var templates = command.NewTemplates(templateFiles)
+
+const module = "gitlab.com/gorib/waffle/config/tools/grpc"
 
 func New() *cmd {
-	return &cmd{command.New("make:domain:grpc", "Make grpc connector to the specified domain", templates, nil).
+	return &cmd{command.New("make:domain:grpc", "Make grpc connector to the specified domain").
 		WithUsage("<domain>")}
 }
 
@@ -32,21 +35,25 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 		return err
 	}
 	domain := args[0]
-	projectName, err := c.FindProjectName()
+	p, err := command.OpenProject()
 	if err != nil {
 		return err
 	}
-	service := filepath.Base(projectName)
-
-	cfg, err := c.ProjectConfig(projectName)
+	if err := p.RequireDomain(domain); err != nil {
+		return err
+	}
+	if err := p.RequireModules(module); err != nil {
+		return err
+	}
+	cfg, err := p.Config()
 	if err != nil {
 		return err
 	}
 
 	params := map[string]string{
 		"Domain":    domain,
-		"Project":   projectName,
-		"Service":   service,
+		"Project":   p.Module(),
+		"Service":   filepath.Base(p.Module()),
 		"ApiImport": cfg.ApiImport,
 	}
 
@@ -58,15 +65,15 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 		filepath.Join("templates", "di.go.tpl"):                                              filepath.Join("config", "di", "di_"+domain+"_grpc.go"),
 	}
 
-	if err := c.Write(sources, params); err != nil {
+	if err := p.Write(templates, sources, params); err != nil {
 		return err
 	}
 	if cfg.Mapper == "goverter" {
-		if err := converter.Generate(filepath.Join(path, "cmd", "grpc", "convert"), projectName); err != nil {
+		if err := converter.Generate(p, filepath.Join(path, "cmd", "grpc", "convert")); err != nil {
 			return err
 		}
 	}
-	if err := c.UncommentModule("gitlab.com/gorib/waffle/config/tools/grpc"); err != nil {
+	if err := p.EnableModule(module); err != nil {
 		return err
 	}
 
@@ -85,11 +92,9 @@ command can't build it. Finish manually, in order:
 	}
 
 	// generate pb before tidy, else tidy fetches the not-yet-generated import remotely.
-	if info, err := exec.Command("go", "generate", "./api/...").CombinedOutput(); err != nil {
-		return fmt.Errorf("%v: %v", err, string(info))
+	if _, err := p.Run("go", "generate", "./api/..."); err != nil {
+		return err
 	}
-	if info, err := exec.Command("make", ".tidy", "generate").CombinedOutput(); err != nil {
-		return fmt.Errorf("%v: %v", err, string(info))
-	}
-	return nil
+	_, err = p.Run("make", ".tidy", "generate")
+	return err
 }

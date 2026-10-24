@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
@@ -14,8 +13,7 @@ import (
 
 func NewGuard() *guard {
 	return &guard{base: command.New("agents:guard",
-		"Exit non-zero, naming the mode or grant that would allow it, if the mode does not allow editing the path",
-		noTemplates, nil).
+		"Exit non-zero, naming the mode or grant that would allow it, if the mode does not allow editing the path").
 		WithUsage("<mode> <path> [--grant <name>]...\n" +
 			"  mode is one of: " + strings.Join(modeNames(), ", ") + "\n" +
 			"  path is absolute or relative to the working directory\n" +
@@ -32,13 +30,9 @@ func (c *guard) Description() string { return c.base.Description() }
 func (c *guard) Usage() string       { return c.base.Usage() }
 
 func (c *guard) Run(_ context.Context, args ...string) error {
-	var granted []string
-	for i := slices.Index(args, "--grant"); i >= 0; i = slices.Index(args, "--grant") {
-		if i+1 == len(args) {
-			return errors.New("--grant takes an area's name")
-		}
-		granted = append(granted, args[i+1])
-		args = slices.Delete(args, i, i+2)
+	granted, args, err := command.TakeValues(args, "--grant", "an area's name")
+	if err != nil {
+		return err
 	}
 	if err := c.base.Operands(args, 2, 2); err != nil {
 		return err
@@ -47,7 +41,7 @@ func (c *guard) Run(_ context.Context, args ...string) error {
 	if err != nil {
 		return err
 	}
-	rules, err := serviceRules(c.base)
+	rules, err := serviceRules()
 	if err != nil {
 		return err
 	}
@@ -55,32 +49,36 @@ func (c *guard) Run(_ context.Context, args ...string) error {
 	if err != nil {
 		return err
 	}
-	if abs, err = resolveExisting(abs); err != nil {
+	resolved, err := resolveExisting(abs)
+	if err != nil {
 		return err
 	}
 
-	switch v, reason := rules.Check(mode, abs, granted); v {
-	case Refused:
-		return errors.New(reason)
-	case Unclaimed:
-		fmt.Printf("unclaimed: no area of this service names %s\n", abs)
+	verdict := Unclaimed
+	for _, p := range []string{rules.written(abs), resolved} {
+		switch v, reason := rules.Check(mode, p, granted); v {
+		case Refused:
+			return errors.New(reason)
+		case Allowed:
+			verdict = Allowed
+		}
+	}
+	if verdict == Unclaimed {
+		fmt.Printf("unclaimed: no area of this service names %s\n", resolved)
 	}
 	return nil
 }
 
-func serviceRules(c *command.Command) (Rules, error) {
-	root, err := command.ModuleRoot()
+func serviceRules() (Rules, error) {
+	p, err := command.OpenProject()
 	if err != nil {
 		return Rules{}, err
 	}
-	if root, err = filepath.EvalSymlinks(root); err != nil {
-		return Rules{}, err
-	}
-	project, err := c.FindProjectName()
+	root, err := filepath.EvalSymlinks(p.Root())
 	if err != nil {
 		return Rules{}, err
 	}
-	cfg, err := c.ProjectConfig(project)
+	cfg, err := p.Config()
 	if err != nil {
 		return Rules{}, err
 	}
@@ -88,7 +86,7 @@ func serviceRules(c *command.Command) (Rules, error) {
 	if err != nil {
 		return Rules{}, err
 	}
-	return Rules{Root: root, Areas: areas}, nil
+	return newRules(root, areas)
 }
 
 func resolveExisting(p string) (string, error) {
@@ -96,7 +94,7 @@ func resolveExisting(p string) (string, error) {
 	for {
 		resolved, err := filepath.EvalSymlinks(p)
 		if err == nil {
-			return filepath.Join(append([]string{resolved}, tail...)...), nil
+			return filepath.Join(append([]string{onDisk(resolved)}, tail...)...), nil
 		}
 		if !os.IsNotExist(err) {
 			return "", err
@@ -108,4 +106,35 @@ func resolveExisting(p string) (string, error) {
 		tail = append([]string{filepath.Base(p)}, tail...)
 		p = parent
 	}
+}
+
+func onDisk(p string) string {
+	parent := filepath.Dir(p)
+	if parent == p {
+		return p
+	}
+	dir := onDisk(parent)
+	return filepath.Join(dir, listed(dir, filepath.Base(p)))
+}
+
+// A case-insensitive filesystem finds a name under any spelling; only the
+// listing has the one the rules compare against.
+func listed(dir, name string) string {
+	if _, err := os.Lstat(filepath.Join(dir, name)); err != nil {
+		return name
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return name
+	}
+	spelled := name
+	for _, e := range entries {
+		if e.Name() == name {
+			return name
+		}
+		if strings.EqualFold(e.Name(), name) {
+			spelled = e.Name()
+		}
+	}
+	return spelled
 }
