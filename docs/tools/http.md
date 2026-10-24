@@ -116,19 +116,20 @@ Warnings are logged and the command still succeeds. Structural conflicts make it
 
 ### What the DTO contributes
 
-The request type registered with `Bind` supplies both the parameters and the body schema; the response type supplies the 200 schema.
+The request type registered with `Bind` supplies both the parameters and the body schema; the response type supplies the 200 schema. They answer *required* differently: a request lists what the binder demands, a response what the encoder never omits. A type used on both sides gets the request's list, and a warning when the two differ.
 
 | In the DTO | In the spec |
 |---|---|
 | `scan:"path=id"`, `scan:"query=limit"`, `scan:"header=X-Request-Id"` | a parameter in that location; `path` is always required |
 | `scan:"embed"` | the embedded struct's fields are inlined |
 | `json:"email"`, or a protobuf `json=` name | a body property; a field with neither tag is skipped |
-| `validate:"required"` | listed in `required` |
+| `validate:"required"` on a request field | listed in `required` |
+| `omitempty` or `omitzero` on a response field | left out of `required`; every other response field is listed |
 | `validate:"email"`, `uuid`, `url`, `hostname`, `datetime` | `format` |
 | `validate:"oneof=new used"` | `enum` |
 | `validate:"min=2,max=64"` | `minLength`/`maxLength`, `minimum`/`maximum` or `minItems`/`maxItems`, by type |
 | any other `validate` rule | appended to the description as `Constraints: …` |
-| a pointer field that isn't required | nullable — `type: [string, "null"]`, or `anyOf` for a `$ref` |
+| a request pointer without `validate:"required"`, or a response pointer without `omitempty` | nullable — `type: [string, "null"]`, or `anyOf` for a `$ref` |
 | a type with a `Values() []string` method | `enum` |
 | `time.Time`, `uuid.UUID`, protobuf well-known types | their standard formats |
 
