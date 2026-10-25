@@ -60,10 +60,14 @@ $ waffle init:service
   + config/config.go
   + config/di/di.go
   + config/di/modules.go
+  + config/diogen/boundaries_test.go
   + config/diogen/di.go
   + waffle
   + waffle.yaml
+  + waffle.md
   + AGENTS.md
+  + CLAUDE.md → AGENTS.md
+  + .cursorrules → AGENTS.md
   + added tool gitlab.com/gorib/di/cmd/diogen
   + added tool gitlab.com/gorib/waffle/cmd/waffle
 ```
@@ -74,8 +78,8 @@ before you have touched anything.
 
 ```
 catalog/
-├── AGENTS.md              Conventions for AI coding agents (waffle-managed)
-├── Makefile               generate / .tidy / build / audit / replacements
+├── AGENTS.md              The service's own agent instructions; brings in waffle.md
+├── Makefile               generate / .tidy / test / build / run / audit
 ├── api/
 │   ├── init.go            Service API package
 │   └── proto/             Proto sources (gRPC)
@@ -88,9 +92,11 @@ catalog/
 │   │   ├── di.go          Hand-written wiring: InitDi() and the //go:generate line
 │   │   └── modules.go     Blank imports — the set of waffle modules
 │   └── diogen/
+│       ├── boundaries_test.go The boundary rule, as an ordinary test
 │       ├── di.go          Hand-written adapter (InitDi → InitApp)
 │       └── di_gen.go      Generated container — do not edit
 ├── waffle                 ./waffle → go tool waffle
+├── waffle.md              The framework's conventions for AI coding agents (waffle-managed)
 ├── waffle.yaml            Project conventions read by the generators
 ├── .env                   Local environment
 └── .gitignore
@@ -121,7 +127,7 @@ waffle make:domain --no-repository product
   + config/di/di_product_domain.go
   + domain/product/service/service.go
   + domain/product/model/product.go
-  + AGENTS.md
+  + waffle.md
   ! product is not in the container until something reads its management — make generate refuses it until then; add a consumer:
       waffle make:domain:http product
       waffle make:domain:grpc product
@@ -420,15 +426,15 @@ When you bump waffle to a newer version, refresh the AI-agent instructions:
 ```sh
 go get gitlab.com/gorib/waffle@latest
 go get -tool gitlab.com/gorib/waffle/cmd/waffle@latest
-waffle agents                  # refresh AGENTS.md with new conventions
+waffle agents                  # refresh waffle.md with new conventions
 go mod tidy
 make generate
 ```
 
-`waffle agents` rewrites `AGENTS.md` (the AI-agent instructions file that
-ships with every waffle service) so AI coding assistants follow the current
-framework conventions. Without this step, agents may keep using deprecated
-patterns from the previous waffle version. See [agents](cli/agents.md).
+`waffle agents` rewrites `waffle.md` (the framework's instructions for AI coding
+agents, which the service's `AGENTS.md` brings in) so AI coding assistants follow
+the current framework conventions. Without this step, agents may keep using
+deprecated patterns from the previous waffle version. See [agents](cli/agents.md).
 
 ## Next steps
 

@@ -156,12 +156,12 @@ Ensures the `proto/` directory is tracked by git even when empty.
 **`waffle.yaml`**
 
 Project-level conventions the generators read instead of hardcoding paths.
-`init:service` writes three of them — `api_import`, `proto_dir` and `mapper` —
-each with its default and a comment saying what it decides. The fourth,
-`replacements.allow`, you add when the first component test asks for a seam; an
-absent key and an empty one both allow nothing. A missing file behaves exactly
-like one holding only the defaults, so the file is documentation as much as
-configuration. Keys in [CLI overview](overview.md#waffleyaml).
+`init:service` writes all three — `api_import`, `proto_dir` and `mapper` —
+each with its default and a comment saying what it decides. What a component
+test may replace is not among them: that is `replacements.allow` in specrig's
+`specrig.yaml`. A missing file behaves exactly like one holding only the
+defaults, so the file is documentation as much as configuration. Keys in
+[CLI overview](overview.md#waffleyaml).
 
 **`.env`**
 

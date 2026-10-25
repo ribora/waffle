@@ -38,7 +38,6 @@ var docPackages = map[string][]string{
 	"openapitest": {"gitlab.com/gorib/http/openapi/openapitest"},
 	"pry":         {"gitlab.com/gorib/pry"},
 	"redistest":   {"gitlab.com/gorib/redis/redistest"},
-	"resource":    {"gitlab.com/gorib/waffle/resource"},
 	"scan":        {"gitlab.com/gorib/whisk/scan"},
 	"server":      {"gitlab.com/gorib/http/server", "gitlab.com/gorib/grpc/server"},
 	"session":     {"gitlab.com/gorib/session"},

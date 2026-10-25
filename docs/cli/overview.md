@@ -185,7 +185,9 @@ afterwards — and what each produces is described where the produced thing is:
 The component harness, the list of what a test may replace and the records a
 suite writes are specrig's, for a waffle service through
 [the waffle adapter of specrig-go](https://github.com/specrig/specrig-go/tree/main/waffle): `go tool specrig init`
-once after `init:service`, then `harness`, `replacements`, `surface` and `flows`.
+once after `init:service`, then `harness`, `replacements` and `surface`. A
+project's flows are assembled from every service's records by specrig-go's
+`specrig-flows`.
 
 ## Next
 
@@ -194,4 +196,4 @@ once after `init:service`, then `harness`, `replacements`, `surface` and `flows`
 | The whole path a scaffolded service takes | [Getting Started](../getting-started.md) |
 | Where the generated tree comes from and why it is shaped that way | [Recommended architectures](../architectures.md) |
 | What each generated registration means | [di/overview](../di/overview.md) |
-| What a component test may replace, and where to cut | [conventions/component-harness](https://github.com/specrig/specrig-go/blob/main/waffle/docs/harness.md) |
+| What a component test may replace, and where to cut | [Component harness](https://github.com/specrig/specrig-go/blob/main/waffle/docs/harness.md) |

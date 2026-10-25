@@ -15,7 +15,6 @@ var (
 	addMark  = color.New(color.FgGreen).Sprint("+")
 	keepMark = color.New(color.FgYellow).Sprint("=")
 	warnMark = color.New(color.FgYellow).Sprint("!")
-	missMark = color.New(color.FgRed).Sprint("-")
 )
 
 func ReportCreated(paths ...string) {
@@ -28,18 +27,6 @@ func ReportUnchanged(paths ...string) {
 	for _, path := range paths {
 		_, _ = fmt.Fprintf(output, "  %s %s — up to date\n", keepMark, path)
 	}
-}
-
-func ReportMissing(paths ...string) {
-	for _, path := range paths {
-		_, _ = fmt.Fprintf(output, "  %s %s — missing\n", missMark, path)
-	}
-}
-
-// Not an error: the run succeeded, and this is about something it deliberately
-// did not touch.
-func ReportWarning(text string) {
-	_, _ = fmt.Fprintf(output, "  %s %s\n", warnMark, text)
 }
 
 func reportCreated(paths []string) {

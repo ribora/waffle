@@ -174,7 +174,7 @@ failure the framework's own modules give, rather than a nil field discovered on
 the first request.
 
 That the reads sit next to the registration is also what `waffle agents` walks
-to fill in the env list in `AGENTS.md`: it greps `env.Value` / `env.NeedValue`
+to fill in the env list in `waffle.md`: it greps `env.Value` / `env.NeedValue`
 across `config/`, `domain/` and `cmd/`. A struct built somewhere else is
 invisible to it.
 

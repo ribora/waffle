@@ -256,4 +256,4 @@ event was lost" look the same, which is the thing being fixed.
 | Where the outbox sits in a modular monolith | [Recommended architectures](../architectures.md#events-leaving-the-binary) |
 | Publishing without the outbox, straight to the broker | [tools/scribus](scribus.md) and `config/service/amqp` |
 | What has to be running and in `.env` | [reference/running-locally](../reference/running-locally.md#by-module) |
-| Why the recorder rather than a silent stand-in | [conventions/component-harness](https://github.com/specrig/specrig-go/blob/main/waffle/docs/harness.md#noop-is-a-recorder-nobody-queries) |
+| Why the recorder rather than a silent stand-in | [Component harness](https://github.com/specrig/specrig-go/blob/main/waffle/docs/harness.md#noop-is-a-recorder-nobody-queries) |

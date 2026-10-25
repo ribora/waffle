@@ -273,4 +273,4 @@ The HTTP server registers itself with the app closer. On `SIGINT` / `SIGTERM` th
 | `RouterTag` and every other collection | [di/tags](../di/tags.md#httproutertag) |
 | `Router`, `Mux`, `Source`, `Renderer` in full | [reference/interfaces](../reference/interfaces.md#toolshttp-package) |
 | What has to be in `.env` for the command to start | [reference/running-locally](../reference/running-locally.md) |
-| Serving the real routes in a component test | [conventions/component-harness](https://github.com/specrig/specrig-go/blob/main/waffle/docs/harness.md#the-in-process-server) |
+| Serving the real routes in a component test | [Component harness](https://github.com/specrig/specrig-go/blob/main/waffle/docs/harness.md#the-in-process-server) |
