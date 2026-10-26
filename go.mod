@@ -16,7 +16,7 @@ require (
 	gitlab.com/gorib/failure v1.4.0
 	gitlab.com/gorib/grpc v1.7.1
 	gitlab.com/gorib/hilton v1.2.3
-	gitlab.com/gorib/http v1.13.0
+	gitlab.com/gorib/http v1.14.0
 	gitlab.com/gorib/pry v1.4.2
 	gitlab.com/gorib/redis v1.4.0
 	gitlab.com/gorib/session v1.2.0
@@ -37,6 +37,7 @@ require (
 	github.com/elastic/elastic-transport-go/v8 v8.11.0 // indirect
 	github.com/elastic/go-elasticsearch/v8 v8.19.7 // indirect
 	github.com/getsentry/sentry-go v0.48.0 // indirect
+	github.com/go-json-experiment/json v0.0.0-20260820222146-c27c302e5fc3 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-sql-driver/mysql v1.10.0 // indirect
