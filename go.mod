@@ -16,7 +16,7 @@ require (
 	gitlab.com/gorib/failure v1.4.0
 	gitlab.com/gorib/grpc v1.7.1
 	gitlab.com/gorib/hilton v1.2.4
-	gitlab.com/gorib/http v1.14.2
+	gitlab.com/gorib/http v1.14.3
 	gitlab.com/gorib/pry v1.4.2
 	gitlab.com/gorib/redis v1.4.0
 	gitlab.com/gorib/session v1.2.0
