@@ -22,7 +22,6 @@ This pulls in the registrations from [`config/tools/migrate/init.go`](../../conf
 
 ```go
 import (
-    "io/fs"
     "gitlab.com/gorib/di"
     "gitlab.com/gorib/waffle/app"
     "gitlab.com/gorib/waffle/tools/migrate"
@@ -82,9 +81,11 @@ A source is reached only through the tag, so it needs no interface of its own,
 and registering `embed.FS` concretely in twenty domains is twenty distinct
 container fields: each is named after its import alias and the type.
 
-The migrate command collects every source under the tag as `[]fs.FS` and runs
-them in order. Adding a domain with migrations is the one registration above —
-no change to the migrate command itself.
+The migrate command collects every source under the tag as `[]fs.FS` and runs them
+as one set, in version order. One domain's versions say nothing about another's, so
+a domain's migrations must apply without another domain's having run. Adding a
+domain with migrations is the one registration above — no change to the migrate
+command itself.
 
 ## Database connection
 
@@ -120,6 +121,11 @@ Pass the goose subcommand as a positional argument after `migrate`:
 | `status` | Print the applied/pending status of every migration |
 | `version` | Print the current schema version |
 
+The sources are one set to every subcommand: `down` rolls back the last applied
+migration whichever source ships it, and `status` lists each migration once. A
+version two sources ship runs once, so they must ship the same file; different
+contents under one version stop the command before anything runs.
+
 ## Migration table
 
 Waffle configures goose to use `migrations` as the tracking table name (instead of goose's default `goose_db_version`). This is fixed and cannot be overridden.
@@ -146,7 +152,9 @@ Example: `20240315143022_create_users_table.sql`
 
 ## Missing migrations
 
-The migrate tool is configured with `goose.WithAllowMissing()`. This means if a migration file is deleted after being applied, goose will not error out on subsequent runs — it will simply skip the missing version.
+The migrate tool is configured with `goose.WithAllowMissing()`: a version below the highest one applied still runs if it has not run yet, which is what lets a second source carry versions below the first one's highest.
+
+A file deleted after being applied is a different case. `up` does not notice it, and `down` fails with `no current version found` once that version is the current one.
 
 ## File layout
 
@@ -164,7 +172,29 @@ domain/user/cmd/migrate/
 
 | Tag | Collects |
 |-----|---------|
-| `migrate.MigrationsTag` | All domain `Migration` (i.e. `fs.FS`) sources |
+| `migrate.MigrationsTag` | All domain `fs.FS` sources |
+
+## Testing
+
+`migrate.Up(sources...)` applies the sources in a test, postgres only. It returns the function `sqltest.Migrations` takes:
+
+```go
+postgres := sqltest.New(
+    sqltest.Env("DB_DSN"),
+    sqltest.Migrations(migrate.Up(userMigration.NewMigrations(), billingMigration.NewMigrations())),
+)
+```
+
+A domain's migrations must apply alone: `migrate.Up` over one source and an empty database is what shows they do.
+
+`migrate.CheckShared` refuses two different files under one version, as the command does, and names the sources, so a test finds it before any database does:
+
+```go
+err := migrate.CheckShared(map[string]fs.FS{
+    "user":    userMigration.NewMigrations(),
+    "billing": billingMigration.NewMigrations(),
+})
+```
 
 ## Next
 
@@ -174,4 +204,3 @@ domain/user/cmd/migrate/
 | Adding one more `.sql` to a domain that has them | `waffle make:domain:migration <domain> <description>` — [cli/overview](../cli/overview.md#commands) |
 | The table a scaffolded entity gets, and the `stored<X>` struct it pairs with | [cli/make:domain](../cli/make-domain.md#migrations) |
 | `DB_DRIVER` and `DB_DSN` | [reference/environment](../reference/environment.md#configservicesql) |
-| Applying the same migrations in a component test | [Component harness](https://github.com/specrig/specrig-go/blob/main/waffle/docs/harness.md#postgres) |
