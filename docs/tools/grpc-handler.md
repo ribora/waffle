@@ -18,6 +18,7 @@ import (
 
     proto "mymodule/api/pb/user"
     "mymodule/domain/user/model"
+    "github.com/samber/lo"
     "google.golang.org/grpc"
 )
 
@@ -52,7 +53,7 @@ func (s *userService) Start(server grpc.ServiceRegistrar) {
 
 ## Implementing RPC methods
 
-Each method receives a proto request, calls the management interface, and returns a proto response. Domain errors propagate as-is — the error mapper middleware translates them to gRPC status codes.
+Each method receives a proto request, calls the management interface, and returns a proto response. Domain errors propagate as-is — the error mapper middleware translates them to gRPC status codes. These examples call the hand-written helpers of `mapper: dto`, below; under the default `mapper: goverter` the same calls go to the generated `convert` package.
 
 ```go
 func (s *userService) Get(ctx context.Context, req *proto.GetUserRequest) (*proto.User, error) {
@@ -93,7 +94,6 @@ package grpc
 import (
     proto "mymodule/api/pb/user"
     "mymodule/domain/user/model"
-    "github.com/samber/lo"
 )
 
 func userToProto(u *model.User) *proto.User {
@@ -127,7 +127,7 @@ if err != nil {
 
 ## Wiring in DI
 
-`make:domain:grpc` generates `config/di/di_user_grpc.go`. The handler and the error mapper are concrete types collected by tag — use `di.Define`. Register the domain service with `di.Alias` so the handler's `UserManagement` interface resolves to it:
+`make:domain:grpc` generates `config/di/di_user_grpc.go`. The handler and the error mapper are concrete types collected by tag — use `di.Define`. The handler's `UserManagement` interface is wired from the handle `config/di/di_user_domain.go` holds:
 
 ```go
 import userGrpc "mymodule/domain/user/cmd/grpc"
@@ -135,10 +135,7 @@ import userGrpc "mymodule/domain/user/cmd/grpc"
 di.Define(userGrpc.NewUserService, di.Tag(grpcCommand.ServiceTag))
 di.Define(userGrpc.NewErrorHandler, di.Tag(grpcCommand.ErrorMapperTag))
 
-di.Define(service.NewUserService,
-    di.Alias[userGrpc.UserManagement](),
-    // other aliases...
-)
+di.Wire[userGrpc.UserManagement](userManagementInstance)
 ```
 
 ## File layout

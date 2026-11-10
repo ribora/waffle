@@ -45,7 +45,7 @@ func (h *userHandler) Create(ctx context.Context, req *createRequest) (*server.R
 mux.Post("/v1/users", server.Bind(r.handler.Create))
 ```
 
-`Bind` also records the request and response types on the route, and that record is what the OpenAPI generator reads. A route registered with `Handle` carries no types and stays out of the specification — see [OpenAPI](http.md#openapi).
+`Bind` also records the request and response types on the route, and that record is what the OpenAPI generator reads. A route registered with `Handle` carries no types, so it reaches the document without schemas or an `operationId`, and needs prose until `AssertUpToDate` passes — see [OpenAPI](http.md#openapi).
 
 ## Without the framework
 
@@ -108,16 +108,19 @@ through it where an invalid request reaches the service.
 
 ## Response helpers
 
-Every one of these returns a `*server.Response[Res]` and takes a **pointer** to
-the payload. The status-named ones are JSON, which is what a handler wants
-almost every time:
+The status-named helpers are JSON, which is what a handler wants almost every
+time. They take a **pointer** to the payload and return a
+`*server.Response[Res]`:
 
 ```go
 return server.OK(&userResponse{Id: user.Id}), nil        // 200
 return server.Created(&userResponse{Id: user.Id}), nil   // 201
 return server.Accepted(&jobResponse{Id: job.Id}), nil    // 202
-return server.NoContent(), nil                           // 204, no payload
 ```
+
+`server.NoContent()` takes no payload and returns a `*server.Response[any]`: a
+`Handle` handler can return it, and a `Bind` handler typed on its own `Res`
+cannot. There, `return nil, nil` renders the same 204.
 
 The rest take the status, because it is the part that varies:
 
@@ -129,8 +132,19 @@ The rest take the status, because it is the part that varies:
 | `server.HTML(status, body)` | `text/html; charset=utf-8` |
 | `server.StreamWith(status, contentType, fn)` | yours; the body is written incrementally by `fn` |
 
-`server.NewJsonResponse` and `server.NewResponse` are the older spelling of
-`JSON` and `Text` and still work. New code takes the shorter ones.
+`server.NewJsonResponse` and `server.NewResponse` are other names for `JSON` and
+`Text`.
+
+`Text`, `HTML` and `NewResponse` set the content type and JSON-encode the body:
+`server.Text(200, &s)` writes `"hello"` with its quotes. `StreamWith` writes a
+plain one, and returns a `*server.Response[any]`:
+
+```go
+return server.StreamWith(200, "text/plain; charset=utf-8", func(w io.Writer) error {
+    _, err := io.WriteString(w, s)
+    return err
+}), nil
+```
 
 Returning a nil renderer with a nil error also renders 204, so `NoContent()` is
 for saying it on purpose rather than by omission.
@@ -180,7 +194,7 @@ import (
     "mymodule/domain/user/model"
 )
 
-// What the router asks for, and the seam a component test stands in on.
+// What the router asks for.
 type Routes interface {
     Get(src server.Source) (server.Renderer, error)
     Create(src server.Source) (server.Renderer, error)
@@ -249,20 +263,17 @@ Two different reasons, and neither is a style preference.
 
 **The handler is `di.Wire[Routes]`** — the interface declared beside it above —
 because `di.Define` alone would expose `*userHandler`, a name the generated
-container cannot use and no component test can stand in for. The router asks
-for a `Routes`, so the interface is also what makes the two meet.
+container cannot use. The router asks for a `Routes`, so the interface is also
+what makes the two meet.
 
 **The router is `di.Define` plus the tag** because it reaches the server only
 through the collection; a plain `di.Wire[server.Router]` fills a slot nothing
-asks for any more. See [di/tags](../di/tags.md#httproutertag).
+asks for. See [di/tags](../di/tags.md#httproutertag).
 
-The service dependency (`UserManagement`) is resolved automatically from the registered aliases. If the service struct satisfies multiple interfaces, declare them with `di.Alias` when registering the service:
+The service dependency (`UserManagement`) is wired from the domain's handle, which `make:domain:http` writes in `config/di/di_user_http.go`. Each transport wires the same handle to its own interface, so they all share one instance — see [di/overview](../di/overview.md#didefine--registering-a-concrete-constructor):
 
 ```go
-di.Define(service.NewUserService,
-    di.Alias[httpCmd.UserManagement](),
-    di.Alias[grpcCmd.UserManagement](),
-)
+di.Wire[userHttp.UserManagement](userManagementInstance)
 ```
 
 ## Guidelines
@@ -278,6 +289,6 @@ di.Define(service.NewUserService,
 |---|---|
 | The server these handlers are mounted on | [tools/http](http.md) |
 | Every `scan` and `validate` tag, the hooks, custom validators | [conventions/input-parsing](../conventions/input-parsing.md) |
-| Scaffolding the router, the handler and the convert package | [cli/make:domain:http](../cli/make-domain-http.md) |
+| Scaffolding the router and the convert package | [cli/make:domain:http](../cli/make-domain-http.md) |
 | `Handler`, `Source`, `Renderer` and the response helpers | [reference/interfaces](../reference/interfaces.md#handler-and-layer) |
 | Getting an OpenAPI document out of these routes | [tools/http](http.md#openapi) |

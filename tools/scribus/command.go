@@ -184,8 +184,8 @@ func (c *scribusCommand) Usage(ctx context.Context) error {
 	opts := getopt.New()
 	var help bool
 	opts.FlagLong(&help, "help", 'h', "Display this help message")
-	timeout := opts.DurationLong("flush-timeout", 't', 0, "Flush every [n] seconds", "n")
-	reconnect := opts.DurationLong("reconnect-timeout", 'r', 0, "Reconnect every [n] seconds", "n")
+	timeout := opts.DurationLong("flush-timeout", 't', 0, "Flush every [n], a duration such as 5s", "n")
+	reconnect := opts.DurationLong("reconnect-timeout", 'r', 0, "Reconnect every [n], a duration such as 5m", "n")
 	page := opts.Uint16Long("page", 'p', 0, "Number of items for bulk processing")
 	if err := opts.Getopt(app.Args(ctx), nil); err != nil {
 		return err

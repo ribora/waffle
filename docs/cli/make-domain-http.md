@@ -114,10 +114,9 @@ for what a handle is and why the wiring splits across two files.
 the server only through the collection, and a plain `di.Wire` fills a slot
 nothing asks for. See [di/tags](../di/tags.md#httproutertag).
 
-A handler you add is registered the same way, in the same file, with
-`di.Wire[Routes](NewProductHandler)` — the interface, because
-`di.Define` alone would expose `*productHandler`, which no component test can
-stand in for.
+A handler you add goes in the same file, as
+`di.Wire[httpProduct.Routes](httpProduct.NewProductHandler)`: the router asks for a
+`Routes`, and the interface on the registration is what makes the two meet.
 
 ### The convert package
 
@@ -136,7 +135,7 @@ file is created once per project and left alone afterwards. See
 | appends `DAEMON_HOST`, `DAEMON_PORT`, `HEALTH_PATH` to `.env` | a variable arrives with the module that reads it — only what is missing is added, so a second run contributes nothing |
 | `go get -tool` for `whisk`, and for `goverter` under the default mapper | the generators the layer uses have to be in `go.mod` before the first `//go:generate` line you write |
 | runs `go tool whisk init`, writing `whisk.yaml` | whisk owns its own defaults; an existing file is left alone |
-| runs `make .tidy generate` | so the container has the new registration and the project compiles when the command returns |
+| runs `make .tidy generate` | so the container has the new registration and the project compiles when the command returns; another domain nothing reads yet fails this step, see [make:domain](make-domain.md#post-generation-steps) |
 
 ## After it runs
 
@@ -145,16 +144,18 @@ $ go run ./cmd/app --help
 Usage: app [-h] command
  -h, --help  Display this help message
 Available commands:
-	http 	Start web server
+	http    	Start web server
+	migrate 	Run migrations
 ```
 
-An empty list here means the last step did not happen — run `make generate` and
-read what it prints. The server starts and answers 404 to everything until
+`migrate` came with `make:domain`; a domain made with `--no-repository` lists `http`
+alone. An empty list here means the last step did not happen — run `make generate`
+and read what it prints. The server starts and answers 404 to everything until
 `Setup` registers a route: the scaffold registers none, and
 `ProductManagement` declares no methods.
 
-Idempotent, like every scaffolding command: an existing file is skipped without
-error, so re-running it after adding a second entity costs nothing.
+Idempotent: an existing file is skipped without error, so re-running it after
+adding a second entity costs nothing.
 
 ## Next
 

@@ -21,15 +21,15 @@ your mind later.
 | **Service fleet** | many domains, many teams, a database each | many binaries | gRPC, HTTP or a queue |
 
 The middle row is the one the rest of this page is about, because it is the one
-waffle's machinery was shaped for and the one its documentation used to skip.
+waffle's machinery is shaped for.
 
 ## What every shape shares
 
 ```
 cmd/app/main.go          entry point — builds the container, calls RunUntilStop
-config/di/               hand-written registrations, one file per domain
+config/di/               hand-written registrations, di_<name>_*.go per domain
 config/di/modules.go     blank imports: the set of modules this binary carries
-config/diogen/           generated container (do not edit)
+config/diogen/           generated container (di_gen.go, do not edit) and its adapter
 domain/<name>/
   model/                 entities and domain errors
   service/               business logic, and the interfaces it needs
@@ -59,10 +59,10 @@ deleting a line. See [Introduction](introduction.md) for the built-in set.
 
 One domain, three to ten endpoints, no second reader.
 
-Be honest about this case: most of waffle is overhead here. Six scaffolding
-commands to save a `main.go` you would have written in an afternoon is not a
-trade that pays, and a small Go service next to a large Python one is the case
-waffle explicitly does not fit.
+Be honest about this case: most of waffle is overhead here. A scaffolding CLI to
+save a `main.go` you would have written in an afternoon is not a trade that pays,
+and a small Go service next to a large Python one is the case waffle explicitly
+does not fit.
 
 What still pays on its own, without adopting the rest, is the core:
 `failure`, `pry`, `session` and `hilton` give you typed errors, correlation ids
@@ -78,8 +78,9 @@ deployment, one schema and one transaction.
 
 ### A module is a domain directory
 
-`domain/<name>/` plus its registration file in `config/di/` and its migrations.
-Nothing else belongs to it, and nothing of it lives anywhere else.
+`domain/<name>/`, migrations included, plus its registration files in `config/di/`
+and, if it speaks gRPC, its proto under `api/proto/<name>/`. Nothing else belongs
+to it, and nothing of it lives anywhere else.
 
 ### The boundary rule
 
@@ -183,10 +184,9 @@ So the boundary is a check over the import graph, with the layer table above as
 its rule. `boundaries.Check()` runs it as an ordinary test from
 `config/diogen/boundaries_test.go`, which `waffle init:service` writes.
 
-There is no exception list, and that is deliberate. `replacements.allow` has one
-because a replacement is legitimately different from service to service; a
-crossing is not. A crossing that looks like it needs an entry is a design
-question, and a format invented before the first exception guesses wrong.
+There is no exception list, and that is deliberate. A crossing that looks like it
+needs an entry is a design question, and a format invented before the first
+exception guesses wrong.
 
 ### What the import graph stops telling you
 
@@ -246,7 +246,7 @@ marked as reaching outward.
 
 ### Testing
 
-The [component harness](https://github.com/specrig/specrig-go/blob/main/waffle/docs/harness.md) boots the real
+A [component test](di/overview.md#testing-with-the-container) boots the real
 container over real infrastructure and replaces only the leaves. In a monolith
 that is per-module component tests against the same binary — the thing everybody
 wants from a modular monolith and rarely gets, because there is usually no seam

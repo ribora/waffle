@@ -83,7 +83,7 @@ HTTP/gRPC servers, queue consumers, and other long-running commands implement th
 
 ```
 $ ./app cron
-Error: cron: command is a daemon, cannot schedule: http
+cron: command is a daemon, cannot schedule: http
 ```
 
 Daemons block in their `Run` until ctx is cancelled. Putting one on a tick would jam the scheduler. The check is fail-fast at startup — not on first fire, where you might not notice until hours later.
@@ -96,7 +96,7 @@ Schedule entries that reference an unregistered command name are rejected at sta
 
 ```
 $ ./app cron
-Error: cron: unknown command in schedule: rebt
+cron: unknown command in schedule: rebt
 ```
 
 ## Timezone
@@ -112,7 +112,7 @@ The schedule above fires at 09:00 Berlin time on weekdays.
 
 ## Logging
 
-Failed task runs are logged via the bound `pry.Logger` with `Method=CRON` in the session, so log lines and Sentry events show which command (and which argv) failed. Successful runs are silent at default log level — set `LOGLEVEL=trace` to see fire-times.
+Failed task runs are logged via the bound `pry.Logger` with `Method=CRON` in the session, so log lines and Sentry events show which command (and which argv) failed. Successful runs are silent at every log level: nothing logs a tick.
 
 ## Running a scheduled command manually
 

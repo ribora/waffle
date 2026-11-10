@@ -79,6 +79,7 @@ before you have touched anything.
 ```
 catalog/
 ├── AGENTS.md              The service's own agent instructions; brings in waffle.md
+├── CLAUDE.md              → AGENTS.md
 ├── Makefile               generate / .tidy / test / build / run / audit
 ├── api/
 │   ├── init.go            Service API package
@@ -98,6 +99,7 @@ catalog/
 ├── waffle                 ./waffle → go tool waffle
 ├── waffle.md              The framework's conventions for AI coding agents (waffle-managed)
 ├── waffle.yaml            Project conventions read by the generators
+├── .cursorrules           → AGENTS.md
 ├── .env                   Local environment
 └── .gitignore
 ```
@@ -192,7 +194,9 @@ three edits, one new file and one line of wiring.
 
 ### The model gets a field
 
-The entity is a plain struct with no storage tags — yours to edit.
+The entity is a plain struct with no storage tags — yours to edit. Nothing here
+returns the scaffold's `ErrProductNotFound` yet, so it goes, and its `failure`
+import with it.
 
 ```go
 // domain/product/model/product.go
@@ -241,15 +245,14 @@ func (m *productManagement) GetProduct(_ context.Context, productId int) (*model
 }
 ```
 
-The scaffold's `var _ = model.Product{}` line goes: it was there to keep the
-import used until the first method arrived.
+The scaffold's `var _ = model.Product{}` line goes: it only keeps the import used
+until the first method arrives.
 
 ### The handler
 
 The handler is its own type behind its own interface, and the response struct
-with `json` tags sits next to it — never in `model/`. The router will ask for
-`Routes`, not for the struct: a constructor's concrete return type is what DI
-exposes, and a component test can only stand in for an interface.
+with `json` tags sits next to it — never in `model/`. The router asks for
+`Routes`, not for the struct: that interface is all it needs of its handler.
 
 ```go
 // domain/product/cmd/http/product.go
@@ -353,8 +356,8 @@ func InitProductHttp() {
 
 `di.Wire[T](constructor)` is the form every handler in a waffle service is
 registered with: the container holds a `T`, the constructor keeps returning the
-unexported struct. `di.Define` alone would expose `*productHandler`, which the
-generated container cannot name and no test can replace.
+unexported struct. `di.Define` alone would register `*productHandler`, and since
+`NewRouter` asks for a `Routes`, `make generate` would refuse it.
 
 Nothing else needs saying — `NewRouter` asks for a `Routes` and there is now
 exactly one, so diogen connects them. This is a registration change, so the
@@ -366,8 +369,8 @@ container has to be rebuilt; the next command does that itself.
 make run ARGS=http
 ```
 
-`run` tidies and regenerates before it starts — `.tidy generate`, the pair every
-scaffolding command runs — so the binary is built from what is on disk,
+`run` tidies and regenerates before it starts — `.tidy generate`, the pair
+`make:domain:http` ran above — so the binary is built from what is on disk,
 including the `di.Wire` line above. That is the one failure worth designing out:
 edit a registration, start a stale container, and the code looks right while
 nothing happens. The subcommand travels in `ARGS` because `make run http` would

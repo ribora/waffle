@@ -27,9 +27,10 @@ go install gitlab.com/gorib/waffle/cmd/waffle@latest
 | `waffle make:outbox --driver <id>` | Enable the transactional outbox: the table, its migration runner, the module and the named broker driver under `config/tools/outbox`. See [tools/outbox](../tools/outbox.md) |
 | `waffle agents` | Regenerate `waffle.md` after a waffle upgrade, and bring it into the service's `AGENTS.md` ([details](agents.md)) |
 
-`--help` on any of them prints its description and operands. A flag that takes a
-value takes it either way, `--driver amqp` or `--driver=amqp`. A failing command
-exits non-zero, so a `make` target that calls one stops.
+`waffle` alone lists them, and `--help` on any of them prints its description and
+operands. A flag that takes a value takes it either way, `--driver amqp` or
+`--driver=amqp`. A command whose own check or step fails exits non-zero, so a
+`make` target that calls one stops.
 
 ### Names
 
@@ -45,10 +46,12 @@ written wherever it is not one. `waffle make:domain:entity warehouse unit_type`
 writes `model/unit_type.go` and `adapter/postgres/stored_unit_type.go`, declaring
 `UnitType` and `storedUnitType`, against a table called `unit_types`.
 
-The check runs before anything is written, and so do the ones below, each of
-which used to fail at the end of a command with its files already on disk. A
-command that cannot finish leaves no files behind — `waffle make:domain --help`
-used to scaffold a domain called `--help` and stop halfway through.
+The check runs before anything is written, and so do the ones below: a command
+they refuse leaves no files behind. A later step that fails does not undo what
+came before it. When `go get`, `make .tidy` or `make generate` fails, the
+scaffolded files stay on disk and the command exits non-zero; a re-run skips them.
+`init:service` checks no name first: a module path ending in `my-service` stops
+at `api/init.go` with `.env`, `.gitignore` and `Makefile` written.
 
 | Refused when | By |
 |---|---|
@@ -113,7 +116,7 @@ Every scaffolding command walks up the directory tree from the current working d
 
 Each command ships embedded Go templates. When you run a command, waffle renders each template with the parameters you provide (service name, domain name, timestamp) and writes the result to the target path.
 
-**Idempotent writes:** If the target file already exists, waffle skips it without error. You can safely re-run commands; only missing files are created.
+**Idempotent writes:** If the target file already exists, waffle skips it without error. You can safely re-run commands; only missing files are created. `make:domain:migration` is the exception: its file name carries the current second, so every run writes another migration.
 
 ### Post-generation hooks
 
@@ -122,12 +125,12 @@ Some commands run additional steps after writing files:
 - `init:service` — installs the `diogen` and `waffle` tools, then runs `make .tidy generate`
 - `make:domain` — installs the `store` tool and enables `config/service/sql` and `config/tools/migrate` (unless `--no-repository`), then runs `make .tidy` and `go generate ./domain/<domain>/...` — not the container, which refuses the domain until a transport reads it
 - `make:domain:entity` — installs the `store` tool and enables `config/service/sql` and `config/tools/migrate`, then runs `make .tidy` and `go generate ./domain/<domain>/...` — not the container, which refuses the new repository until something reads it; the command prints the parameter to add to the management, and `make generate` after that
-- `make:domain:grpc` — enables `config/tools/grpc`, runs `go generate ./api/...`, then `make .tidy generate`; when `proto_dir` is outside the module both runs are skipped and the command prints the steps to do by hand
+- `make:domain:grpc` — installs `goverter` under the default mapper, enables `config/tools/grpc`, runs `go generate ./api/...`, then `make .tidy generate`; when `proto_dir` is outside the module both runs are skipped and the command prints the steps to do by hand. See [Proto compilation](make-domain-grpc.md#proto-compilation)
 - `make:domain:http` — enables `config/tools/http`, installs `whisk` (and `goverter`, under the default mapper) and writes `whisk.yaml`, then runs `make .tidy generate`
 - `make:domain:scribus` — enables `config/tools/scribus/<driver>` and the mode module, installs `whisk`, then runs `make .tidy generate`
 - `make:domain:command` — runs `make .tidy generate`
 - `make:domain:migrate` — enables `config/service/sql` and `config/tools/migrate`, and stops there
-- `make:outbox` — enables `config/service/sql`, `config/tools/migrate`, `config/tools/outbox` and the driver named by `--driver`, then runs `make .tidy generate`
+- `make:outbox` — installs the `store` tool, enables `config/service/sql`, `config/tools/migrate` and `config/tools/outbox/<driver>`, which pulls `config/tools/outbox` in, then runs `make .tidy generate`
 
 `make:domain:migrate`, `make:domain:migration`, `make:converter` and `agents`
 run no `make`; run `make generate` yourself afterwards.
@@ -154,9 +157,7 @@ Project-level conventions live in `waffle.yaml`, next to `go.mod`. `init:service
 | `proto_dir` | `api/proto` | Where `.proto` sources are written |
 | `mapper` | `"goverter"` | `"goverter"` scaffolds a goverter `convert/convert.go`; `"dto"` scaffolds nothing extra (hand-written conversions) |
 
-`<service>` is the last path segment of the module name. A missing `waffle.yaml`, an empty one, one holding only comments, or one missing some keys, behaves exactly like a file containing only the defaults above — they are indistinguishable to every command. An unknown key (e.g. a typo) or an invalid `mapper` value (anything other than `dto` or `goverter`) is a hard error in the commands that read the file — the transports, `agents` and the two commands that regenerate `waffle.md` (`init:service`, `make:domain`); the others never open it.
-
-What a component test may replace, the areas of Rule #11 and what a record cannot learn from the code are not waffle's keys: specrig reads them from `specrig.yaml`, beside it. See [the waffle adapter of specrig-go](https://github.com/specrig/specrig-go/tree/main/waffle).
+A missing `waffle.yaml`, an empty one, one holding only comments, or one missing some keys, behaves exactly like a file containing only the defaults above — they are indistinguishable to every command. An unknown key (e.g. a typo) or an invalid `mapper` value (anything other than `dto` or `goverter`) is a hard error in the commands that read the file — `make:domain:http`, `make:domain:grpc` and `make:domain:scribus`; the others never open it.
 
 The whisk generator keeps its own `whisk.yaml` beside it, on the same missing-is-defaults rule. `make:domain:http` and `make:domain:scribus` write it the first time they pull whisk in, and never overwrite one you have edited; the keys are documented in [whisk's README](https://gitlab.com/gorib/whisk#whiskyaml).
 
@@ -170,8 +171,9 @@ The whisk generator keeps its own `whisk.yaml` beside it, on the same missing-is
 - [agents](agents.md)
 
 The remaining commands have no page of their own. They follow the same rules as
-the ones above — project root detection, idempotent writes, `make generate`
-afterwards — and what each produces is described where the produced thing is:
+the ones above — project root detection, idempotent writes (`make:domain:migration`
+aside), `make generate` afterwards — and what each produces is described where the
+produced thing is:
 
 | Command | Read |
 |---|---|
@@ -182,13 +184,6 @@ afterwards — and what each produces is described where the produced thing is:
 | `make:converter` | [conventions/dto-conversion](../conventions/dto-conversion.md#cli-scaffolding) |
 | `make:outbox` | [tools/outbox](../tools/outbox.md#setup) |
 
-The component harness, the list of what a test may replace and the records a
-suite writes are specrig's, for a waffle service through
-[the waffle adapter of specrig-go](https://github.com/specrig/specrig-go/tree/main/waffle): `go tool specrig init`
-once after `init:service`, then `harness`, `replacements` and `surface`. A
-project's flows are assembled from every service's records by specrig-go's
-`specrig-flows`.
-
 ## Next
 
 | | |
@@ -196,4 +191,4 @@ project's flows are assembled from every service's records by specrig-go's
 | The whole path a scaffolded service takes | [Getting Started](../getting-started.md) |
 | Where the generated tree comes from and why it is shaped that way | [Recommended architectures](../architectures.md) |
 | What each generated registration means | [di/overview](../di/overview.md) |
-| What a component test may replace, and where to cut | [Component harness](https://github.com/specrig/specrig-go/blob/main/waffle/docs/harness.md) |
+| What a component test may replace, and where to cut | [di/overview](../di/overview.md#testing-with-the-container) |

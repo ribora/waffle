@@ -32,8 +32,8 @@ waffle make:domain:command media sweep-otp
 ```
 
 ```
-  + domain/media/cmd/sweep-otp/main.go
   + config/di/di_media_sweep_otp.go
+  + domain/media/cmd/sweep-otp/main.go
 ```
 
 The one operand decides every name — the CLI token `media:sweep-otp`, the

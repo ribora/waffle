@@ -142,13 +142,13 @@ func parseCreateOrder(src server.Source) (*createOrder, error) {
     if out.Currency == "" {
         return nil, failure.Wrap("%w: currency is required", scan.ErrPayload)
     }
-    if !validate.IsCurrency(out.Currency) {
+    if ok, _ := validate.IsCurrency(out.Currency); !ok {
         return nil, failure.Wrap("%w: currency is not a currency", scan.ErrPayload)
     }
     if out.Email == "" {
         return nil, failure.Wrap("%w: email is required", scan.ErrPayload)
     }
-    if !validate.IsEmail(out.Email) {
+    if ok, _ := validate.IsEmail(out.Email); !ok {
         return nil, failure.Wrap("%w: email is not an email", scan.ErrPayload)
     }
     if len(out.Items) == 0 {
@@ -215,8 +215,8 @@ mymodule/domain/order/cmd/http: order.go:14:9: undefined: model.Currency
 | `unique=G: anonymous struct in slice "F" has no field "G"` | typo in the field name | match the element's field |
 | `wrong comparison for field F` | an ordering comparison, or a value other than `true`/`false`, on a bool field | `validate:"equal=true"` |
 | `eq doesn't make sense for time field "F", an instant is bounded with gte/lte rather than matched` | equality against a `time.Time` | bound it with `gte`/`lte` |
-| `T.parse must take scan.Source` / `T.validate must return error` | hook signature | `func (s *T) parse(src scan.Source) error`, `func (s T) validate() error` |
-| `unknown format "yaml": no builtin preset, and no func UnmarshalYaml in pkg/scan/yaml.go` | `-format=yaml` with nothing behind it | add the function, or drop the flag |
+| `T.parse must take gitlab.com/gorib/whisk/scan.Source` / `T.validate must return error` | hook signature | `func (s *T) parse(src scan.Source) error`, `func (s T) validate() error` |
+| `unknown format "yaml": no built-in preset, and no func UnmarshalYaml in pkg/scan (…)` | `-format=yaml` with nothing behind it | add the function, or drop the flag |
 
 ### Silent outcomes
 
@@ -240,7 +240,7 @@ it can shadow the outer one. Give the field a name.
 |---|---|
 | `method T.Parse already declared` | the struct already has a hand-written `Parse`, and whisk generates for every struct in the file — move the DTO to its own file, or rename the hand-written method |
 | `s.F.Parse undefined` | `scan:"embed"` on a type whose own package was never generated — add the `//go:generate` directive there too |
-| `undefined: validate.IsX` | stale output: a custom validator was renamed or deleted while the tag stayed. Regenerating turns this into `unsupported validator tag` |
+| `undefined: validate.IsX` | stale output: a custom validator was renamed or deleted while the tag stayed. Regenerating turns this into `unknown validator tag` |
 
 ## Where this shows up
 

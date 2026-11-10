@@ -63,8 +63,9 @@ Outbound adapters are the hole: there is **no** command for a client of another
 service or of a third-party API. Write it by hand, shaped like an existing one
 in `domain/*/adapter/`, and wire it in `config/di/di.go` — see Rule #9.
 
-Each `make:*` command is idempotent — existing files are NEVER overwritten. You
-can re-run any of them safely.
+Each `make:*` command is idempotent — existing files are NEVER overwritten — and
+can be re-run safely, except `make:domain:migration`: its file name carries the
+current second, so every run writes another migration.
 
 Project conventions (API import path, proto directory, DTO mapper) live in
 `waffle.yaml` at the project root — generators follow it instead of
@@ -101,9 +102,9 @@ is part of your change, not something to revert.
 The scaffolds write it, so the shape is what `./waffle make:domain` left in
 `domain/`. What the tree does not show:
 
-- `domain/<x>/model` depends on nothing, `service/` on `model/` only;
-  `adapter/` is outbound and the only door to another domain (Rule #12),
-  `cmd/` is inbound
+- By convention `domain/<x>/model` depends on nothing and `service/` on `model/`
+  only. What the check closes is `adapter/`, outbound and the only door to another
+  domain (Rule #12), and `cmd/`, inbound
 - `api/proto/` is edited; `api/pb/` and every `*_gen.go` are generated
 - `config/di/di.go` is yours; `config/diogen/di_gen.go` is diogen's
 - `mapper: dto` in `waffle.yaml` scaffolds no `convert/` package — conversions
@@ -143,12 +144,14 @@ func (s *invoiceService) toDomain(invoice *invoiceModel.Invoice) *model.Invoice 
 ```
 
 ```go
-// config/di/di.go — the neighbour's service answers the adapter's interface
-di.Define(invoiceService.NewInvoiceManagement,
-    di.Alias[invoiceGrpc.InvoiceManagement](),
-    di.Alias[rentAdapter.InvoiceManagement](),   // the only cross-domain shape
-)
+// config/di/di.go — the neighbour's management answers the adapter's interface
+di.Wire[rentAdapter.InvoiceManagement](invoiceManagementInstance)   // the only cross-domain shape
 ```
+
+`invoiceManagementInstance` is the handle `./waffle make:domain invoice` published
+in `config/di/di_invoice_domain.go`. A second `di.Define` of that constructor is an
+ambiguous provider, and diogen takes one import name per package: `domain/<x>/service`
+is `service`, as the scaffolds import it.
 
 Behaviour crosses through the interface; types cross directly and stop at
 `toDomain`. Past that line the neighbour's model does not appear.
@@ -163,38 +166,43 @@ These deviate from Go style guide but are project-wide. Don't "fix" them.
 
 - `Db` not `DB`, `Dsn` not `DSN`, `Id` not `ID` (across all gorib + waffle + services)
 - **Constructors return the unexported struct, and the interface is on the
-  registration.** `func NewUserHandler(...) *userHandler`, wired as
-  `di.Wire[Routes](NewUserHandler)` — that is what every scaffold writes, and
-  it is what gives the seam a `Replacements` entry. Exporting the struct only
-  adds a second way to reach the same thing. Two exceptions: a constructor
-  whose type is the interface (`func NewRouter(...) server.Router`), and a type
-  collected by tag and reached no other way (`di.Define(..., di.Tag(...))`),
-  where there is nothing to name it by
+  registration.** `func NewUserRepository(...) *userRepository`, wired as
+  `di.Wire[service.UserRepository](postgres.NewUserRepository)`, is what the
+  repository scaffold writes. A handler has the same shape:
+  `func NewUserHandler(...) *userHandler`, wired as `di.Wire[Routes](NewUserHandler)`
+  because the router asks for a `Routes`. Exporting the struct only adds a second
+  way to reach the same thing. Two exceptions: a constructor whose type is the
+  interface (`func NewRouter(...) server.Router`), and a type collected by tag and
+  reached no other way (`di.Define(..., di.Tag(...))`), where there is nothing to
+  name it by
 - Domain interfaces declared by **consumer**, not producer:
   - gRPC handler declares `type FooManagement interface { ... }` — what it needs from service
-  - Service implements it without referencing `grpc.FooManagement` — wired via `di.Alias[grpc.FooManagement]()`
+  - Service implements it without referencing `grpc.FooManagement` — wired by the
+    management's handle, `di.Wire[fooGrpc.FooManagement](fooManagementInstance)`,
+    which `./waffle make:domain:grpc <domain>` writes
 - File naming: snake_case for files (`back_in_stock.go`), CamelCase for types
 
 ## Rule #4 — dependency injection (diogen)
 
 DI is **compile-time**: `config/di/di.go` is read by diogen and turned into
-`di_gen.go`; there is no runtime container. The primitives and every generation
-error are in the diogen README — a mistake in wiring stops `make generate` with
-a message the README's Troubleshooting section explains.
+`di_gen.go`; there is no runtime container. The primitives are in the diogen
+README, and a mistake in wiring stops `make generate` with a message its
+`docs/reference.md#error-catalogue` explains.
 
 What generation does not stop, because it compiles and is wrong:
 
-- ❌ Calling constructors by hand outside `InitDi()` or its delegates
+- ❌ Calling constructors by hand in production code, outside `InitDi()` or its
+  delegates. A unit test does build its subject by hand
 - ❌ `func init()` for DI registration — registrations go in `InitDi()`
 - ❌ Registering a waffle module in `di.go` — it is a **blank import** in
   `config/di/modules.go`, then `make generate`
 - ❌ `if env.Value("APP_ENV") == "test"` in `InitDi()` — test knowledge in
-  production wiring. A test substitutes through `Replacements`
+  production wiring. A component test substitutes through `Replacements`
 - ❌ `di.Override()` to inject a mock — it is a build-time directive, so the mock
   would have to be importable from production code
 - ❌ The AMQP publisher exposed as both `amqp.Publisher` and a service's port. Its
-  `Replacements` field becomes a composite interface the harness has no recorder
-  for, so a component test builds the real publisher. Expose it as one type: the
+  `Replacements` field becomes a composite interface no recorder satisfies, so a
+  component test builds the real publisher. Expose it as one type: the
   port alone, or, when `amqp.Publisher` is read too, the port declared as an alias,
   `type Publisher = amqp.Publisher`
 
@@ -298,15 +306,16 @@ Rule #2 — `make generate && make audit && make`.
 | task | order |
 |---|---|
 | gRPC method on an existing domain | rpc in `api/proto/<x>/service.proto` → regenerate stubs (Rule #10) → method on `cmd/grpc/service.go` → the method on the **handler's** Management interface → implement it in `service/` → conversion in `cmd/grpc/convert/`, or by hand in the `grpc` package under `mapper: dto` |
-| database table | `./waffle make:domain:migration <domain> <description>` scaffolds the migration only → write the `.sql` → `model.X` → `stored<X>` in `adapter/postgres/stored_<x>.go` |
-| outbound client — the one shape with no command | `adapter/<name>.go` by hand, shaped like an existing one → `./waffle make:converter domain/<x>/adapter/<name>/dto` → `di.Wire[<x>service.<Name>Client](<x>adapter.New<Name>Service, di.Args(...))` in `config/di/di.go`, with the interface declared by the consumer (Rule #3) |
+| new database table | `./waffle make:domain:entity <domain> <entity>` writes the table with its model, repository, stored struct and DI → add the columns to the `.sql`, `model.X` and `stored<X>` → add the repository to the management, the parameter the command prints |
+| change to an existing table | `./waffle make:domain:migration <domain> <description>` scaffolds the migration only → write the `.sql` → `model.X` → `stored<X>` in `adapter/postgres/stored_<x>.go` |
+| outbound client — the one shape with no command | `adapter/<name>.go` by hand, shaped like an existing one → `./waffle make:converter domain/<x>/adapter/<name>/dto` → `di.Wire[service.<Name>Client](<x>Adapter.New<Name>Service, di.Args(...))` in `config/di/di.go`, with the interface declared by the consumer (Rule #3). A neighbour's management goes in by its handle: `di.Wire[<x>Adapter.<Name>Management](<name>ManagementInstance)` (Rule #12) |
 
 ## Rule #10 — what NOT to do
 
 - ❌ `protoc` directly — proto generation is driven by the project's proto step (in-module: `go generate ./api/...`; monorepo with `proto_dir` outside the module: a central step such as `make -C <api-dir>`)
 - ❌ Manual `go mod tidy` after every edit — `make .tidy` does it consistently
 - ❌ A `replace` in `go.mod` whose target is outside this repository — a local checkout of gorib or of anything else builds only on the machine it was written on. Release the module and bump the version instead; a `replace` onto another module of the same repository is fine
-- ❌ Touch `di_gen.go`, `*_goverter_gen.go`, `*_whisk_gen.go`, `stored_*_gen.go`, `*_mock*.go` — they're generated
+- ❌ Touch `di_gen.go`, `*_goverter_gen.go`, `*_whisk_gen.go`, `stored_*_gen.go` — they're generated
 - ❌ Wrap stdlib types in custom abstractions inside `domain/<x>/model/` — model stays pure Go types
 - ❌ Reach another domain other than through `adapter/`, or import `domain/<x>/cmd/**` from outside `cmd/` (Rule #12)
 - ❌ Pass `context.Background()` deeper than the entrypoint — propagate ctx from caller

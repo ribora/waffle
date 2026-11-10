@@ -73,7 +73,7 @@ The command collects the tag, so every domain that serves HTTP registers its own
 Two things follow from sharing a mux, and both are checked before the listener opens:
 
 - **A pattern claimed twice is an error**, naming the method, the path and both routers. chi keeps the last registration and says nothing, so left unchecked the domain that loses is simply unreachable. Two domains that both want `/users` need a prefix, and a router takes one itself: `mux.Group("/billing")` returns a sub-mux sharing the chi router and the route list. Nothing hands out a prefix per domain — a domain is not always a path.
-- **An empty collection is an error** (`ErrNoRouters`). A daemon with no routers boots, listens and 404s everything; the usual cause is a domain still registering with `di.Wire[server.Router]`, which now satisfies nothing.
+- **An empty collection is an error** (`ErrNoRouters`). A daemon with no routers boots, listens and 404s everything; the usual cause is a domain registering with `di.Wire[server.Router]`, which satisfies nothing.
 
 ## OpenAPI
 
@@ -85,7 +85,7 @@ The `--openapi` flag derives an OpenAPI 3.1 document from the registered routes,
 
 The flag runs the real wiring — the router and everything it depends on is constructed — so the spec describes the same routes the server would serve.
 
-Only routes registered with `server.Bind` reach the spec: `Bind` captures the request and response types, `server.Handle` has nothing to capture. A `Handle` route is invisible to the generator; if you documented one by hand it stays in the file and is reported as doc-only.
+Only routes registered with `server.Bind` get schemas: `Bind` captures the request and response types, `server.Handle` has nothing to capture. A `Handle` route still reaches the document, with its path, its path parameters and a bare 200, but without schemas or an `operationId`, and it needs prose until `AssertUpToDate` passes. A schema or parameter you write by hand for one stays in the file and is reported as doc-only.
 
 ```go
 func (r *router) Setup(mux server.Mux) {
@@ -107,8 +107,8 @@ Every run merges, including the first — it merges into an empty document, so e
 | | |
 |---|---|
 | **Added** when the code has it and the file doesn't | schemas, fields, parameters, operations — each marked `TODO(openapi)`, so unfinished prose is greppable |
-| **Kept in sync** on every run | `required`, nullability, `operationId` |
-| **Left alone** | `summary`, `description`, examples, extra responses, `format` on existing fields, and everything outside `paths` and `components` |
+| **Kept in sync** on every run | `required`, nullability, `operationId`, and what a `validate` rule derives: `format`, `enum`, `pattern`, the length, range and item bounds, `x-constraints` |
+| **Left alone** | `summary`, `description`, examples, extra responses, a derived keyword with no `validate` rule behind it, and everything outside `paths` and `components` |
 | **Warned** | anything in the file the code doesn't produce — a hand-written operation, or something stale after a rename |
 | **Error** | a field or parameter whose type contradicts the code, or a field the code no longer has |
 
@@ -122,13 +122,13 @@ The request type registered with `Bind` supplies both the parameters and the bod
 |---|---|
 | `scan:"path=id"`, `scan:"query=limit"`, `scan:"header=X-Request-Id"` | a parameter in that location; `path` is always required |
 | `scan:"embed"` | the embedded struct's fields are inlined |
-| `json:"email"`, or a protobuf `json=` name | a body property; a field with neither tag is skipped |
+| `json:"email"`, or a protobuf `json=` name | a body property; a field with neither tag takes its Go name, and `json:"-"` keeps it out |
 | `validate:"required"` on a request field | listed in `required` |
 | `omitempty` or `omitzero` on a response field | left out of `required`; every other response field is listed |
 | `validate:"email"`, `uuid`, `url`, `hostname`, `datetime` | `format` |
 | `validate:"oneof=new used"` | `enum` |
 | `validate:"min=2,max=64"` | `minLength`/`maxLength`, `minimum`/`maximum` or `minItems`/`maxItems`, by type |
-| any other `validate` rule | appended to the description as `Constraints: …` |
+| any other `validate` rule | listed under `x-constraints` |
 | a request pointer without `validate:"required"`, or a response pointer without `omitempty` | nullable — `type: [string, "null"]`, or `anyOf` for a `$ref` |
 | a type with a `Values() []string` method | `enum` |
 | `time.Time`, `uuid.UUID`, protobuf well-known types | their standard formats |
@@ -148,11 +148,8 @@ The first command fails on a structural conflict, the second on drift — code c
 
 ### Media types
 
-**A route can answer XML.** `server.OK` writes JSON and `server.XML` writes XML,
-and the schema generator reads `encoding/xml` tags — element names, attributes,
-namespaces, a `lines>line` wrapped array, `XMLName` — so one struct is described
-for both serializations. The full tag mapping is the [XML
-section](https://gitlab.com/gorib/http#xml) of the `http` README.
+**A route can answer XML.** `server.OK` writes JSON and `server.XML` writes XML.
+The schema describes the struct by its JSON shape; `xml` tags are not read.
 
 What the generator **writes** into `content` is `application/json`, and only
 that. The error renderer is why: its body is an open map, `encoding/xml` cannot
@@ -187,7 +184,7 @@ How many documents to keep follows where the **prose** differs, not where the co
 
 ## Middleware
 
-Middleware is a `server.Layer`: `func(next server.Handler) server.Handler`.
+Middleware is a `server.Layer`: `func(next server.Handler) server.Handler`. `server.Middleware` is its named form, and it is the one a constructor returns: the container names its fields after types, and an alias has no name to use.
 
 The chain that runs around **every** request is `httpCommand.Global` — a `[]server.Middleware` — and the command puts it on the mux once, before any router registers a route. It sits outside routing, so it also covers what no route matched.
 
@@ -216,10 +213,10 @@ and drop out of the container with it.
 
 ### Custom middleware
 
-Write a `server.Layer` and add it to the chain:
+Write a constructor that returns `server.Middleware`. Diogen refuses one that returns `server.Layer`, with `cannot be exposed as func(next server.Handler) server.Handler`:
 
 ```go
-func NewAuthLayer(publicKey *ecdsa.PublicKey) server.Layer {
+func NewAuth(publicKey *ecdsa.PublicKey) server.Middleware {
     return func(next server.Handler) server.Handler {
         return func(src server.Source) (server.Renderer, error) {
             // validate the JWT from src.Header("Authorization")
@@ -236,6 +233,16 @@ func (r *router) Setup(mux server.Mux) {
     mux.Use(r.auth)
     // routes ...
 }
+```
+
+The router takes it through a handle. Every layer of the global chain is a `server.Middleware` too, so a parameter of that type left unpinned is ambiguous:
+
+```go
+auth := di.Define(NewAuth)
+
+di.Define(NewRouter, di.Tag(httpCommand.RouterTag), di.Args(map[string]any{
+    "auth": auth,
+}))
 ```
 
 To place it outside the global chain instead — the usual want for auth or cors — write your own list with it first:
@@ -261,7 +268,27 @@ admin.Get("/{id}", server.Handle(r.handler.GetAdmin))
 
 ## Graceful shutdown
 
-The HTTP server registers itself with the app closer. On `SIGINT` / `SIGTERM` the server's graceful shutdown is triggered and in-flight requests are allowed to complete, bounded by the configured shutdown timeout.
+The command is an `io.Closer`, so the container's `Shutdown` closes it. On `SIGINT` / `SIGTERM` the server's graceful shutdown is triggered and in-flight requests are allowed to complete. `config/tools/http` passes no options, so the wait has no bound of its own and the orchestrator's grace period owns it; `server.WithShutdownTimeout` in the command's `opts` sets one.
+
+## Testing
+
+`waffleHttp.Serve` (`gitlab.com/gorib/waffle/tools/http`) puts the routes on an `httptest` server. It calls the same `Setup` as the daemon, with the container's own mux, global chain and routers, so a test checks the routes and the middleware that ship:
+
+```go
+srv, err := waffleHttp.Serve(
+    container.ServerMux(),
+    container.HttpCommandGlobal(),
+    container.ServerRouterAsHttpCommandRouterTag(),
+)
+if err != nil {
+    t.Fatal(err)
+}
+defer srv.Close()
+
+response, err := srv.Client.Get(srv.URL + "/v1/users/7")
+```
+
+The getters follow the import aliases the scaffold writes. Any further argument wraps the whole server, outermost last. Building `container` and choosing what to replace is [Testing with the container](../di/overview.md#testing-with-the-container).
 
 ## Next
 
@@ -273,4 +300,3 @@ The HTTP server registers itself with the app closer. On `SIGINT` / `SIGTERM` th
 | `RouterTag` and every other collection | [di/tags](../di/tags.md#httproutertag) |
 | `Router`, `Mux`, `Source`, `Renderer` in full | [reference/interfaces](../reference/interfaces.md#toolshttp-package) |
 | What has to be in `.env` for the command to start | [reference/running-locally](../reference/running-locally.md) |
-| Serving the real routes in a component test | [Component harness](https://github.com/specrig/specrig-go/blob/main/waffle/docs/harness.md#the-in-process-server) |

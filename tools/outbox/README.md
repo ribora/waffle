@@ -61,7 +61,7 @@ should never depend on what the caller happened to have on the context.
 ## The relay
 
 `./app outbox` runs it: claim the oldest entry, send it, mark it sent. It is a
-supervised goroutine the module owns, not a cron job — `tools/cron` refuses to
+daemon command the module owns, not a cron job — `tools/cron` refuses to
 schedule a daemon, and a cron interval would become the delivery latency. It polls
 with backoff: without pauses while there is work, rarely when there is none.
 

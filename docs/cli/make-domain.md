@@ -38,6 +38,8 @@ not the storage format:
 package model
 
 import (
+    "time"
+
     "gitlab.com/gorib/failure"
 )
 
@@ -46,9 +48,9 @@ var (
 )
 
 type User struct {
-    Id    int
-    Email string
-    Name  string
+    Id        int
+    CreatedAt time.Time
+    UpdatedAt *time.Time
 }
 ```
 
@@ -92,18 +94,43 @@ type UserRepository interface {
     Count(ctx context.Context, query criteria.Expression) (int, error)
 }
 
-func NewUserManagement(userRepository UserRepository) *userManagement {
-    return &userManagement{userRepository: userRepository}
+func NewUserManagement(
+    userRepository UserRepository,
+) *userManagement {
+    return &userManagement{
+        userRepository: userRepository,
+    }
 }
 
 type userManagement struct {
     userRepository UserRepository
 }
+
+func (m *userManagement) GetUser(ctx context.Context, userId int) (*model.User, error) {
+    return m.userRepository.Get(ctx, userId)
+}
+
+func (m *userManagement) List(ctx context.Context, expr criteria.Expression) ([]*model.User, error) {
+    return m.userRepository.List(ctx, expr, nil, 0, 0)
+}
+
+func (m *userManagement) ListPaged(ctx context.Context, expr criteria.Expression, sort []string, page, count int) ([]*model.User, int, error) {
+    items, err := m.userRepository.List(ctx, expr, sort, page, count)
+    if err != nil {
+        return nil, 0, err
+    }
+    total, err := m.userRepository.Count(ctx, expr)
+    if err != nil {
+        return nil, 0, err
+    }
+    return items, total, nil
+}
 ```
 
-How the management's methods are split across files is yours: by entity
-(`service_user.go`) or by use case (`billing.go`, `lifecycle.go`). The
-scaffolder writes neither, because it cannot tell which one a domain wants.
+The three methods are where a management starts, all in `service.go`. How its
+methods are split across files after that is yours: by entity (`service_user.go`)
+or by use case (`billing.go`, `lifecycle.go`). The scaffolder picks neither,
+because it cannot tell which one a domain wants.
 
 ### A second entity
 
@@ -214,22 +241,25 @@ driver's message.
 The stored struct with field mapping tags. The `store` code generator reads this file and produces `Scan()`, `Returns()`, `Updates()`, and `Inserts()` methods:
 
 ```go
-package postgres
-
 //go:generate go tool store $GOFILE
 
-import "mymodule/domain/user/model"
+package postgres
+
+import (
+    "time"
+
+    "mymodule/domain/user/model"
+)
 
 type storedUser struct {
-    _ *model.User
-
-    Id    int    `db:"id"    store:",readonly,updates:Identity"`
-    Email string `db:"email"`
-    Name  string `db:"name"`
+    _         *model.User
+    Id        int        `db:"id" store:",readonly"`
+    CreatedAt time.Time  `db:"created_at" store:",readonly"`
+    UpdatedAt *time.Time `db:"updated_at" store:",readonly"`
 }
 ```
 
-After `make generate`, a companion file with all generated methods is created alongside this file. It is named after the struct, not the source file: `storedUser` produces `stored_user_gen.go`.
+The command writes a companion file with all generated methods alongside this file, and `make generate` refreshes it after an edit. It is named after the struct, not the source file: `storedUser` produces `stored_user_gen.go`.
 
 The blank `_ *model.User` field is what marks a struct as a stored struct — it names the domain type `new<X>()` accepts and `Unwrap()` returns, and it can sit anywhere in the struct. A `db` tag puts a field in the column list; `store:"-"` keeps it out. Every field says one or the other — a field that says neither stops the run.
 
@@ -243,8 +273,8 @@ Every field is answered for: one with neither a `db` tag nor `store:"-"` stops t
 |---|---|---|
 | `the _ field must name the model type` | the `_` field is something else — a map, a function type | name the model, or mark the struct `store:"nonew,nounwrap"` for a read model with no model type |
 | `an embedded field cannot carry a db tag` | an embed has no name to map, so the tag went nowhere | name the field, or drop the tag |
-| `fields sharing one db tag would map to one column` | `Left, Right int \`db:"side"\`` — the second name was dropped in silence | give each field its own tag |
-| `a field needs a db tag to become a column, or store:"-" to stay out of one` | the field says nothing about itself; silence used to mean "not a column" | add the `db` tag, or `store:"-"` |
+| `fields sharing one db tag would map to one column` | `Left, Right int \`db:"side"\`` — two fields, one column | give each field its own tag |
+| `a field needs a db tag to become a column, or store:"-" to stay out of one` | the field says nothing about itself | add the `db` tag, or `store:"-"` |
 | `added to the stored struct, now give each a db tag or store:"-"` | a model field had nothing here to carry it, and the generator wrote it in | tag the written-in field, or decline it with `store:"-"` |
 | `the model has no field Foo` | `store:"Foo"` names a model field that does not exist, or the field was renamed on the model | match the model field name |
 | `the field is A and model field X is B` | the stored field and the model field have different types | align them, or add a `convert:` |
@@ -302,34 +332,24 @@ func InitUserUserRepository() {
 }
 ```
 
-If the management has to satisfy the interfaces a transport declares, add the
-aliases to its registration:
+A transport leaves that registration alone. The file it writes answers the
+interface it declares with the handle:
 
 ```go
-di.Define(service.NewUserManagement,
-    di.Alias[grpc.UserManagement](),
-    di.Alias[http.UserManagement](),
-)
+di.Wire[userGrpc.UserManagement](userManagementInstance)
 ```
 
-Those aliases decide something else as well. A component test can replace a
-registration only when every type it is exposed as is an interface, and the two
-above are exposed differently: `di.Wire[service.UserRepository]` names an
-interface, so the repository gets a `Replacements` field, while `di.Define` on
-its own exposes whatever the constructor returns — `*userManagement`, which no
-fake can be — so the management gets none.
+`diogen` refuses a `di.Alias` for the same interface on `di.Define` beside it: the
+`di.Wire` would name a type the handle provides already.
 
-What both constructors return is beside the point: `postgres.NewUserRepository`
-returns an unexported `*userRepository` and is replaceable anyway. Aliases do not
-add to the concrete exposure, they take its place, so the registration above —
-`di.Define` plus two `di.Alias` — is replaceable through a field typed as both
-interfaces at once.
+The generated `Replacements` struct has a field wherever every type a registration
+is exposed as is an interface: `ServiceUserRepository` from the `di.Wire` above, and
+`ServiceUserManagement` once a transport's `di.Wire` exposes the management, typed
+as every interface the transports declare.
 
-Leaving the management without a seam is usually right: a component test drives
-the service through a transport and wants the real one. Declare an interface for
-it when something below it has to be cut and the repository is not where the cut
-belongs. [Component harness](https://github.com/specrig/specrig-go/blob/main/waffle/docs/harness.md) covers what may
-be replaced; `gitlab.com/gorib/di` covers how a seam is derived.
+A field says what the container can do, not where to cut. A component test replaces
+only leaves at the process edge, and the repository and the management stay real:
+see [Testing with the container](../di/overview.md#testing-with-the-container).
 
 ## Post-generation steps
 
@@ -342,12 +362,17 @@ It does not rebuild the container. Nothing reads the management until a
 transport does, and `diogen` refuses a registration nothing reads:
 
 ```
-diogen: nothing reads mymodule/domain/user/service.NewUserManagement (config/di/di_user_domain.go:12), and no di.Entry names it — declare it with di.Entry[T]() if it is built for itself, or remove it
+diogen: nothing reads mymodule/domain/user/service.NewUserManagement (/path/to/mymodule/config/di/di_user_domain.go:12), and no di.Entry names it — declare it with di.Entry[T]() if it is built for itself, or remove it
 ```
 
 That is what `make generate` prints until the first of the commands below. The
 previous container stays in place, so the project still compiles; the domain
 joins it with its first consumer.
+
+Until then it stops the generate step of every other command too. With a second
+domain unread, `waffle make:domain:http user` writes its files and exits non-zero
+at `make .tidy generate`, naming the unread management. Give each new domain its
+consumer before the next.
 
 ## What to do next
 

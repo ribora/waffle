@@ -111,8 +111,8 @@ type ServiceHandler interface {
 Each domain that exposes gRPC implements `ServiceHandler`. `waffle make:domain:grpc` generates this for you. The `Start` method receives the gRPC server registrar and calls the protoc-generated `RegisterXxxServer` function:
 
 ```go
-func (g *UserGrpc) Start(registrar grpc.ServiceRegistrar) {
-    proto.RegisterUserServiceServer(registrar, g)
+func (s *userService) Start(registrar grpc.ServiceRegistrar) {
+    proto.RegisterUserServiceServer(registrar, s)
 }
 ```
 
@@ -121,14 +121,14 @@ func (g *UserGrpc) Start(registrar grpc.ServiceRegistrar) {
 Use `di.Define` tagged with `grpcCommand.ServiceTag`. Handlers are concrete types — do not use `di.Wire[ServiceHandler]`:
 
 ```go
-di.Define(usergrpc.NewUserGrpc, di.Tag(grpcCommand.ServiceTag))
+di.Define(userGrpc.NewUserService, di.Tag(grpcCommand.ServiceTag))
 ```
 
 All tagged handlers are passed to `NewGrpcCommand` and registered with the server on startup.
 
 ## Interceptors
 
-Built-in interceptors (session, tracing, log, status, recover) are wired automatically by `tools/grpc`, as a `di.List` under `server.Interceptors`. The list is the order.
+Built-in interceptors (session, tracing, log, status, recover) are wired automatically by `config/tools/grpc`, as a `di.List` under `server.Interceptors`. The list is the order.
 
 ### Unary interceptor
 
@@ -157,7 +157,8 @@ rather than the raw error — outside them, every failure is recorded as
 the process.
 
 That is also why `UnaryChain` is exported: a component test chains the
-container's own interceptor list with the same function the daemon uses. See [Component harness](https://github.com/specrig/specrig-go/blob/main/waffle/docs/harness.md#the-in-process-server).
+container's own interceptor list with the same function the daemon uses. See
+[Testing](#testing).
 
 The full table, with what each one puts on the context and which methods skip
 tracing, is [Interceptor order](https://gitlab.com/gorib/grpc#interceptor-order)
@@ -218,7 +219,7 @@ type ErrorMapper interface {
 }
 ```
 
-`ErrorMapper` is a standalone concept — not coupled to interceptors. Register implementations under `grpcCommand.ErrorMapperTag`; the framework aggregates them into a single `ErrorMapper` that the built-in `status` and `log` interceptors read at request time.
+`ErrorMapper` is a standalone concept — not coupled to interceptors. Register implementations under `grpcCommand.ErrorMapperTag`; the framework aggregates them into a single `ErrorMapper` that the built-in `status` and `log` interceptors read once, when they are built.
 
 ```go
 type domainErrors struct{}
@@ -255,6 +256,28 @@ listed under `server.Interceptors` instead.
 
 On `SIGINT` / `SIGTERM`, the gRPC server calls `GracefulStop()`, which waits for active RPCs to complete before closing.
 
+## Testing
+
+`waffleGrpc.Serve` (`gitlab.com/gorib/waffle/tools/grpc`) runs the handlers on an in-process server over bufconn. It chains the container's own interceptor lists with `UnaryChain` and `StreamChain`, the functions the daemon uses, so a test checks the chain that ships:
+
+```go
+server, err := waffleGrpc.Serve(
+    container.GrpcCommandServiceHandlerAsServiceTag(),
+    container.ServerInterceptorsInterceptors(),
+    container.ServerStreamInterceptorsInterceptors(),
+)
+if err != nil {
+    t.Fatal(err)
+}
+defer server.Close()
+
+user, err := proto.NewUserServiceClient(server.Conn()).Get(t.Context(), &proto.GetUserRequest{Id: 7})
+```
+
+The getters follow the import aliases the scaffold writes.
+
+A neighbouring service is cut at its typed client, not at `ClientConnInterface`. `grpcClient.Dead(name)` (`gitlab.com/gorib/grpc/client`) fills the connection under a client left real: a call that reaches it panics, naming it. Building `container` and choosing what to replace is [Testing with the container](../di/overview.md#testing-with-the-container).
+
 ## Next
 
 | | |
@@ -262,7 +285,6 @@ On `SIGINT` / `SIGTERM`, the gRPC server calls `GracefulStop()`, which waits for
 | Writing the handler this server registers | [tools/grpc-handler](grpc-handler.md) |
 | Scaffolding the proto, the handler and its DI | [cli/make:domain:grpc](../cli/make-domain-grpc.md) |
 | Converting between proto and domain types | [conventions/dto-conversion](../conventions/dto-conversion.md) |
-| `ServiceTag` and the three other collections | [di/tags](../di/tags.md#grpcservicetag) |
+| `ServiceTag` and every other collection | [di/tags](../di/tags.md#grpcservicetag) |
 | `ServiceHandler`, `Interceptor`, `ErrorMapper` in full | [reference/interfaces](../reference/interfaces.md#toolsgrpc-package) |
 | What has to be in `.env`, and running http and grpc at once | [reference/running-locally](../reference/running-locally.md#two-servers-at-once) |
-| Calling the real server from a component test | [Component harness](https://github.com/specrig/specrig-go/blob/main/waffle/docs/harness.md#the-in-process-server) |

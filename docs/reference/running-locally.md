@@ -40,7 +40,8 @@ connected to, which is where both of its variables come from.
 
 ## The minimum
 
-A service that wires `config/app` and one transport needs two variables and no
+A service that wires `config/app`, `config/service/pry`,
+`config/service/hilton/otel` and one transport needs two variables and no
 infrastructure:
 
 ```
@@ -58,6 +59,7 @@ database:
 ```go
 import (
     _ "gitlab.com/gorib/waffle/config/app"
+    _ "gitlab.com/gorib/waffle/config/service/hilton/otel"
     _ "gitlab.com/gorib/waffle/config/service/pry"
     _ "gitlab.com/gorib/waffle/config/service/sql"
     _ "gitlab.com/gorib/waffle/config/tools/http"
@@ -116,6 +118,6 @@ missing, so the second module contributes only its own key — `HEALTH_PATH` or
 |---|---|
 | exits immediately naming a variable | a `NeedValue` variable is missing from `.env` — find its module in the table |
 | starts, then fails on the first query | `DB_DSN` points at a database that is not running or not migrated |
-| consumer starts and receives nothing | the exchange or the binding does not exist yet; scribus declares the queue but never unbinds — see [tools/scribus](../tools/scribus.md) |
+| consumer starts and receives nothing | the publisher writes to another exchange, or no handler's `Keys()` matches the routing key; the AMQP consumer declares the exchange and the queue, binds every key itself and never unbinds one — see [tools/scribus](../tools/scribus.md) |
 | no traces or metrics anywhere | `OTEL_EXPORTER_OTLP_ENDPOINT` is empty, which is the default — the provider is a no-op |
-| logs are quiet | `LOGLEVEL` defaults to `info`; set `debug` locally |
+| logs are quiet | the request log is at `trace`; `LOGLEVEL` defaults to `info` and the scaffolded `.env` says `debug` |

@@ -30,7 +30,7 @@ Registers a concrete type (no interface). Use this when the type is injected by 
 
 ```go
 di.Define(notifyGrpc.NewNotificationService, di.Tag(grpcCommand.ServiceTag))
-di.Define(notifyGrpc.NewErrorMap, di.Tag(grpcCommand.ErrorMapperTag))
+di.Define(notifyGrpc.NewErrorHandler, di.Tag(grpcCommand.ErrorMapperTag))
 ```
 
 `di.Define` answers with a **handle**, and `di.Wire` takes one in place of a
@@ -105,8 +105,8 @@ This keeps the high-level service composition visually separate from the imperat
 
 Three namespaces ship with waffle:
 
-- `waffle/config/app` — the application root. Includes one registration: `app.App` wired from `app.Init` collecting all commands tagged `app.CommandTag`. Always present in your `modules.go`.
-- `waffle/config/service/*` — infrastructure modules (`pry` logger, `hilton` observability, `sql` db, `redis`, `elastic`).
+- `waffle/config/app` — the application root: the closing policy, the `di.Entry` and `app.App` wired from `app.Init` collecting all commands tagged `app.CommandTag`. Always present in your `modules.go`.
+- `waffle/config/service/*` — infrastructure modules (`pry` logger, `hilton` observability, `sql` db, `redis`, `elastic`, `amqp` publisher).
 - `waffle/config/tools/*` — tool registrations (each pulls a `Command` into the app, e.g. `http`, `grpc`, `migrate`, `scribus/single`, `scribus/batch`).
 
 Properties:
@@ -119,7 +119,7 @@ Properties:
 
 Constraints:
 
-- A condition may use a variable its own `if` declares (`if cfg := config.Load(); cfg.Redis != nil`) — the container evaluates it once, under a name of its own. Any other **local variable** of the markup function is refused at generation: the generator copies expressions into the container and cannot copy the local. References to other *packages* are fine: their imports are carried into the generated file.
+- A condition may use a variable its own `if` declares (`if cfg := config.Load(); cfg.Redis != nil`) — the container evaluates it once, under a name of its own. Any other **local variable** of the markup function, a `di.Handle` aside, is refused at generation: the generator copies expressions into the container and cannot copy the local. References to other *packages* are fine: their imports are carried into the generated file.
 
 ## The InitXxx functions
 
@@ -132,15 +132,15 @@ func InitHttp() {
     di.Wire[server.Mux](server.New)
     session := di.Define(middleware.NewSession)
     // ... the rest of the standard middlewares ...
-    di.Wire[Global](NewGlobal, di.Fallback(), di.Args(map[string]any{
+    di.Wire[http.Global](http.NewGlobal, di.Fallback(), di.Args(map[string]any{
         "layers": di.List(compress, health, session /* ... */),
     }))
     di.Wire[app.BaseCommand](
         func() app.BaseCommand { return app.NewCommand("http", "Start web server") },
-        di.For[HttpCommand](),
+        di.For[http.HttpCommand](),
     )
-    di.Wire[HttpCommand](NewHttpCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
-        "routers": di.Tags(RouterTag),
+    di.Wire[http.HttpCommand](http.NewHttpCommand, di.Tag(app.CommandTag), di.Args(map[string]any{
+        "routers": di.Tags(http.RouterTag),
     }))
 }
 ```
@@ -167,7 +167,7 @@ Each tool's documentation page shows both forms — the short blank-import line 
 
 If you need finer control — for example, swapping a tool's command name or wrapping its constructor — copy the registrations from `InitXxx()` directly into your `InitDi()` instead of blank-importing the module. Both styles are supported in the same setup; you can blank-import some tools and hand-write others.
 
-To replace a single provider while still blank-importing the rest of a module, keep the blank import and register your replacement with `di.Override()` — it wins over the module's registration for that slot. (Without `di.Override()`, blank-importing the module *and* wiring the same slot yourself is an ambiguity error.) This works for single-provider slots; tagged collections are additive and can't be overridden this way.
+To replace a single provider while still blank-importing the rest of a module, keep the blank import and register your replacement. A registration the module marks `di.Fallback()` loses to a plain one of yours; a plain one needs yours marked `di.Override()`, because two plain registrations of one slot are an ambiguity error. This works for single-provider slots; tagged collections are additive and can't be overridden this way.
 
 `di.Override()` decides at generation time and belongs in the wiring. To swap an implementation **in a test**, use `Replacements` instead — see [Testing with the container](#testing-with-the-container).
 
@@ -285,7 +285,7 @@ di.Wire[service.UserRepositoryInterface](postgres.NewUserRepository)
 ### Concrete type with aliases
 
 ```go
-di.Define(service.NewUserService,
+di.Define(service.NewUserManagement,
     di.Alias[handler.UserManagement](),
     di.Alias[grpc.UserManagement](),
 )
@@ -299,10 +299,10 @@ rule](../architectures.md#the-boundary-rule).
 
 ```go
 // Register a gRPC handler
-di.Define(usergrpc.NewUserGrpc, di.Tag(grpcCommand.ServiceTag))
+di.Define(userGrpc.NewUserService, di.Tag(grpcCommand.ServiceTag))
 
 // Register a gRPC error mapper
-di.Define(usergrpc.NewErrorMap, di.Tag(grpcCommand.ErrorMapperTag))
+di.Define(userGrpc.NewErrorHandler, di.Tag(grpcCommand.ErrorMapperTag))
 ```
 
 ## Code generation
@@ -313,7 +313,7 @@ di.Define(usergrpc.NewErrorMap, di.Tag(grpcCommand.ErrorMapperTag))
 // Generated — do not edit
 type Application struct { ... }
 
-func (a *Application) App() app.App { ... }
+func (a *Application) AppApp() app.App { ... }
 func (a *Application) Shutdown() func() error { ... }
 
 type Replacements struct { ... }
@@ -324,7 +324,7 @@ func InitAppWith(replacements Replacements) (*Application, error)
 
 The hand-written `config/diogen/di.go` calls `InitApp()` and exposes a clean `InitDi() (app.App, error)`.
 
-A parameter of a markup function — the initialization context, configuration fetched before the container exists — becomes a parameter of both, ahead of `replacements`: `InitApp(ctx context.Context, cfg *config.Config)`. The waffle modules declare none, so `InitApp()` stays bare until a service adds one; `di.go` then passes it, and the component harness asks its [`params` hook](https://github.com/specrig/specrig-go/blob/main/waffle/docs/harness.md#hooks). See [Parameters](https://gitlab.com/gorib/di/-/blob/main/README.md#parameters) in the diogen README.
+A parameter of a markup function — the initialization context, configuration fetched before the container exists — becomes a parameter of both, ahead of `replacements`: `InitApp(ctx context.Context, cfg *config.Config)`. The waffle modules declare none, so `InitApp()` stays bare until a service adds one; `di.go` then passes it, and so does a test that calls `InitAppWith`. See [Parameters](https://gitlab.com/gorib/di/-/blob/main/README.md#parameters) in the diogen README.
 
 ### Automatic resource cleanup
 
@@ -357,7 +357,7 @@ func (fakeContracts) Get(ctx context.Context, in *contract.GetRequest, _ ...grpc
 
 func TestUserFlow(t *testing.T) {
     container, err := diogen.InitAppWith(diogen.Replacements{
-        ContractServiceClient: fakeContracts{},
+        ContractContractServiceClient: fakeContracts{},
     })
     if err != nil {
         t.Fatal(err)
@@ -367,11 +367,29 @@ func TestUserFlow(t *testing.T) {
 }
 ```
 
-The connection under a replaced client is not built: a replacement prunes what only it fed. A client a test leaves real still needs its connection, and the harness fills that with `grpcClient.Dead` for you. Where to cut, and why, is [Choosing where to cut](https://github.com/specrig/specrig-go/blob/main/waffle/docs/harness.md#choosing-where-to-cut).
+The connection under a replaced client is not built: a replacement prunes what only it fed. A client a test leaves real still needs its connection: fill that seam with `grpcClient.Dead(name)`, which panics naming the client if a call reaches it. Cut above anything that speaks a language the code generates: the typed client rather than its connection, and never `sql.Db`, which carries the SQL the repositories build.
 
-The field's type is the interface the value is wired as, so a fake that stops satisfying it fails to compile at the line that supplies it. Nothing is asserted at run time.
+**Infrastructure is a requirement.** The database and the repositories over it stay real, and an unreachable database fails the test loudly; it never skips. Fixtures go in through the container's repositories and assertions read back through them, so both run the code that ships.
 
-Which fields a test may supply is a separate question, and waffle leaves it to the suite: specrig answers it with `replacements.allow` in `specrig.yaml`, enforced by a test its [waffle adapter](https://github.com/specrig/specrig-go/tree/main/waffle) scaffolds beside the container.
+**A unit test is the other shape.** It builds its subject by hand and uses no `Replacements`. There a mock is the default and a recorder the exception; in a scenario suite it is the reverse. waffle generates no mocks.
+
+**`Noop()` is a recorder nobody queries**, so a scenario prefers a recorder: it costs the same, and the assertion is there when the scenario needs one.
+
+| | |
+|---|---|
+| [`sql/sqltest`](https://gitlab.com/gorib/sql) | a real postgres: provisions, migrates and resets it |
+| [`redis/redistest`](https://gitlab.com/gorib/redis) | the same for redis |
+| [`elastic/elastictest`](https://gitlab.com/gorib/elastic) | the same for elasticsearch |
+| [`pry.Recorder()`](https://gitlab.com/gorib/pry#testing) | a logger that keeps its records, under the code production runs |
+| [`hilton.Recorder()`](https://gitlab.com/gorib/hilton#testing) | a provider that keeps spans and measurements |
+| [`scribus.Recorder()`](../tools/scribus.md#testing) | replaces the consumer; `Deliver` runs the handler the command installed |
+| [`amqp.NewPublisherRecorder()`](https://gitlab.com/gorib/amqp#testing) | replaces the publisher and keeps what was published |
+| [`outbox.Recorder()`](../tools/outbox.md#testing) | replaces the `Sender`, so `Enqueue` still writes a row |
+| [`grpcClient.Dead`](../tools/grpc.md#testing) | fills the connection under a client left real |
+
+A `Replacements` field's type is the interface the value is wired as, so a fake that stops satisfying it fails to compile at the line that supplies it. Nothing is asserted at run time.
+
+Which fields a test may supply is a separate question, and waffle leaves it to the suite.
 
 Note that `InitDi()` in `config/diogen/di.go` calls `InitApp()`, which passes no replacements — production behaviour is unchanged. Tests call `InitAppWith` directly.
 

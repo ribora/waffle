@@ -141,7 +141,7 @@ func TestAProjectOpenedBelowTheRootWritesAtTheRoot(t *testing.T) {
 }
 
 func TestWriteIfChanged(t *testing.T) {
-	target := filepath.Join(t.TempDir(), "tests", "surface.yaml")
+	target := filepath.Join(t.TempDir(), "nested", "file.yaml")
 	for i, want := range []bool{true, false} {
 		changed, err := WriteIfChanged(target, []byte("body\n"))
 		if err != nil {

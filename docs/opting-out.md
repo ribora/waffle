@@ -25,7 +25,7 @@ Four packages are imported by the platform itself, not just wired into it:
 | Package | Imported by | Why it is core |
 |---|---|---|
 | `hilton` | `amqp`, `elastic`, `grpc`, `http`, `redis`, `sql`, `waffle` | every package emits spans and metrics through it; removing it means every package loses its instrumentation |
-| `failure` | `amqp`, `grpc`, `http`, `pry`, `waffle`, `whisk` | the shared error shape — what an interceptor maps to a status code, what a logger records |
+| `failure` | `amqp`, `grpc`, `http`, `pry`, `redis`, `waffle`, `whisk` | the shared error shape — what an interceptor maps to a status code, what a logger records |
 | `pry` | `amqp`, `elastic`, `grpc`, `http`, `waffle` | the logger the framework hands to every component |
 | `session` | `amqp`, `grpc`, `http`, `pry`, `waffle` | request/command identity — correlation ids across transports |
 
@@ -40,9 +40,9 @@ Everything else in the table below is imported by `waffle` and nothing more.
 | Tool | What it replaces | Skip it and you | What you lose |
 |---|---|---|---|
 | `diogen` | wiring written and ordered by hand | write `InitDi()` yourself | conditional wiring, collections across packages, modules by blank import |
-| `whisk` | request parsing and validation by hand | parse in the handler, use `server.Handle` | OpenAPI generation, one binding for every transport |
+| `whisk` | request parsing and validation by hand | parse in the handler, use `server.Handle` | the schemas in the OpenAPI document, one binding for every transport |
 | `sql` | any query layer | use `pgx`, `sqlc`, `bun`, whatever | the repository generics and the `stored<X>` mapping |
-| `http`, `grpc`, `scribus`, `cron`, `migrate` | a server or consumer you start yourself | implement `Command` directly | the wiring, flags and graceful shutdown each tool brings |
+| `http`, `grpc`, `scribus`, `outbox`, `cron`, `migrate` | a server or consumer you start yourself | implement `Command` directly | the wiring, flags and graceful shutdown each tool brings |
 | `elastic`, `redis` | thin clients | use the official ones | nothing but the constructors |
 | `goverter` | conversions between DTO and domain | write them by hand (`mapper: dto`) | the refusal to generate on an unmappable field — a hand-written mapper compiles happily while a new model field stops reaching the wire |
 
@@ -52,9 +52,8 @@ Everything else in the table below is imported by `waffle` and nothing more.
 Go already provides that. If a constructor needs a `UserRepository` and you pass
 nothing, the build fails with or without a generator.
 
-The relevant comparison is against a **reflection container**, which is what
-diogen replaced here. There, a missing or ambiguous dependency is a panic at
-startup rather than a build error.
+The relevant comparison is against a **reflection container**. There, a missing or
+ambiguous dependency is a panic at startup rather than a build error.
 
 **What it does buy you**, compared to writing `InitDi()` by hand:
 
@@ -63,7 +62,7 @@ startup rather than a build error.
 - **Conditions.** Wiring that depends on the environment stays readable:
 
   ```go
-  if env.Value("CACHE") == "redis" {
+  if env.Value("CACHE", "") == "redis" {
       di.Wire[Cache](NewRedisCache)
   } else {
       di.Wire[Cache](NewMemoryCache)
@@ -111,25 +110,26 @@ the same payload from a different source.
 **Skipping it** is a supported path: register routes with `server.Handle`
 instead of `server.Bind`, read `src.Body()` and unmarshal yourself.
 
-**What you lose:** the OpenAPI document. It is derived from the request and
-response types captured by `Bind`; a `Handle` route has no types to capture and
-stays out of the specification. You also lose the one-binding-per-DTO property —
-the same struct read from an HTTP request and an AMQP delivery.
+**What you lose:** the schemas in the OpenAPI document. They are derived from the
+request and response types captured by `Bind`; a `Handle` route has no types to
+capture, so it reaches the document as a path, its path parameters and a bare 200.
+You also lose the one-binding-per-DTO property — the same struct read from an HTTP
+request and an AMQP delivery.
 
 ## sql
 
-Nothing in the platform requires it. It is imported by `waffle` to wire a
-connection, and by `criteria`. Adapters are your code: use `pgx` directly,
-`sqlc`, `bun` or anything else, and the repository interface your service
-declares stays yours.
+Nothing in the platform requires it. Only `waffle` imports it, to wire a connection
+and for the `migrate` and `outbox` tools that run over one. Adapters are your code:
+use `pgx` directly, `sqlc`, `bun` or anything else, and the repository interface
+your service declares stays yours.
 
 What you give up is the `sql.Repository[Model]` generics and the `stored<X>`
 struct whose `Scan`/`Inserts`/`Updates` methods are generated from tags.
 
 ## Transports
 
-`http`, `grpc`, `scribus`, `cron` and `migrate` are `Command` implementations
-pulled in by blank import. A service that needs none of them is a valid waffle
+`http`, `grpc`, `scribus`, `outbox`, `cron` and `migrate` are `Command`
+implementations pulled in by blank import. A service that needs none of them is a valid waffle
 service — `app.Init` accepts an empty command list. A service that needs
 something waffle does not ship implements `Command` itself; see
 [core/commands](core/commands.md).
@@ -144,19 +144,19 @@ where it is and becomes ordinary source you edit by hand: nothing regenerates it
 nothing validates it, no build step looks for it.
 
 For containers the break is total — **no generated container imports
-`gitlab.com/gorib/di`**. Every non-standard import in `di_gen.go` is a package of
-your own constructors, so what remains after deleting the directive has no link
-back to the tool that wrote it.
+`gitlab.com/gorib/di`**. Every non-standard import in `di_gen.go` is a package
+whose constructors it calls, yours and the framework's, so what remains after
+deleting the directive has no link back to the tool that wrote it.
 
 For whisk it costs a copy. Generated `Parse` and `Validate` keep referring to two
-packages, and to keep them compiling on your own you copy:
+of whisk's packages, and to keep them compiling on your own you copy:
 
 | Copy | Lines | What for |
 |---|---|---|
-| `scan/source.go` | 59 | the `Source` interface — and ~30 of those are a bytes-backed implementation for tests |
-| `scan/errors.go` | 6 | `ErrPayload` |
-| `validate/validation_error.go` | 152 | `ValidationError`, `Path`, the segment constructor and the two formatters |
-| the rules you actually call | 7–50 each | `IsEmail`, `IsUuid`, … — only the ones your tags name |
+| `scan/source.go` | 59 | the `Source` interface — and ~20 of those are a bytes-backed implementation for tests |
+| `scan/errors.go` | 6 | `ErrPayload`, over `failure` — core, and imported by a generated `Parse` as well |
+| `validate/validation_error.go` | 151 | `ValidationError`, `Path`, the segment constructors and the formatters |
+| the rules you actually call | 7–117 each | `IsEmail`, `IsUuid`, … — only the ones your tags name |
 
 So a `Parse` survives on 65 copied lines, a `Parse` plus `Validate` on about 220.
 None of it is logic you have to understand: it is the shape of a request and the

@@ -62,9 +62,10 @@ you can read it, index it further with `waffle make:domain:migration outbox …`
 or port it by hand to a database that is not PostgreSQL.
 
 Two rules if you edit it. It has **no foreign keys into domain tables and no
-dependency on their triggers**, because the order of the migration sources
-collected through `migrate.MigrationsTag` is not guaranteed — an outbox that waits
-on another domain's migration will fail on a fresh database. And `created_at` is
+dependency on their triggers**, because the sources collected through
+`migrate.MigrationsTag` run in version order and its version says nothing about
+theirs — an outbox that waits on another domain's migration can fail on a fresh
+database. And `created_at` is
 sub-second where the entity template is `timestamp(0)`: two events a millisecond
 apart are two events.
 
@@ -241,8 +242,15 @@ Replace the Sender, not the Store: the scenario then runs against a real
 outbox, so `Enqueue` writes a real row and the test can assert on the row.
 
 ```go
-cut.OutboxSender = outbox.Recorder()
+sender := outbox.Recorder()
+
+container, err := diogen.InitAppWith(diogen.Replacements{OutboxSender: sender})
 ```
+
+It keeps every `Send` — subject, payload, correlation id and trace — read back with
+`Sent()` or `WithSubject(subject)`. `Publish` reaches it directly, and an enqueued
+row once a relay runs. `FailWith(err)` makes every `Send` fail from then on, for a
+scenario about a broker refusing, and `Reset()` clears both.
 
 A recorder for the publisher instead would make "the event went out" and "the
 event was lost" look the same, which is the thing being fixed.
@@ -256,4 +264,3 @@ event was lost" look the same, which is the thing being fixed.
 | Where the outbox sits in a modular monolith | [Recommended architectures](../architectures.md#events-leaving-the-binary) |
 | Publishing without the outbox, straight to the broker | [tools/scribus](scribus.md) and `config/service/amqp` |
 | What has to be running and in `.env` | [reference/running-locally](../reference/running-locally.md#by-module) |
-| Why the recorder rather than a silent stand-in | [Component harness](https://github.com/specrig/specrig-go/blob/main/waffle/docs/harness.md#noop-is-a-recorder-nobody-queries) |

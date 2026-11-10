@@ -16,7 +16,8 @@ Example:
 waffle make:domain:grpc user
 ```
 
-Run this after `waffle make:domain user`.
+Run this after `waffle make:domain user`, with `protoc`, `protoc-gen-go` and
+`protoc-gen-go-grpc` on `PATH`. [Proto compilation](#proto-compilation) says why.
 
 ## waffle.yaml
 
@@ -48,7 +49,7 @@ service UserService {
 }
 ```
 
-Add your RPC methods here, then run `make generate` to compile the proto file into Go code.
+Add your RPC methods here, then run `make generate` to compile the proto file into Go code (see [Proto compilation](#proto-compilation)).
 
 ### gRPC handler
 
@@ -155,15 +156,20 @@ editing — see [di/overview](../di/overview.md#the-initxxx-functions).
 
 ## Post-generation steps
 
+Before these, the command enables `config/tools/grpc` in `modules.go`, appends `GRPC_MAX_RECV_MSG_SIZE` to `.env` and, under the default mapper, adds the goverter tool. Then it runs:
+
 ```sh
+go generate ./api/...
 make .tidy generate
 ```
 
-This regenerates the DI container.
+This compiles the proto and regenerates the DI container.
 
 ## Proto compilation
 
-When `proto_dir` resolves inside the current module (the default), `make:domain:grpc` runs `go generate ./api/...` itself before `make .tidy generate`, so `pb/user` exists locally and `go mod tidy` doesn't try to fetch it as a remote module.
+When `proto_dir` resolves inside the current module (the default), `make:domain:grpc` runs `go generate ./api/...` itself before `make .tidy generate`, so that `pb/user` exists locally and `go mod tidy` doesn't try to fetch it as a remote module. The directive in `api/init.go` runs `protoc`, which needs `protoc-gen-go` and `protoc-gen-go-grpc`.
+
+A `.proto` that `protoc` refuses stops the command, which exits non-zero with its files written.
 
 When `proto_dir` points outside the module (a centralized proto repo shared by several services, for example), the command skips that step and prints a note — run the proto generator for that repo separately, then `make .tidy generate` here.
 

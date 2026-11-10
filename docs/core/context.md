@@ -28,8 +28,9 @@ It carries three more things, and they are the reason a command needs no constru
 | `hilton.ProviderFromContext(ctx)` | the tracing and metrics provider, so an adapter instruments itself wherever the context reaches |
 | `pry.LoggerFromContext(ctx)` | the logger, for code too far down to have been handed one |
 
-The HTTP and gRPC middlewares put the same three on a request context, which is
-what makes a service package identical under a transport and under the CLI.
+The HTTP and gRPC middlewares put a session, the provider and the logger on a
+request context, which is what makes a service package identical under a transport
+and under the CLI.
 
 ## Args
 
@@ -52,7 +53,7 @@ func (c *myCommand) Usage(ctx context.Context) error {
 }
 ```
 
-This indirection exists so commands invoked by a scheduler (cron) see *their own* argv from the schedule entry, not the process's `os.Args`. The CLI dispatch path and the cron tick path both produce a context with the right argv attached — the command does not know which path it came through.
+This indirection exists so commands invoked by a scheduler (cron) see *their own* argv from the schedule entry, not the process's `os.Args`. The CLI dispatch path and the cron tick path both attach the right argv, so a command parses its flags the same way on either.
 
 `WithArgs(ctx, args)` is the setter, used by orchestrators (cron) to build a child context for the command they're about to invoke. Most application code never calls it directly.
 
@@ -78,16 +79,16 @@ func (c *myCommand) Run(ctx context.Context) error {
 `pry.Ctx(ctx)` reads the session from the context and attaches it to log events and Sentry reports. By storing session data in the context at the CLI boundary, all downstream calls — service layer, database adapters, HTTP clients — automatically carry the correlation context without any extra wiring.
 
 ```go
-func (c *migrateCommand) Run(ctx context.Context) error {
-    c.logger.Info("starting migration", pry.Ctx(ctx))
-    // Sentry event will include Method=CLI, Uri=migrate
-    return c.runMigrations(ctx)
+func (c *myCommand) Run(ctx context.Context) error {
+    c.logger.Info("starting", pry.Ctx(ctx))
+    // A Sentry event from this record includes Method=CLI and the command name as Uri.
+    return c.work(ctx)
 }
 ```
 
 ## HTTP and gRPC contexts
 
-When a request arrives over HTTP or gRPC, the respective middleware populates the context with a session before it reaches your handler — `middleware.Session` and `interceptor.NewSessionMW`, with the logger and provider arriving from their own neighbours in the same chain. The session shape is the same, so `FromContext` works identically regardless of transport, and a service package cannot tell which one it is under.
+When a request arrives over HTTP or gRPC, the respective middleware populates the context with a session before it reaches your handler — `middleware.NewSession` and `interceptor.NewSessionMW`, with the logger and provider arriving from their own neighbours in the same chain. The session shape is the same, so `FromContext` works identically regardless of transport, and a service package cannot tell which one it is under.
 
 ## Next
 

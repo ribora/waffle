@@ -2,9 +2,11 @@
 
 [Docs](../README.md) · Reference
 
-Every exported interface a service implements or is handed — waffle's own, plus
-the ones from gorib packages it meets through waffle. The import path is in a
-comment wherever it is not waffle's.
+The interfaces a service implements or a tool hands it — waffle's own, plus the
+gorib ones a transport and the logger bring. The import path is in a comment
+wherever it is not waffle's. A client a service wires as a dependency, such as
+`hilton.Provider`, `sql.Db`, `redis.Db`, `elastic.Client` or `amqp.Publisher`, is
+documented with its package.
 
 ---
 
@@ -104,7 +106,7 @@ type Router interface {
 }
 ```
 
-The one interface a service implements for every domain that serves HTTP, scaffolded by `waffle make:domain:http`. Register it under the collection — `di.Define(http.NewRouter, di.Tag(httpCommand.RouterTag))` — and every domain's routes land on one mux. `Setup` registers routes; the same method is what the component harness calls, so a scenario exercises the routes that ship. The `Mux` it is handed is the router's own group, so a `Use` there covers its routes and no neighbour's. See [tools/http](../tools/http.md#registering-routes).
+The one interface a service implements for every domain that serves HTTP, scaffolded by `waffle make:domain:http`. Register it under the collection — `di.Define(http.NewRouter, di.Tag(httpCommand.RouterTag))` — and every domain's routes land on one mux. `Setup` registers routes; the same method is what `tools/http.Serve` runs, so a component test exercises the routes that ship. The `Mux` it is handed is the router's own group, so a `Use` there covers its routes and no neighbour's. See [tools/http](../tools/http.md#registering-routes).
 
 ### Global
 
@@ -136,7 +138,7 @@ type Mux interface {
 }
 ```
 
-What `Setup` receives. chi-backed, so patterns are `{id}`, `{id:[0-9]+}` and a trailing `/*`. `Group` snapshots the layers and prefix at the call, after which parent and child diverge. `Routes()` is the route table the OpenAPI generator reads — which is why a route registered with `server.Bind` reaches the document and one registered with `server.Handle` does not, having no types to report.
+What `Setup` receives. chi-backed, so patterns are `{id}`, `{id:[0-9]+}` and a trailing `/*`. `Group` snapshots the layers and prefix at the call, after which parent and child diverge. `Routes()` is the route table the OpenAPI generator reads — a route registered with `server.Bind` reaches the document with its schemas, and one registered with `server.Handle` as a path and a bare 200, having no types to report.
 
 ### Handler and Layer
 
@@ -168,12 +170,14 @@ type Source interface {
     Form(key string) string
     FormAll(key string) []string
 
+    Peek(n int) []byte
+
     Request() *http.Request
     SetRequest(*http.Request)
 }
 ```
 
-The request, as an interface. You are handed one rather than implementing it. The embedded `scan.Source` is what lets a whisk-generated `Parse` read an HTTP request exactly as it reads an AMQP delivery; the typed accessors above it are for what has no generated `Parse` — middleware, and handlers written by hand. Query, form and body reads are cached, so a middleware and a handler cannot race for the body reader.
+The request, as an interface. You are handed one rather than implementing it. The embedded `scan.Source` is what lets a whisk-generated `Parse` read an HTTP request exactly as it reads an AMQP delivery; the typed accessors above it are for what has no generated `Parse` — middleware, and handlers written by hand. Query, form and body reads are cached, so a middleware and a handler cannot race for the body reader. `Peek` returns up to the first `n` bytes of the body and leaves it readable.
 
 ### Renderer
 
@@ -225,7 +229,7 @@ type Server interface {
 }
 ```
 
-The listening half of the command, as the command sees it. `grpcCommand.Run` builds one with `grpc.NewServer` and hands it the chained interceptors and the address; the interface is what keeps `tools/grpc` from naming the concrete server type. Nothing registers it in DI, so this is a type you read, not one you implement — an in-process server for a test comes from [`Serve`](https://github.com/specrig/specrig-go/blob/main/waffle/docs/harness.md#the-in-process-server) instead.
+The listening half of the command, as the command sees it. `grpcCommand.Run` builds one with `grpc.NewServer` and hands it the chained interceptors and the address; the interface is what keeps `tools/grpc` from naming the concrete server type. Nothing registers it in DI, so this is a type you read, not one you implement — an in-process server for a test comes from [`Serve`](../tools/grpc.md#testing) instead.
 
 ### Interceptor
 
@@ -372,7 +376,7 @@ type Consumer interface {
 }
 ```
 
-The consumer the driver supplies — `gitlab.com/gorib/amqp` for RabbitMQ. Configured and started by `scribusCommand.Run`, with `Bind` called once per subject a handler declares. Paging, flushing and reconnection are here because every broker has them; connecting is behind `Transport` because none of them spell it the same way. In production you do not implement this — it comes from the registrations in `config/tools/scribus/amqp/init.go` (see [Scribus Tool](../tools/scribus.md) for setup). A component test replaces it with `scribus.Recorder()`, which keeps that wiring and delivers through the handler the command installed (see [Component harness](https://github.com/specrig/specrig-go/blob/main/waffle/docs/harness.md)).
+The consumer the driver supplies — `gitlab.com/gorib/amqp` for RabbitMQ. The command's constructor calls `Bind` once per subject a handler declares and installs the handler; `scribusCommand.Run` applies the flags and starts it. Paging, flushing and reconnection are here because every broker has them; connecting is behind `Transport` because none of them spell it the same way. In production you do not implement this — it comes from the registrations in `config/tools/scribus/amqp/init.go` (see [Scribus Tool](../tools/scribus.md) for setup). A component test replaces it with `scribus.Recorder()`, which keeps that wiring and delivers through the handler the command installed (see [Testing](../tools/scribus.md#testing)).
 
 ---
 
@@ -479,7 +483,7 @@ type Sink interface {
 }
 ```
 
-A side channel receiving every record the logger emits, off the calling goroutine. `channels.Sentry` is the one that ships. A sink sees only what the logger emits — the level gate runs before the record is built, so it cannot ask for anything below the logger's own level.
+A side channel receiving every record the logger emits, off the calling goroutine. `channels.Sentry` is the one that ships. A sink sees only what the logger emits — the level gate runs before the record is built, so it cannot ask for anything below the logger's own level. It can narrow that: a sink that also implements `pry.Leveled` is sent nothing below the level it answers.
 
 ### Record
 

@@ -17,7 +17,7 @@ up for.
 | starting a service | [Getting Started](getting-started.md) → [Recommended architectures](architectures.md) → [Running locally](reference/running-locally.md) |
 | adding a transport to one that exists | [Commands](core/commands.md) → the tool page → the matching handler page |
 | wiring something up | [DI overview](di/overview.md) → [Tags](di/tags.md) |
-| setting a service's tests up, and how changes get made | [the waffle adapter of specrig-go](https://github.com/specrig/specrig-go/tree/main/waffle) |
+| testing a service | [Testing with the container](di/overview.md#testing-with-the-container) |
 | deciding whether to adopt waffle | [Introduction](introduction.md) → [What is optional](opting-out.md) → [Recommended architectures](architectures.md) |
 | debugging a service that will not start | [Running locally](reference/running-locally.md#when-it-does-not-start) → [Environment Variables](reference/environment.md) |
 
@@ -39,14 +39,16 @@ up for.
 - [Overview](cli/overview.md) — Every command, naming rules, `waffle.yaml`
 - [init:service](cli/init-service.md) — Bootstrap a new microservice project
 - [make:domain](cli/make-domain.md) — Model, service, postgres adapter, stored struct
-- [make:domain:http](cli/make-domain-http.md) — Router, handler, request DTOs, convert package
+- [make:domain:http](cli/make-domain-http.md) — Router, DI registration, convert package, the `http` command
 - [make:domain:grpc](cli/make-domain-grpc.md) — Proto definition, gRPC handler, error mapping
 - [make:domain:migrate](cli/make-domain-migrate.md) — Migration runner, SQL files, goose format
 - [agents](cli/agents.md) — Regenerate waffle.md (run after every waffle upgrade)
 
 ## Tools
 
-Each tool is a `Command` pulled in by one blank import in `config/di/modules.go`.
+A command arrives by blank import in `config/di/modules.go`: one line, or two for
+scribus, which takes a driver and a mode. The handler pages and Hilton sit beside
+the commands.
 
 - [HTTP](tools/http.md) — chi-based server, middleware registry, OpenAPI generation
 - [HTTP Handler](tools/http-handler.md) — Handler signature, request DTOs, responses
@@ -68,11 +70,8 @@ Each tool is a `Command` pulled in by one blank import in `config/di/modules.go`
 - [Input Parsing](conventions/input-parsing.md) — Binding and validation by codegen, custom tags, escape hatches
 - [DTO Conversion](conventions/dto-conversion.md) — goverter pattern, project-wide whitelist of conversion helpers
 
-Component tests, the records a suite writes and the specification-first workflow
-are specrig's: [the waffle adapter of specrig-go](https://github.com/specrig/specrig-go/tree/main/waffle) has their pages.
-
 ## Reference
 
-- [Interfaces](reference/interfaces.md) — Every interface a service implements or is handed
+- [Interfaces](reference/interfaces.md) — The interfaces a service implements or a tool hands it
 - [Running locally](reference/running-locally.md) — What each module needs running and in `.env`
 - [Environment Variables](reference/environment.md) — All env vars read by waffle tools

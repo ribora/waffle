@@ -156,9 +156,12 @@ This overrides conversion for a single field without changing the whitelist.
 
 The `goverter` the scaffolds install is `gitlab.com/gorib/convert/cmd/goverter`:
 upstream plus one transformer on every method, so a proto enum and a string
-enum map by value with nothing to annotate — one declared method per pair:
+enum map by value — one declared method per pair. The one annotation is for a
+zero value with no domain counterpart, which `goverter:enum:unknown` answers:
 
 ```go
+// goverter:converter
+// goverter:enum:unknown @error
 type Convert interface {
     StatusToDomain(pb.OrderStatus_Value) (model.Status, error)
 }
@@ -205,8 +208,8 @@ The CLI uses the last path segment as the Go package name (`convert`,
 file is a no-op.
 
 `make:domain:entity` (postgres) does *not* scaffold a goverter convert
-— the sql adapter uses a hand-written `stored<X>` struct with `Unwrap()`
-and `Inserts()` methods instead. See
+— the sql adapter uses a `stored<X>` struct instead, whose `Unwrap()` and
+`Inserts()` the `store` generator writes. See
 [make:domain](../cli/make-domain.md#postgres-adapter) for that convention if you
 need to mix the two.
 

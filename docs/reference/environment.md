@@ -2,7 +2,7 @@
 
 [Docs](../README.md) · Reference
 
-All environment variables are read using `gitlab.com/gorib/env`, which loads a `.env` file from the working directory at startup and falls back to the process environment.
+All environment variables are read using `gitlab.com/gorib/env`, which loads a `.env` file from the working directory at startup. A variable already set in the process environment wins over `.env`.
 
 A variable is only read if the module that reads it is enabled — every one below comes from a blank import in `config/di/modules.go`. `NeedValue` panics at startup when the variable is missing, so a misconfigured service fails immediately rather than at the first request; `Value` takes a fallback.
 
@@ -14,13 +14,13 @@ A variable is only read if the module that reads it is enabled — every one bel
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `DB_DRIVER` | yes | — | `pgx` is what `init:service` writes. See below |
+| `DB_DRIVER` | yes | — | `pgx` is what enabling the module writes. See below |
 | `DB_DSN` | yes | — | Connection string, e.g. `postgres://user:pass@host:port/dbname?sslmode=disable` |
 
 `postgres`, `pgx` and `pgsql` all select the native pgx pool — the scaffolded
-`.env` says `pgx`. Any other value is passed to `database/sql` as a driver name,
-so it has to be one your binary registers by import: `mysql`, `sqlite`,
-`sqlite3`.
+`.env` says `pgx`. `mysql`, `sqlite` and `sqlite3` go through `database/sql`, over
+drivers `gitlab.com/gorib/sql` links itself. Anything else fails at startup with
+`unsupported driver`.
 
 ### `config/service/redis`
 
@@ -80,7 +80,7 @@ one instance on one connection rather than two.
 | `HEALTH_PATH` | no | empty | `http` only — empty means the middleware's own default path |
 | `GRPC_MAX_RECV_MSG_SIZE` | no | `4194304` | `grpc` only — the largest request the server accepts, in bytes |
 
-Both servers read the same pair, so a service running HTTP and gRPC in one process runs them as two commands, not two listeners in one.
+Both servers read the same pair, so a service with HTTP and gRPC runs them as two commands of one binary, not two listeners in one process.
 
 ### `config/tools/scribus/amqp`
 
@@ -90,7 +90,7 @@ Both servers read the same pair, so a service running HTTP and gRPC in one proce
 | `RABBIT_EXCHANGE` | yes | — | Exchange to bind the queue to |
 | `RABBIT_QUEUE` | yes | — | Queue name |
 
-The **driver** module, not `config/tools/scribus` itself: the command names no broker, so a driver of your own reads whatever it likes and none of these three exist. Page size and flush interval are wired as constants there rather than read from the environment; both can be overridden per run with `--page` and `--flush-timeout`. See [tools/scribus.md](../tools/scribus.md).
+The **driver** module, not `config/tools/scribus` itself: the command names no broker, so a driver of your own reads whatever it likes and none of these three exist. Page size and flush interval are wired as constants there rather than read from the environment; both can be overridden per run with `--flush-timeout` and, in batch mode, `--page`. See [tools/scribus.md](../tools/scribus.md).
 
 ### `config/tools/outbox`
 
@@ -182,7 +182,7 @@ Two rules follow, and they are the reason there is no central config object:
 
 - **Nothing reads the environment below the composition root.** A service or an
   adapter takes the value as a constructor argument. That is what makes it
-  replaceable in a component test, which sets no environment at all.
+  replaceable in a component test.
 - **A variable arrives with the thing that reads it**, so it goes into `.env`
   in the same change — the convention every scaffolding command follows.
 

@@ -141,9 +141,14 @@ Nothing calls `InitUserMigrate` — diogen reads the bodies of every `InitXxx` i
 
 ## Post-generation steps
 
+The command enables the two modules and stops: it runs no `make`. Run this yourself:
+
 ```sh
 make .tidy generate
 ```
+
+`make generate` refuses the domain until a consumer reads its management — see
+[make:domain](make-domain.md#post-generation-steps).
 
 ## Running migrations
 
@@ -173,7 +178,8 @@ empty `Up`/`Down` pair already wrapped in `StatementBegin`/`StatementEnd` — th
 markers a function body or a `$$`-quoted block needs, and the ones people
 remember only after goose has split a statement on a semicolon inside one. The
 description is a single file-name segment, so it may hold dashes and dots but
-not a separator.
+not a separator. Run it once per migration: the name carries the current second,
+so a second run writes a second file.
 
 By hand is the same file: the convention is `<timestamp>_<description>.sql`, and
 the timestamp has to be monotonically increasing — which is the reason to let the

@@ -53,12 +53,13 @@ A waffle service is structured around three layers:
 ```
 cmd/app/main.go          ← entry point, wires DI, calls app.RunUntilStop()
 config/di/               ← hand-written DI registrations
-config/diogen/           ← generated DI container (do not edit)
+config/diogen/           ← generated DI container (di_gen.go, do not edit) and its adapter
 domain/<name>/
   model/                 ← entities and domain errors
   service/               ← business logic
   adapter/postgres/      ← database adapters (stored structs + queries)
-  cmd/grpc/<name>/       ← gRPC handler
+  cmd/http/              ← HTTP router
+  cmd/grpc/              ← gRPC handler
   cmd/migrate/           ← migration runner
 api/                     ← API initialization, proto definitions
 ```
@@ -108,7 +109,10 @@ waffle/
 
 A component test boots the real container over real infrastructure and replaces
 only the leaves. The pieces it stands on live next to what they describe —
-`sql/sqltest`, `redis/redistest`, `elastic/elastictest`, `pry.Recorder()`,
-`scribus.Recorder()`, `tools/grpc.Serve`, `tools/http.Serve` — and the harness that
-puts them together from the container is specrig's: see
-[the waffle adapter of specrig-go](https://github.com/specrig/specrig-go/tree/main/waffle).
+`sql/sqltest`, `redis/redistest`, `elastic/elastictest`, `tools/migrate.Up`,
+`pry.Recorder()`, `hilton.Recorder()`, `scribus.Recorder()`, `outbox.Recorder()`,
+`tools/grpc.Serve`, `tools/http.Serve` — and how a suite puts them together is the
+suite's own. `tools/tap` reports the messages the tools move and the route a request
+matched; `container` reads a service's source for its containers, their seams and
+which of those are leaves, and the variables it reads. See
+[Testing with the container](di/overview.md#testing-with-the-container).

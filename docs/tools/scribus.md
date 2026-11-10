@@ -109,9 +109,9 @@ Subjects are **not** an argument of the running command — they come from each 
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--flush-timeout` | `-t` | `0` (use default) | Flush every [n] seconds |
+| `--flush-timeout` | `-t` | `0` (use default) | Flush every [n], a duration such as `5s` |
 | `--page` | `-p` | `0` (use default) | Messages per page; above 1 requires batch mode — see [Page size and settlement](#page-size-and-settlement) |
-| `--reconnect-timeout` | `-r` | `0` (use default) | Reconnect every [n] seconds |
+| `--reconnect-timeout` | `-r` | `0` (use default) | Reconnect every [n], a duration such as `5m` |
 
 ## Environment variables
 
@@ -131,7 +131,9 @@ Subjects are **not** configured in env. Each `Handler` (single mode) or `BatchHa
 
 Bindings are additive: `QueueBind` is idempotent at the broker level, so repeated startups don't churn. Removing a subject from a `Handler` stops new messages from being delivered for it only after the stale binding is removed manually via RabbitMQ Management UI (or `rabbitmqadmin delete binding`). Scribus does not unbind for you — the consumer code only knows what it currently *wants*, not what was bound before.
 
-For ad-hoc fan-out (consume everything), implement `Keys() []string{"#"}` on the handler. Wildcard semantics belong to the driver's `Subjects`, not to scribus — under the AMQP one they are RabbitMQ's.
+For ad-hoc fan-out (consume everything), return `[]string{"#"}` from `Keys()`. Wildcard semantics belong to the driver's `Subjects`, not to scribus — under the AMQP one they are RabbitMQ's.
+
+In single mode no two subjects may overlap, because a message has to have one handler. `NewScribusCommand` asks the driver's `Subjects.Overlap` and refuses at startup — `subjects overlap: "#" and "order.created" — give them separate consumers` — so a `#` handler stands alone.
 
 ## Single mode
 
@@ -234,15 +236,13 @@ func (h *orderCreatedHandler) Run(src scan.Source) error {
 Register with `di.Define` and tag with `wscribus.CommandTag`. A handler is reached only through the tag, so it needs no interface binding:
 
 ```go
-di.Define(scribus.NewOrderCreatedHandler, di.Tag(wscribus.CommandTag))
+di.Define(scribusOrder.NewOrderCreatedHandler, di.Tag(wscribus.CommandTag))
 ```
 
-Wire the service dependency via `di.Alias` on the service registration:
+The service dependency is wired from the domain's handle, in `config/di/di_<domain>_scribus.go`:
 
 ```go
-di.Define(service.NewOrderService,
-    di.Alias[scribus.OrderManagement](),
-)
+di.Wire[scribusOrder.OrderManagement](orderManagementInstance)
 ```
 
 ## Batch mode
@@ -270,6 +270,10 @@ type orderBatchHandler struct {
 
 func NewOrderBatchHandler(management OrderManagement, logger pry.Logger) *orderBatchHandler {
     return &orderBatchHandler{management: management, logger: logger}
+}
+
+func (h *orderBatchHandler) Keys() []string {
+    return []string{"order.created"}
 }
 
 func (h *orderBatchHandler) Run(msgs []scan.Source) error {
@@ -306,7 +310,7 @@ than the database is.
 Register exactly one `BatchHandler` without a tag:
 
 ```go
-di.Wire[wscribus.BatchHandler](scribus.NewOrderBatchHandler)
+di.Wire[wscribus.BatchHandler](scribusOrder.NewOrderBatchHandler)
 ```
 
 ## How routing works
@@ -321,14 +325,14 @@ On startup the scribus command:
 
 ## Page size and settlement
 
-A page is acknowledged as one unit: `Ack`/`Nack` carry AMQP's `multiple` flag as soon as it holds more than one message. So the page size, not the mode, decides how much is at stake per failure — and one failure nacks the page with requeue.
+A page is acknowledged as one unit: `Ack`/`Nack` carry AMQP's `multiple` flag when the page size is above 1. So the page size, not the mode, decides how much is at stake per failure — and one failure nacks the page with requeue.
 
-`config/tools/scribus` pins the size to 1 for both modes, so out of the box every message settles on its own. `--page` raises it, and the two modes treat that differently:
+`config/tools/scribus/amqp` pins the size to 1 for both modes, so out of the box every message settles on its own. `--page` raises it, and the two modes treat that differently:
 
 | | `--page` unset or 1 | `--page` above 1 |
 |---|---|---|
 | **single** | per-message settlement, which is the point of the mode | **refused at startup** — the handler is called per message but the page settles together, so one failure requeues its neighbours and skips the rest |
-| **batch** | legal, warns: the handler is handed one message at a time | the intended configuration |
+| **batch** | legal: the handler is handed one message at a time, and only an explicit `--page 1` warns | the intended configuration |
 
 The refusal covers the flag. A service that registers its own `scribus.Consumer` with a larger page size bypasses it, because by then nothing knows which mode was wired.
 
@@ -357,10 +361,37 @@ per-line one, so turning it on to follow dispatch would otherwise put every
 payload in the log sink, and what a message carries is the service's to decide
 about rather than this tool's.
 
-The AMQP driver's own log middleware is a separate decision and currently does
-include the body, one line per message, so a service that enables Trace does see
-payloads today. Drop `interceptor.NewLog` from the middleware registrations if
-that is not acceptable for what your queues carry.
+The AMQP driver's own log middleware is a separate decision and includes the body,
+one line per message, so a service that enables Trace sees payloads. Drop
+`interceptor.NewLog` from the middleware registrations if that is not acceptable
+for what your queues carry.
+
+## Testing
+
+`scribus.Recorder()` replaces the `Consumer` and connects to nothing. The container still builds the command and its middlewares, so `Deliver` runs the handler the command installed, under the bindings it asked for (`Bindings()`):
+
+```go
+consumer := scribus.Recorder()
+publisher := amqp.NewPublisherRecorder()
+
+container, err := diogen.InitAppWith(diogen.Replacements{
+    ScribusConsumer: consumer,
+    AmqpPublisher:   publisher,
+})
+if err != nil {
+    t.Fatal(err)
+}
+defer container.Shutdown()()
+
+err = consumer.Deliver(amqp.Delivery{
+    RoutingKey: "order.created",
+    Body:       []byte(`{"id": 7}`),
+}.Source(t.Context()))
+```
+
+`amqp.Delivery{}.Source(ctx)` builds the message a handler receives, with the same scopes as a real delivery. `Deliver` returns what the chain returned, so a handler's error is what the broker would have been told.
+
+`amqp.NewPublisherRecorder()` keeps what the handler publishes, read back with `Published()` or `WithKey(key)`; `FailWith(err)` makes every `Publish` fail from then on. More on building `container` is in [Testing with the container](../di/overview.md#testing-with-the-container).
 
 ## Next
 
@@ -371,4 +402,3 @@ that is not acceptable for what your queues carry.
 | `CommandTag` | [di/tags](../di/tags.md#scribuscommandtag) |
 | Publishing an event that must not be lost | [tools/outbox](outbox.md) |
 | What has to be running and in `.env` | [reference/running-locally](../reference/running-locally.md#by-module) |
-| Delivering an event through the real consumer in a test | [Component harness](https://github.com/specrig/specrig-go/blob/main/waffle/docs/harness.md#delivering-an-event) |

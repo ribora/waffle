@@ -21,14 +21,19 @@ import _ "gitlab.com/gorib/waffle/config/app"
 which expands to:
 
 ```go
+di.DefaultCloser[io.Closer](di.Fallback())
+di.Entry[app.App]()
+
 di.Wire[app.App](app.Init, di.Args(map[string]any{
     "commands": di.Tags(app.CommandTag),
 }))
 ```
 
-Only `commands` is named, because only a collection has to be: the logger and
-the provider are ordinary dependencies the container resolves from
-`config/service/pry` and `config/service/hilton/otel`.
+`di.Entry` names what the container is built for, and `di.DefaultCloser` is the
+closing policy of [Graceful shutdown](#graceful-shutdown). Only `commands` is named,
+because only a collection has to be: the logger and the provider are ordinary
+dependencies the container resolves from `config/service/pry` and
+`config/service/hilton/otel`.
 
 Your `main.go` calls `config.Init()` which delegates to the generated DI container:
 
@@ -36,7 +41,7 @@ Your `main.go` calls `config.Init()` which delegates to the generated DI contain
 func main() {
     application, err := config.Init()
     if err != nil {
-        fmt.Printf("failed to start: %s\n", err)
+        fmt.Printf("Failed to create an application: %v\n", err)
         os.Exit(1)
     }
     application.RunUntilStop()
@@ -85,8 +90,7 @@ Calls the registered closer function (if any) and returns its error. Use this fo
 
 ```go
 a.SetCloser(func() error {
-    _ = logger.Close()
-    return db.Close()
+    return errors.Join(cache.Close(), queue.Close())
 })
 ```
 
@@ -126,10 +130,10 @@ When invoked without arguments or with an unknown command, the app prints getopt
 Usage: app [-h] command
  -h, --help  Display this help message
 Available commands:
-	grpc   	Start grpc server
-	http   	Start web server
-	migrate	Run migrations
-	scribus	Start queue consumer
+	grpc    	Start grpc server
+	http    	Start web server
+	migrate 	Run migrations
+	scribus 	Start the event consumer
 ```
 
 Commands are listed in alphabetical order. An unknown name is preceded by `Unknown command '<name>'.` in red. Either way the process exits 2, because `Run()` returns `app.ErrUsage`.
