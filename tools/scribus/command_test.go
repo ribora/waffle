@@ -107,7 +107,7 @@ func single(t *testing.T, consumer Consumer) *scribusCommand {
 func batch(t *testing.T, consumer Consumer) *scribusCommand {
 	t.Helper()
 	cmd, err := NewBatchScribusCommand(
-		oneKeyBatch{key: "order.created"}, nil,
+		oneKeyBatch{key: "order.created"}, nil, starSubjects{},
 		app.NewCommand("scribus", "test"), consumer, logger(t),
 	)
 	if err != nil {

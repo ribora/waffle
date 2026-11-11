@@ -61,6 +61,15 @@ func applyMiddlewares(handler func(msgs []scan.Source) error, middlewares Middle
 	return handler
 }
 
+// The broker routes by the bindings before a real consumer sees anything, so only
+// a consumer standing in for the broker asks for the driver's rule.
+func route(consumer Consumer, subjects Subjects) error {
+	if router, ok := consumer.(interface{ SetSubjects(Subjects) error }); ok {
+		return router.SetSubjects(subjects)
+	}
+	return nil
+}
+
 type Handler interface {
 	Run(src scan.Source) error
 	Keys() []string
@@ -127,6 +136,9 @@ func NewScribusCommand(
 	if err := consumer.SetHandler(applyMiddlewares(handler, middlewares)); err != nil {
 		return nil, err
 	}
+	if err := route(consumer, subjects); err != nil {
+		return nil, err
+	}
 
 	return &scribusCommand{
 		consumer:    consumer,
@@ -138,6 +150,7 @@ func NewScribusCommand(
 func NewBatchScribusCommand(
 	handler BatchHandler,
 	middlewares Middlewares,
+	subjects Subjects,
 	command app.BaseCommand,
 	consumer Consumer,
 	logger pry.Logger,
@@ -152,6 +165,9 @@ func NewBatchScribusCommand(
 		}
 	}
 	if err := consumer.SetHandler(applyMiddlewares(handler.Run, middlewares)); err != nil {
+		return nil, err
+	}
+	if err := route(consumer, subjects); err != nil {
 		return nil, err
 	}
 

@@ -391,6 +391,8 @@ err = consumer.Deliver(amqp.Delivery{
 
 `amqp.Delivery{}.Source(ctx)` builds the message a handler receives, with the same scopes as a real delivery. `Deliver` returns what the chain returned, so a handler's error is what the broker would have been told.
 
+The recorder routes as the broker would: a subject that none of the bindings takes, by the driver's own `Subjects.Match`, is refused with the subject and the bindings named, and nothing of that page reaches the handler. A handler bound under a misspelt key is then a red case, not a message the broker would never have sent.
+
 `amqp.NewPublisherRecorder()` keeps what the handler publishes, read back with `Published()` or `WithKey(key)`; `FailWith(err)` makes every `Publish` fail from then on. More on building `container` is in [Testing with the container](../di/overview.md#testing-with-the-container).
 
 ## Next

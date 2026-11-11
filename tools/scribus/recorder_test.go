@@ -119,17 +119,33 @@ func TestDeliverReturnsWhatTheHandlerReturned(t *testing.T) {
 	}
 }
 
-func TestDeliverSkipsAnUnboundSubject(t *testing.T) {
+func TestDeliverRefusesASubjectNoBindingTakes(t *testing.T) {
 	consumer := Recorder()
 	handler := &capturing{key: "contracts.updated"}
 	command(t, consumer, handler)
 
-	if err := consumer.Deliver(message{key: "orders.created"}); err != nil {
+	err := consumer.Deliver(
+		message{key: "contracts.updated", body: []byte("first")},
+		message{key: "orders.created", body: []byte("second")},
+	)
+
+	if err == nil || !strings.Contains(err.Error(), `"orders.created"`) || !strings.Contains(err.Error(), "contracts.updated") {
 		t.Fatalf("deliver: %v", err)
 	}
-
 	if len(handler.seen) != 0 {
-		t.Fatalf("a message for another key reached the handler: %v", handler.seen)
+		t.Fatalf("a page holding a refused message reached the handler: %v", handler.seen)
+	}
+}
+
+func TestBatchDeliverRefusesASubjectNoBindingTakes(t *testing.T) {
+	consumer := Recorder()
+	batch(t, consumer)
+
+	if err := consumer.Deliver(message{key: "order.created"}); err != nil {
+		t.Fatalf("deliver: %v", err)
+	}
+	if err := consumer.Deliver(message{key: "order.cancelled"}); err == nil {
+		t.Fatal("a subject the batch handler never bound was delivered")
 	}
 }
 

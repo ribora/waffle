@@ -21,6 +21,7 @@ func Recorder(params ...string) *ConsumerRecorder {
 type ConsumerRecorder struct {
 	mu        sync.Mutex
 	handler   func(msgs []scan.Source) error
+	subjects  Subjects
 	params    []string
 	applied   []string
 	bindings  []string
@@ -34,6 +35,13 @@ func (r *ConsumerRecorder) SetHandler(handler func(msgs []scan.Source) error) er
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.handler = handler
+	return nil
+}
+
+func (r *ConsumerRecorder) SetSubjects(subjects Subjects) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.subjects = subjects
 	return nil
 }
 
@@ -91,11 +99,19 @@ func (r *ConsumerRecorder) Consume(context.Context) error {
 
 func (r *ConsumerRecorder) Deliver(msgs ...scan.Source) error {
 	r.mu.Lock()
-	handler := r.handler
+	handler, subjects, bindings := r.handler, r.subjects, slices.Clone(r.bindings)
 	r.mu.Unlock()
 
 	if handler == nil {
 		return errors.New("scribus: no handler installed, boot the container first")
+	}
+	if subjects != nil {
+		for _, msg := range msgs {
+			subject := subjects.Of(msg)
+			if !slices.ContainsFunc(bindings, func(binding string) bool { return subjects.Match(binding, subject) }) {
+				return fmt.Errorf("scribus: no binding takes %q, the consumer binds %q", subject, bindings)
+			}
+		}
 	}
 	for _, msg := range msgs {
 		if m, ok := msg.(interface {
