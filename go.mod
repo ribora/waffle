@@ -16,11 +16,11 @@ require (
 	gitlab.com/gorib/failure v1.4.1
 	gitlab.com/gorib/grpc v1.7.2
 	gitlab.com/gorib/hilton v1.2.5
-	gitlab.com/gorib/http v1.14.5
+	gitlab.com/gorib/http v1.15.0
 	gitlab.com/gorib/pry v1.4.3
 	gitlab.com/gorib/redis v1.4.1
 	gitlab.com/gorib/session v1.2.1
-	gitlab.com/gorib/sql v1.15.1
+	gitlab.com/gorib/sql v1.15.2
 	gitlab.com/gorib/whisk v1.4.1
 	golang.org/x/mod v0.42.0
 	golang.org/x/tools v0.52.0
