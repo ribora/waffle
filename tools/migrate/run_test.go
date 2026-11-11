@@ -181,6 +181,31 @@ func TestRunSetsTheDialect(t *testing.T) {
 	}
 }
 
+func TestUpSpeaksTheHandlesDialect(t *testing.T) {
+	db := sqlite(t)
+
+	if err := Up(source(map[string]string{"1_orders.sql": createTable("orders")}))(context.Background(), db); err != nil {
+		t.Fatal(err)
+	}
+	if got := applied(t, db); !slices.Equal(got, []int{1}) {
+		t.Fatalf("applied %v, want [1]", got)
+	}
+}
+
+func TestUpTakesTheDialectFromTheDriver(t *testing.T) {
+	for driver, want := range map[string]string{"mysql": "mysql", "sqlite": "sqlite3"} {
+		t.Run(driver, func(t *testing.T) {
+			handle, err := dbSql.Open(driver, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := dialectOf(handle); got != want {
+				t.Fatalf("dialect %q, want %q", got, want)
+			}
+		})
+	}
+}
+
 func TestGooseKnowsEveryDialect(t *testing.T) {
 	for _, name := range []string{"postgres", "pgx", "pgsql", "mysql", "sqlite", "sqlite3"} {
 		t.Run(name, func(t *testing.T) {

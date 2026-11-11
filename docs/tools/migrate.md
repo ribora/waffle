@@ -176,7 +176,7 @@ domain/user/cmd/migrate/
 
 ## Testing
 
-`migrate.Up(sources...)` applies the sources in a test, postgres only. It returns the function `sqltest.Migrations` takes:
+`migrate.Up(sources...)` applies the sources in a test, in the dialect of the handle it is given: mysql for `sqltest.NewMysql`, sqlite for `sqltest.NewSqlite`, postgres otherwise. It returns the function `sqltest.Migrations` and `sqltest.NewSqlite` take:
 
 ```go
 postgres := sqltest.New(

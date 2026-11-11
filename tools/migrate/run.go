@@ -9,7 +9,9 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/go-sql-driver/mysql"
 	"github.com/pressly/goose/v3"
+	modernc "modernc.org/sqlite"
 )
 
 // goose keeps its configuration in package globals and reads one filesystem, and
@@ -69,10 +71,21 @@ func (s oneSet) ReadDir(name string) ([]fs.DirEntry, error) {
 	return s.entries, nil
 }
 
-// Postgres, because sqltest speaks nothing else.
 func Up(sources ...fs.FS) func(ctx context.Context, handle *dbSql.DB) error {
 	return func(ctx context.Context, handle *dbSql.DB) error {
 		goose.SetLogger(goose.NopLogger())
-		return run(ctx, handle, sources, "postgres", "up", nil)
+		return run(ctx, handle, sources, dialectOf(handle), "up", nil)
 	}
+}
+
+// The handle's own, as the command takes the sql.Db's: sqltest hands over a
+// *sql.DB, which names its driver only by type.
+func dialectOf(handle *dbSql.DB) string {
+	switch handle.Driver().(type) {
+	case *modernc.Driver:
+		return "sqlite3"
+	case *mysql.MySQLDriver:
+		return "mysql"
+	}
+	return "postgres"
 }

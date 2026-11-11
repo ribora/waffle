@@ -6,6 +6,7 @@ require (
 	github.com/fatih/color v1.19.0
 	github.com/go-chi/chi/v5 v5.5.0
 	github.com/go-co-op/gocron/v2 v2.23.0
+	github.com/go-sql-driver/mysql v1.10.1
 	github.com/pborman/getopt/v2 v2.2.0
 	github.com/pressly/goose/v3 v3.29.0
 	gitlab.com/gorib/amqp v1.9.4
@@ -26,6 +27,7 @@ require (
 	golang.org/x/tools v0.52.0
 	google.golang.org/grpc v1.84.0
 	gopkg.in/yaml.v3 v3.0.1
+	modernc.org/sqlite v1.61.0
 )
 
 require (
@@ -39,7 +41,6 @@ require (
 	github.com/getsentry/sentry-go v0.48.0 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/go-sql-driver/mysql v1.10.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0 // indirect
 	github.com/iancoleman/strcase v0.3.0 // indirect
@@ -86,7 +87,6 @@ require (
 	modernc.org/libc v1.79.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
-	modernc.org/sqlite v1.61.0 // indirect
 )
 
 tool (
