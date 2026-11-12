@@ -256,6 +256,16 @@ listed under `server.Interceptors` instead.
 
 On `SIGINT` / `SIGTERM`, the gRPC server calls `GracefulStop()`, which waits for active RPCs to complete before closing.
 
+A call that does not end on its own — a subscription, a watch — would hold that wait for good. A handler serving one implements `Drainer` beside `ServiceHandler`:
+
+```go
+type Drainer interface {
+    Drain()
+}
+```
+
+The command calls `Drain` on every handler that has it while `GracefulStop` waits, so `Drain` ends such calls the way they end normally, not with an error. The server takes no new call by then, but one can slip in at the moment it stops listening: a call of that kind that comes after `Drain` ends at once. The command drains its handlers when it closes without having served, too, so a component test that closes the container reaches `Drain`.
+
 ## Testing
 
 `waffleGrpc.Serve` (`gitlab.com/gorib/waffle/tools/grpc`) runs the handlers on an in-process server over bufconn. It chains the container's own interceptor lists with `UnaryChain` and `StreamChain`, the functions the daemon uses, so a test checks the chain that ships:

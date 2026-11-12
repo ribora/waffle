@@ -34,6 +34,10 @@ type ServiceHandler interface {
 	Start(baseGrpc.ServiceRegistrar)
 }
 
+type Drainer interface {
+	Drain()
+}
+
 type Server interface {
 	Serve(ctx context.Context) error
 	Close() error
@@ -145,8 +149,19 @@ func (c *grpcCommand) Usage(ctx context.Context) error {
 func (c *grpcCommand) Daemon() {}
 
 func (c *grpcCommand) Close() error {
-	if c.connection != nil {
-		_ = c.connection.Close()
+	stopped := make(chan struct{})
+	go func() {
+		defer close(stopped)
+		if c.connection != nil {
+			_ = c.connection.Close()
+		}
+	}()
+	// The server's Close waits for every running call, and a drained one ends only while it waits.
+	for _, service := range c.commands {
+		if drainer, ok := service.(Drainer); ok {
+			drainer.Drain()
+		}
 	}
+	<-stopped
 	return nil
 }

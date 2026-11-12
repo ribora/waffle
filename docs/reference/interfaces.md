@@ -220,6 +220,16 @@ type ServiceHandler interface {
 
 Implemented by each gRPC domain handler. `Start` registers the proto-generated server with the gRPC registrar.
 
+### Drainer
+
+```go
+type Drainer interface {
+    Drain()
+}
+```
+
+Implemented beside `ServiceHandler` by a handler whose calls do not end on their own. The command calls `Drain` when it closes, while the server waits for the running calls — see [tools/grpc](../tools/grpc.md#graceful-shutdown).
+
 ### Server
 
 ```go
