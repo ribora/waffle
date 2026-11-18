@@ -1,9 +1,11 @@
 package http
 
 import (
+	"context"
 	nethttp "net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 
 	"github.com/go-chi/chi/v5"
 	"gitlab.com/gorib/http/server"
@@ -22,8 +24,10 @@ func Serve(mux server.Mux, global Global, routers []server.Router, wrap ...func(
 	for _, w := range wrap {
 		handler = w(handler)
 	}
-	srv := httptest.NewServer(handler)
-	return &InProcess{URL: srv.URL, Client: srv.Client(), server: srv}, nil
+	inproc := &InProcess{changed: make(chan struct{})}
+	srv := httptest.NewServer(inproc.counted(handler))
+	inproc.URL, inproc.Client, inproc.server = srv.URL, srv.Client(), srv
+	return inproc, nil
 }
 
 // The mux matches on a request of its own; a global layer is where the pattern
@@ -53,7 +57,44 @@ type InProcess struct {
 	URL    string
 	Client *nethttp.Client
 
-	server *httptest.Server
+	server  *httptest.Server
+	mu      sync.Mutex
+	running int
+	changed chan struct{}
+}
+
+func (s *InProcess) counted(next nethttp.Handler) nethttp.Handler {
+	return nethttp.HandlerFunc(func(w nethttp.ResponseWriter, r *nethttp.Request) {
+		s.mu.Lock()
+		s.running++
+		s.mu.Unlock()
+		defer s.finished()
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (s *InProcess) finished() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.running--
+	close(s.changed)
+	s.changed = make(chan struct{})
 }
 
 func (s *InProcess) Close() { s.server.Close() }
+
+func (s *InProcess) Settle(ctx context.Context, open int) error {
+	for {
+		s.mu.Lock()
+		running, changed := s.running, s.changed
+		s.mu.Unlock()
+		if running <= open {
+			return nil
+		}
+		select {
+		case <-changed:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}

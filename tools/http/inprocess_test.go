@@ -7,7 +7,9 @@ import (
 	nethttp "net/http"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"gitlab.com/gorib/http/server"
 
@@ -198,6 +200,68 @@ func TestAWrapLearnsTheRouteAsItWasRegistered(t *testing.T) {
 	if want := []string{"POST /admin/goods/"}; !slices.Equal(routes, want) {
 		t.Errorf("routes %v, want %v", routes, want)
 	}
+}
+
+type held struct {
+	hijacked chan string
+	release  map[string]chan struct{}
+}
+
+func (h held) wrap(next nethttp.Handler) nethttp.Handler {
+	return nethttp.HandlerFunc(func(w nethttp.ResponseWriter, r *nethttp.Request) {
+		conn, _, err := nethttp.NewResponseController(w).Hijack()
+		if err != nil {
+			return
+		}
+		h.hijacked <- r.URL.Path
+		<-h.release[r.URL.Path]
+		_ = conn.Close()
+	})
+}
+
+func TestSettleOutlastsAHijackedRequestAndTheWrapsAroundIt(t *testing.T) {
+	sockets := held{hijacked: make(chan string, 2), release: map[string]chan struct{}{
+		"/first":  make(chan struct{}),
+		"/second": make(chan struct{}),
+	}}
+	var recorded sync.Map
+	record := func(next nethttp.Handler) nethttp.Handler {
+		return nethttp.HandlerFunc(func(w nethttp.ResponseWriter, r *nethttp.Request) {
+			next.ServeHTTP(w, r)
+			recorded.Store(r.URL.Path, true)
+		})
+	}
+	inproc, err := Serve(server.New(), nil, []server.Router{echoRouter{}}, sockets.wrap, record)
+	if err != nil {
+		t.Fatalf("serve: %v", err)
+	}
+	t.Cleanup(inproc.Close)
+	for path := range sockets.release {
+		go func() {
+			if response, err := inproc.Client.Get(inproc.URL + path); err == nil {
+				_ = response.Body.Close()
+			}
+		}()
+	}
+	<-sockets.hijacked
+	<-sockets.hijacked
+
+	early, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	defer cancel()
+	if err := inproc.Settle(early, 1); err == nil {
+		t.Fatal("Settle returned while both hijacked requests were held")
+	}
+
+	close(sockets.release["/first"])
+	within, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	if err := inproc.Settle(within, 1); err != nil {
+		t.Fatalf("Settle did not return once one hijacked request ended: %v", err)
+	}
+	if _, ok := recorded.Load("/first"); !ok {
+		t.Error("Settle returned before the wrap around the ended request finished")
+	}
+	close(sockets.release["/second"])
 }
 
 // A route the router did not register has to 404 rather than reach a handler:

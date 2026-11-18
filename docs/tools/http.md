@@ -290,6 +290,8 @@ response, err := srv.Client.Get(srv.URL + "/v1/users/7")
 
 The getters follow the import aliases the scaffold writes. Any further argument wraps the whole server, outermost last. Building `container` and choosing what to replace is [Testing with the container](../di/overview.md#testing-with-the-container).
 
+`Close` waits for the requests in flight, but not for a hijacked one — a socket — which ends only when whatever holds it lets go: the browser, or the container's `Shutdown`. `Settle(ctx, open)` waits until no more than `open` requests are running, the wraps around each included, so a step that ends a socket settles to the sockets still open before what a wrap recorded about it is read.
+
 ## Next
 
 | | |
