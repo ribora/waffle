@@ -6,10 +6,10 @@ package whisk
 import (
 	"os"
 
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
+	"github.com/ribora/waffle/cmd/waffle/internal/pkg/command"
 )
 
-const module = "gitlab.com/gorib/whisk/cmd/whisk"
+const module = "github.com/ribora/whisk/cmd/whisk"
 
 func Ensure(p *command.Project) error {
 	if err := p.EnsureTool(module); err != nil {

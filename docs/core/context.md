@@ -62,7 +62,7 @@ This indirection exists so commands invoked by a scheduler (cron) see *their own
 Use `session.FromContext` to access the session anywhere a context flows:
 
 ```go
-import "gitlab.com/gorib/session"
+import "github.com/ribora/session"
 
 func (c *myCommand) Run(ctx context.Context) error {
     s := session.FromContext(ctx)

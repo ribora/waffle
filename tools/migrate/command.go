@@ -10,8 +10,8 @@ import (
 
 	"github.com/pborman/getopt/v2"
 
-	"gitlab.com/gorib/sql"
-	"gitlab.com/gorib/waffle/app"
+	"github.com/ribora/sql"
+	"github.com/ribora/waffle/app"
 )
 
 type migrationsTag struct{}

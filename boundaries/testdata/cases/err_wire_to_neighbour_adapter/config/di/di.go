@@ -8,7 +8,7 @@ import (
 	"example.test/domain/invoice/adapter/pg"
 	rentAdapter "example.test/domain/rent/adapter"
 
-	"gitlab.com/gorib/di"
+	"github.com/ribora/diogen/di"
 )
 
 func InitDi() {

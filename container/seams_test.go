@@ -14,7 +14,7 @@ const generatedContainer = `//go:build !diogen
 package diogen
 
 import (
-	sql "gitlab.com/gorib/sql"
+	sql "github.com/ribora/sql"
 	paymentProto "gitlab.com/sherpa-erp/sherpa/api/payment"
 	invoiceGrpc "gitlab.com/sherpa-erp/sherpa/dungeon/domain/invoice/cmd/grpc"
 	rentAdapter "gitlab.com/sherpa-erp/sherpa/dungeon/domain/rent/adapter"
@@ -56,7 +56,7 @@ func TestReadSeams(t *testing.T) {
 	}
 
 	want := []Seam{
-		{Field: "SqlDb", Types: []TypeRef{{"gitlab.com/gorib/sql", "Db"}}},
+		{Field: "SqlDb", Types: []TypeRef{{"github.com/ribora/sql", "Db"}}},
 		{Field: "PaymentProtoPaymentServiceClient", Types: []TypeRef{
 			{"gitlab.com/sherpa-erp/sherpa/api/payment", "PaymentServiceClient"},
 		}},
@@ -101,7 +101,7 @@ func TestReadSeams(t *testing.T) {
 func TestReadSeamsForTagCollection(t *testing.T) {
 	c := writeContainer(t, `package diogen
 
-import fw "gitlab.com/gorib/di/testdata/cases/include_tags/framework"
+import fw "github.com/ribora/diogen/testdata/cases/include_tags/framework"
 
 type Replacements struct {
 	FwHandlerAsHandlerTag []fw.Handler
@@ -116,7 +116,7 @@ type Replacements struct {
 		t.Fatalf("read %d seams, want 1: %+v", len(seams), seams)
 	}
 	got := seams[0]
-	wantType := TypeRef{"gitlab.com/gorib/di/testdata/cases/include_tags/framework", "Handler"}
+	wantType := TypeRef{"github.com/ribora/diogen/testdata/cases/include_tags/framework", "Handler"}
 	if got.Field != "FwHandlerAsHandlerTag" || len(got.Types) != 1 || got.Types[0] != wantType {
 		t.Errorf("= %+v, want Field=FwHandlerAsHandlerTag Types=[%v]", got, wantType)
 	}
@@ -187,9 +187,9 @@ func TestReadSeamsWithoutReplacements(t *testing.T) {
 const leafContainer = `package diogen
 
 import (
-	env "gitlab.com/gorib/env"
-	sql "gitlab.com/gorib/sql"
-	pry "gitlab.com/gorib/pry"
+	env "github.com/ribora/env"
+	sql "github.com/ribora/sql"
+	pry "github.com/ribora/pry"
 	repo "example.com/svc/domain/x/adapter/postgres"
 	service "example.com/svc/domain/x/service"
 	adapter "example.com/svc/domain/x/adapter/security"
@@ -276,9 +276,9 @@ func TestReadSeamsMarksLeaves(t *testing.T) {
 const closureContainer = `package diogen
 
 import (
-	env "gitlab.com/gorib/env"
-	sql "gitlab.com/gorib/sql"
-	pry "gitlab.com/gorib/pry"
+	env "github.com/ribora/env"
+	sql "github.com/ribora/sql"
+	pry "github.com/ribora/pry"
 	repo "example.com/svc/domain/x/adapter/postgres"
 	service "example.com/svc/domain/x/service"
 )
@@ -298,7 +298,7 @@ func InitAppWith(replacements Replacements) (_ *Application, err error) {
 	container.serviceCache = replacements.ServiceCache
 	container.handlerAsH = replacements.HandlerAsH
 
-	buildSqlDb := diogenBuild("gitlab.com/gorib/sql.NewDb", func(name string) error {
+	buildSqlDb := diogenBuild("github.com/ribora/sql.NewDb", func(name string) error {
 		if container.sqlDb == nil {
 			s, err := sql.NewDb(env.NeedValue[string]("DB_DRIVER"), env.NeedValue[string]("DB_DSN"))
 			if err != nil {
@@ -310,7 +310,7 @@ func InitAppWith(replacements Replacements) (_ *Application, err error) {
 		return nil
 	})
 
-	buildPryLogger := diogenBuild("gitlab.com/gorib/pry.New", func(name string) error {
+	buildPryLogger := diogenBuild("github.com/ribora/pry.New", func(name string) error {
 		if container.pryLogger == nil {
 			s := pry.New(env.Value("LOGLEVEL", "info"))
 			container.pryLogger = s
@@ -376,7 +376,7 @@ func InitAppWith(replacements Replacements) (_ *Application, err error) {
 const localContainer = `package diogen
 
 import (
-	env "gitlab.com/gorib/env"
+	env "github.com/ribora/env"
 	lib "example.com/svc/lib"
 	service "example.com/svc/domain/x/service"
 )
@@ -475,8 +475,8 @@ const closeWithContainer = `package diogen
 import (
 	"time"
 
-	env "gitlab.com/gorib/env"
-	sql "gitlab.com/gorib/sql"
+	env "github.com/ribora/env"
+	sql "github.com/ribora/sql"
 	service "example.com/svc/domain/x/service"
 )
 
@@ -489,7 +489,7 @@ func InitAppWith(replacements Replacements) (_ *Application, err error) {
 	container.sqlDb = replacements.SqlDb
 	container.serviceRepo = replacements.ServiceRepo
 
-	buildSqlDb := diogenBuild("gitlab.com/gorib/sql.Open", func(name string) error {
+	buildSqlDb := diogenBuild("github.com/ribora/sql.Open", func(name string) error {
 		if container.sqlDb == nil {
 			closeWith := sql.CloseWithin(env.Value("DB_CLOSE_TIMEOUT", time.Second))
 			s := sql.Open()
@@ -544,7 +544,7 @@ const paramsContainer = `package diogen
 import (
 	"context"
 
-	sql "gitlab.com/gorib/sql"
+	sql "github.com/ribora/sql"
 	di "example.com/svc/config/di"
 	service "example.com/svc/domain/x/service"
 )
@@ -687,7 +687,7 @@ func TestReadSeamsSkippableTagCollectionIsNotALeaf(t *testing.T) {
 }
 
 func TestReadSeamsWithoutInitAppWith(t *testing.T) {
-	c := writeContainer(t, "package diogen\n\nimport sql \"gitlab.com/gorib/sql\"\n\ntype Replacements struct{ SqlDb sql.Db }\n")
+	c := writeContainer(t, "package diogen\n\nimport sql \"github.com/ribora/sql\"\n\ntype Replacements struct{ SqlDb sql.Db }\n")
 
 	seams, err := ReadSeams(c, "example.com/svc/config/diogen")
 	if err != nil {

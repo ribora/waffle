@@ -4,9 +4,9 @@ import (
 	"context"
 	"strings"
 
-	"gitlab.com/gorib/hilton"
-	"gitlab.com/gorib/pry"
-	"gitlab.com/gorib/session"
+	"github.com/ribora/hilton"
+	"github.com/ribora/pry"
+	"github.com/ribora/session"
 )
 
 type argsKey struct{}

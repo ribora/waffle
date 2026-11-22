@@ -110,7 +110,7 @@ deleted — `attempts` and `last_error` stay for whoever has to work out why.
 ## Writing a Store
 
 The storage seam is `Store`, so an outbox can be backed by something other than
-`gitlab.com/gorib/sql` — gorm, for instance. The requirement that matters cannot
+`github.com/ribora/sql` — gorm, for instance. The requirement that matters cannot
 be written into the interface:
 
 > `Add` must join whatever transaction the context already carries.

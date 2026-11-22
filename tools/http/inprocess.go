@@ -8,9 +8,9 @@ import (
 	"sync"
 
 	"github.com/go-chi/chi/v5"
-	"gitlab.com/gorib/http/server"
+	"github.com/ribora/http/server"
 
-	"gitlab.com/gorib/waffle/tools/tap"
+	"github.com/ribora/waffle/tools/tap"
 )
 
 // Setup is what the daemon calls too, so the routes and the middleware under

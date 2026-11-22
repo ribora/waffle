@@ -13,13 +13,13 @@ import (
 	"github.com/fatih/color"
 	"github.com/pborman/getopt/v2"
 
-	"gitlab.com/gorib/failure"
-	"gitlab.com/gorib/hilton"
-	"gitlab.com/gorib/pry"
-	"gitlab.com/gorib/session"
+	"github.com/ribora/failure"
+	"github.com/ribora/hilton"
+	"github.com/ribora/pry"
+	"github.com/ribora/session"
 )
 
-const instrumentationName = "gitlab.com/gorib/waffle/app"
+const instrumentationName = "github.com/ribora/waffle/app"
 
 type Configure interface{}
 

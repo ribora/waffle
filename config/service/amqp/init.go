@@ -1,9 +1,9 @@
 package amqp
 
 import (
-	"gitlab.com/gorib/amqp"
-	"gitlab.com/gorib/di"
-	"gitlab.com/gorib/env"
+	"github.com/ribora/amqp"
+	"github.com/ribora/diogen/di"
+	"github.com/ribora/env"
 )
 
 func InitAmqp() {

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command/commandtest"
+	"github.com/ribora/waffle/cmd/waffle/internal/pkg/command/commandtest"
 )
 
 // A migration file name carries a timestamp, so a later run gets a different name

@@ -12,9 +12,9 @@ import (
 	"testing"
 	"text/template"
 
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command/commandtest"
-	"gitlab.com/gorib/waffle/tools/scribus"
+	"github.com/ribora/waffle/cmd/waffle/internal/pkg/command"
+	"github.com/ribora/waffle/cmd/waffle/internal/pkg/command/commandtest"
+	"github.com/ribora/waffle/tools/scribus"
 )
 
 // Nothing compiles these templates, so a handler that stops satisfying its

@@ -6,7 +6,7 @@ import (
 	invoiceService "example.test/domain/invoice/service"
 	rentService "example.test/domain/rent/service"
 
-	"gitlab.com/gorib/di"
+	"github.com/ribora/diogen/di"
 )
 
 func InitDi() {

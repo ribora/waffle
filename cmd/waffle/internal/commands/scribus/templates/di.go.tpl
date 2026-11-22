@@ -3,7 +3,7 @@ package di
 import (
 	scribus{{ title .Domain }} "{{ .Project }}/domain/{{ .Domain }}/cmd/scribus"
 
-	"gitlab.com/gorib/di"
+	"github.com/ribora/diogen/di"
 )
 
 func Init{{ title .Domain }}Scribus() {

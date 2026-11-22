@@ -40,7 +40,7 @@ package model
 import (
     "time"
 
-    "gitlab.com/gorib/failure"
+    "github.com/ribora/failure"
 )
 
 var (
@@ -82,7 +82,7 @@ package service
 import (
     "context"
 
-    "gitlab.com/gorib/criteria"
+    "github.com/ribora/criteria"
 
     "mymodule/domain/user/model"
 )
@@ -158,7 +158,7 @@ succeeds.
 **`domain/user/adapter/postgres/user.go`**
 
 The implementation of the `UserRepository` interface the service declared, over
-`gitlab.com/gorib/sql`. It holds a `sql.Repository[storedUser]` and exposes
+`github.com/ribora/sql`. It holds a `sql.Repository[storedUser]` and exposes
 domain-typed methods — `Get`, `Save`, `List`, `Count`, the four the interface
 names:
 
@@ -169,10 +169,10 @@ import (
     "context"
     "errors"
 
-    "gitlab.com/gorib/criteria"
-    "gitlab.com/gorib/failure"
-    "gitlab.com/gorib/pry"
-    "gitlab.com/gorib/sql"
+    "github.com/ribora/criteria"
+    "github.com/ribora/failure"
+    "github.com/ribora/pry"
+    "github.com/ribora/sql"
 
     "mymodule/domain/user/model"
 )
@@ -353,7 +353,7 @@ see [Testing with the container](../di/overview.md#testing-with-the-container).
 
 ## Post-generation steps
 
-The command does these itself: it installs `gitlab.com/gorib/sql/cmd/store`,
+The command does these itself: it installs `github.com/ribora/sql/cmd/store`,
 enables the `service/sql` and `tools/migrate` modules in `modules.go`, runs
 `make .tidy`, and runs `go generate ./domain/user/...` so `stored_user.go` gets
 its mapping methods.

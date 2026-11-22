@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"text/template"
 
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/plural"
+	"github.com/ribora/waffle/cmd/waffle/internal/pkg/plural"
 )
 
 type Templates struct {

@@ -2,7 +2,7 @@
 
 [Docs](../README.md) · Tools
 
-The gRPC tool wraps `gitlab.com/gorib/grpc/server` into a waffle `Command`. Blank-import its config package to register the `grpc` command.
+The gRPC tool wraps `github.com/ribora/grpc/server` into a waffle `Command`. Blank-import its config package to register the `grpc` command.
 
 ## Setup
 
@@ -13,7 +13,7 @@ Add a single blank import to `config/di/modules.go`:
 package di
 
 import (
-    _ "gitlab.com/gorib/waffle/config/tools/grpc"
+    _ "github.com/ribora/waffle/config/tools/grpc"
     // ... other modules ...
 )
 ```
@@ -25,12 +25,12 @@ import (
     "net"
     "strconv"
 
-    "gitlab.com/gorib/di"
-    "gitlab.com/gorib/env"
-    "gitlab.com/gorib/grpc/server"
-    "gitlab.com/gorib/grpc/server/interceptor"
-    "gitlab.com/gorib/waffle/app"
-    wgrpc "gitlab.com/gorib/waffle/tools/grpc"
+    "github.com/ribora/diogen/di"
+    "github.com/ribora/env"
+    "github.com/ribora/grpc/server"
+    "github.com/ribora/grpc/server/interceptor"
+    "github.com/ribora/waffle/app"
+    wgrpc "github.com/ribora/waffle/tools/grpc"
 )
 
 func InitDi() {
@@ -133,7 +133,7 @@ Built-in interceptors (session, tracing, log, status, recover) are wired automat
 ### Unary interceptor
 
 ```go
-// gitlab.com/gorib/grpc/server
+// github.com/ribora/grpc/server
 type Interceptor interface {
     Run() grpc.UnaryServerInterceptor
 }
@@ -161,7 +161,7 @@ container's own interceptor list with the same function the daemon uses. See
 [Testing](#testing).
 
 The full table, with what each one puts on the context and which methods skip
-tracing, is [Interceptor order](https://gitlab.com/gorib/grpc#interceptor-order)
+tracing, is [Interceptor order](https://github.com/ribora/grpc#interceptor-order)
 in the `grpc` README. The stream set belongs in the same order.
 
 ```go
@@ -198,7 +198,7 @@ di.Wire[server.Interceptors](wgrpc.NewInterceptors, di.Args(map[string]any{
 ### Stream interceptor
 
 ```go
-// gitlab.com/gorib/grpc/server
+// github.com/ribora/grpc/server
 type StreamInterceptor interface {
     Run() grpc.StreamServerInterceptor
 }
@@ -213,7 +213,7 @@ gRPC returns status codes. Map domain errors to codes so callers receive meaning
 ### ErrorMapper interface
 
 ```go
-// gitlab.com/gorib/grpc/server
+// github.com/ribora/grpc/server
 type ErrorMapper interface {
     Errors() map[error]codes.Code
 }
@@ -268,7 +268,7 @@ The command calls `Drain` on every handler that has it while `GracefulStop` wait
 
 ## Testing
 
-`waffleGrpc.Serve` (`gitlab.com/gorib/waffle/tools/grpc`) runs the handlers on an in-process server over bufconn. It chains the container's own interceptor lists with `UnaryChain` and `StreamChain`, the functions the daemon uses, so a test checks the chain that ships:
+`waffleGrpc.Serve` (`github.com/ribora/waffle/tools/grpc`) runs the handlers on an in-process server over bufconn. It chains the container's own interceptor lists with `UnaryChain` and `StreamChain`, the functions the daemon uses, so a test checks the chain that ships:
 
 ```go
 server, err := waffleGrpc.Serve(
@@ -286,7 +286,7 @@ user, err := proto.NewUserServiceClient(server.Conn()).Get(t.Context(), &proto.G
 
 The getters follow the import aliases the scaffold writes.
 
-A neighbouring service is cut at its typed client, not at `ClientConnInterface`. `grpcClient.Dead(name)` (`gitlab.com/gorib/grpc/client`) fills the connection under a client left real: a call that reaches it panics, naming it. Building `container` and choosing what to replace is [Testing with the container](../di/overview.md#testing-with-the-container).
+A neighbouring service is cut at its typed client, not at `ClientConnInterface`. `grpcClient.Dead(name)` (`github.com/ribora/grpc/client`) fills the connection under a client left real: a call that reaches it panics, naming it. Building `container` and choosing what to replace is [Testing with the container](../di/overview.md#testing-with-the-container).
 
 ## Next
 

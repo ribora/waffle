@@ -1,10 +1,10 @@
 package otel
 
 import (
-	"gitlab.com/gorib/di"
-	"gitlab.com/gorib/env"
-	"gitlab.com/gorib/hilton"
-	"gitlab.com/gorib/hilton/otel"
+	"github.com/ribora/diogen/di"
+	"github.com/ribora/env"
+	"github.com/ribora/hilton"
+	"github.com/ribora/hilton/otel"
 )
 
 func InitOtel() {

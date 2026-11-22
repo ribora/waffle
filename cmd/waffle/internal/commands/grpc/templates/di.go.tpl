@@ -3,8 +3,8 @@ package di
 import (
 	{{ camel .Domain }}Grpc "{{ .Project }}/domain/{{ .Domain }}/cmd/grpc"
 
-	"gitlab.com/gorib/di"
-	grpcCommand "gitlab.com/gorib/waffle/tools/grpc"
+	"github.com/ribora/diogen/di"
+	grpcCommand "github.com/ribora/waffle/tools/grpc"
 )
 
 func Init{{ title .Domain }}Grpc() {

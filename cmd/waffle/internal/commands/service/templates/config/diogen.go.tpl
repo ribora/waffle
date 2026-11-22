@@ -1,6 +1,6 @@
 package diogen
 
-import "gitlab.com/gorib/waffle/app"
+import "github.com/ribora/waffle/app"
 
 func InitDi() (app.App, error) {
     di, err := InitApp()

@@ -10,10 +10,10 @@ import (
 
 	"github.com/pborman/getopt/v2"
 
-	"gitlab.com/gorib/http/openapi"
-	"gitlab.com/gorib/http/server"
-	"gitlab.com/gorib/pry"
-	"gitlab.com/gorib/waffle/app"
+	"github.com/ribora/http/openapi"
+	"github.com/ribora/http/server"
+	"github.com/ribora/pry"
+	"github.com/ribora/waffle/app"
 )
 
 type routerTag struct{}

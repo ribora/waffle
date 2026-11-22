@@ -11,9 +11,9 @@ import (
 	"github.com/pborman/getopt/v2"
 	baseGrpc "google.golang.org/grpc"
 
-	grpc "gitlab.com/gorib/grpc/server"
-	"gitlab.com/gorib/pry"
-	"gitlab.com/gorib/waffle/app"
+	grpc "github.com/ribora/grpc/server"
+	"github.com/ribora/pry"
+	"github.com/ribora/waffle/app"
 )
 
 type (

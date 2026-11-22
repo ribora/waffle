@@ -5,47 +5,47 @@
 package di
 
 import (
-	_ "gitlab.com/gorib/waffle/config/app"
+	_ "github.com/ribora/waffle/config/app"
 
 	// logger
-	_ "gitlab.com/gorib/waffle/config/service/pry"
+	_ "github.com/ribora/waffle/config/service/pry"
 
 	// observability
-	_ "gitlab.com/gorib/waffle/config/service/hilton/otel"
+	_ "github.com/ribora/waffle/config/service/hilton/otel"
 
 	// uncomment if your service uses redis
-	// _ "gitlab.com/gorib/waffle/config/service/redis"
+	// _ "github.com/ribora/waffle/config/service/redis"
 
 	// uncomment if your service uses elasticsearch
-	// _ "gitlab.com/gorib/waffle/config/service/elastic"
+	// _ "github.com/ribora/waffle/config/service/elastic"
 
 	// uncomment if your service uses sql (tracing/metrics are wired automatically)
-	// _ "gitlab.com/gorib/waffle/config/service/sql"
+	// _ "github.com/ribora/waffle/config/service/sql"
 
 	// uncomment if your service uses migrations
-	// _ "gitlab.com/gorib/waffle/config/tools/migrate"
+	// _ "github.com/ribora/waffle/config/tools/migrate"
 
 	// uncomment if your service uses http server
-	// _ "gitlab.com/gorib/waffle/config/tools/http"
+	// _ "github.com/ribora/waffle/config/tools/http"
 
 	// uncomment if your service uses grpc server
-	// _ "gitlab.com/gorib/waffle/config/tools/grpc"
+	// _ "github.com/ribora/waffle/config/tools/grpc"
 
 	// uncomment if your service runs scheduled commands in a single long-lived pod
 	// (in-process cron). For k8s-native per-task CronJob pods, just register
 	// the commands as usual and let k8s schedule them — no import needed.
-	// _ "gitlab.com/gorib/waffle/config/tools/cron"
+	// _ "github.com/ribora/waffle/config/tools/cron"
 
 	// uncomment if your service uses scribus — one driver and one mode
-	// _ "gitlab.com/gorib/waffle/config/tools/scribus/amqp"
+	// _ "github.com/ribora/waffle/config/tools/scribus/amqp"
 	// CHOOSE ONLY ONE VARIANT either batch processing or single processing
-	// _ "gitlab.com/gorib/waffle/config/tools/scribus/batch"
-	// _ "gitlab.com/gorib/waffle/config/tools/scribus/single"
+	// _ "github.com/ribora/waffle/config/tools/scribus/batch"
+	// _ "github.com/ribora/waffle/config/tools/scribus/single"
 
 	// uncomment if your service publishes to rabbitmq
-	// _ "gitlab.com/gorib/waffle/config/service/amqp"
+	// _ "github.com/ribora/waffle/config/service/amqp"
 
 	// uncomment if your published events must survive a crash after the commit —
 	// the driver pulls the module in (waffle make:outbox does this and writes the table)
-	// _ "gitlab.com/gorib/waffle/config/tools/outbox/amqp"
+	// _ "github.com/ribora/waffle/config/tools/outbox/amqp"
 )

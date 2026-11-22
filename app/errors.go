@@ -3,7 +3,7 @@ package app
 import (
 	"errors"
 
-	"gitlab.com/gorib/failure"
+	"github.com/ribora/failure"
 )
 
 var ErrUsage = errors.New("usage")

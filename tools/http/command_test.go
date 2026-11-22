@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	"gitlab.com/gorib/hilton"
-	"gitlab.com/gorib/http/model"
-	"gitlab.com/gorib/http/server"
-	"gitlab.com/gorib/pry"
-	"gitlab.com/gorib/waffle/app"
-	"gitlab.com/gorib/whisk/scan"
+	"github.com/ribora/hilton"
+	"github.com/ribora/http/model"
+	"github.com/ribora/http/server"
+	"github.com/ribora/pry"
+	"github.com/ribora/waffle/app"
+	"github.com/ribora/whisk/scan"
 )
 
 // Parse is whisk's to generate; by hand here so the test needs no codegen step.

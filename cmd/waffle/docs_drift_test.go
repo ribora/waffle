@@ -75,19 +75,19 @@ func TestDocsAnchorsInBackticksResolve(t *testing.T) {
 	}
 }
 
-// Every gorib repository is on main. A link to /blob/master/ is a 404 that
-// nothing else notices, because the host answers it.
-var gitlabBlob = regexp.MustCompile(`gitlab\.com/gorib/[a-z]+/-/blob/([a-z]+)/`)
+// Every repository these docs link to is on main. A link to /blob/master/ is a 404
+// that nothing else notices, because the host answers it.
+var githubBlob = regexp.MustCompile(`github\.com/ribora/[a-z]+/blob/([a-z]+)/`)
 
 func TestDocsLinkToTheDefaultBranch(t *testing.T) {
 	root := repoRoot(t)
 	for _, file := range docFiles(t) {
-		for _, m := range gitlabBlob.FindAllStringSubmatch(read(t, file), -1) {
+		for _, m := range githubBlob.FindAllStringSubmatch(read(t, file), -1) {
 			if m[1] == "main" {
 				continue
 			}
 			rel, _ := filepath.Rel(root, file)
-			t.Errorf("%s links to the %q branch; gorib repositories are on main", rel, m[1])
+			t.Errorf("%s links to the %q branch, not main", rel, m[1])
 		}
 	}
 }

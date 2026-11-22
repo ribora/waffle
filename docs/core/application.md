@@ -7,7 +7,7 @@ The `app` package provides the application lifecycle: command discovery, CLI par
 ## Initialization
 
 ```go
-import "gitlab.com/gorib/waffle/app"
+import "github.com/ribora/waffle/app"
 
 application, err := app.Init(commands, logger, provider)
 ```
@@ -15,7 +15,7 @@ application, err := app.Init(commands, logger, provider)
 `Init` accepts a slice of `Command` values, a `pry.Logger` and a `hilton.Provider`. In practice you never call this directly — it is registered via a blank import in your `config/di/modules.go`:
 
 ```go
-import _ "gitlab.com/gorib/waffle/config/app"
+import _ "github.com/ribora/waffle/config/app"
 ```
 
 which expands to:

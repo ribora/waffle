@@ -2,7 +2,7 @@
 
 [Docs](../README.md) · Tools
 
-`gitlab.com/gorib/hilton` is a thin tracing/metrics abstraction. Base packages depend on hilton interfaces, not on any specific backend; the OTel SDK is the default implementation, hidden behind the `hilton.Provider` interface.
+`github.com/ribora/hilton` is a thin tracing/metrics abstraction. Base packages depend on hilton interfaces, not on any specific backend; the OTel SDK is the default implementation, hidden behind the `hilton.Provider` interface.
 
 ## Setup
 
@@ -13,11 +13,11 @@ Add a blank import for `config/service/hilton/otel` to your `modules.go`:
 package di
 
 import (
-    _ "gitlab.com/gorib/waffle/config/app"                 // wires app.App
-    _ "gitlab.com/gorib/waffle/config/service/hilton/otel" // OTel observability
-    _ "gitlab.com/gorib/waffle/config/service/pry"         // logging
-    _ "gitlab.com/gorib/waffle/config/tools/http"
-    _ "gitlab.com/gorib/waffle/config/tools/grpc"
+    _ "github.com/ribora/waffle/config/app"                 // wires app.App
+    _ "github.com/ribora/waffle/config/service/hilton/otel" // OTel observability
+    _ "github.com/ribora/waffle/config/service/pry"         // logging
+    _ "github.com/ribora/waffle/config/tools/http"
+    _ "github.com/ribora/waffle/config/tools/grpc"
 )
 ```
 

@@ -1,10 +1,10 @@
 package cron
 
 import (
-	"gitlab.com/gorib/di"
-	"gitlab.com/gorib/env"
-	"gitlab.com/gorib/waffle/app"
-	"gitlab.com/gorib/waffle/tools/cron"
+	"github.com/ribora/diogen/di"
+	"github.com/ribora/env"
+	"github.com/ribora/waffle/app"
+	"github.com/ribora/waffle/tools/cron"
 )
 
 // CRON_SCHEDULE is newline-separated, not comma-separated — comma is reserved

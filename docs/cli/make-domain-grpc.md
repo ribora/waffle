@@ -135,8 +135,8 @@ package di
 import (
     userGrpc "mymodule/domain/user/cmd/grpc"
 
-    "gitlab.com/gorib/di"
-    grpcCommand "gitlab.com/gorib/waffle/tools/grpc"
+    "github.com/ribora/diogen/di"
+    grpcCommand "github.com/ribora/waffle/tools/grpc"
 )
 
 func InitUserGrpc() {

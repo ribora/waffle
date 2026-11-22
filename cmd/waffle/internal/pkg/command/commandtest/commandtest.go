@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
+	"github.com/ribora/waffle/cmd/waffle/internal/pkg/command"
 )
 
 // Project is an empty module in a fresh directory, which is also the working one.

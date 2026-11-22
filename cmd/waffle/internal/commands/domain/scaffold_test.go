@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	httpcmd "gitlab.com/gorib/waffle/cmd/waffle/internal/commands/http"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/service"
+	httpcmd "github.com/ribora/waffle/cmd/waffle/internal/commands/http"
+	"github.com/ribora/waffle/cmd/waffle/internal/commands/service"
 )
 
 // The path init-service.md documents, through the real generators: a domain
@@ -24,7 +24,7 @@ func TestADomainJoinsTheContainerWithItsFirstTransport(t *testing.T) {
 	t.Chdir(t.TempDir())
 
 	run(t, "go", "mod", "init", "catalog")
-	run(t, "go", "mod", "edit", "-replace", "gitlab.com/gorib/waffle="+checkout)
+	run(t, "go", "mod", "edit", "-replace", "github.com/ribora/waffle="+checkout)
 	if err := service.New().Run(t.Context()); err != nil {
 		t.Fatalf("init:service: %v", err)
 	}

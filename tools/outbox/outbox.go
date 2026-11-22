@@ -5,13 +5,13 @@ import (
 	"time"
 	"uuid"
 
-	"gitlab.com/gorib/hilton"
-	"gitlab.com/gorib/session"
+	"github.com/ribora/hilton"
+	"github.com/ribora/session"
 
-	"gitlab.com/gorib/waffle/tools/tap"
+	"github.com/ribora/waffle/tools/tap"
 )
 
-const instrumentationName = "gitlab.com/gorib/waffle/tools/outbox"
+const instrumentationName = "github.com/ribora/waffle/tools/outbox"
 
 // Send must return an error when the broker has not confirmed delivery: the relay
 // marks the row sent on its word.

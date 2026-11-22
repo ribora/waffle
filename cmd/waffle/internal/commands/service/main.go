@@ -7,8 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/agents"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
+	"github.com/ribora/waffle/cmd/waffle/internal/commands/agents"
+	"github.com/ribora/waffle/cmd/waffle/internal/pkg/command"
 )
 
 //go:embed templates/*
@@ -63,10 +63,10 @@ func (c *cmd) Run(ctx context.Context, args ...string) error {
 	if _, err := agents.Generate(p, false); err != nil {
 		return err
 	}
-	if err := p.EnsureBuiltTool("gitlab.com/gorib/di/cmd/diogen", "gitlab.com/gorib/di"); err != nil {
+	if err := p.EnsureBuiltTool("github.com/ribora/diogen/cmd/diogen", "github.com/ribora/diogen/di"); err != nil {
 		return err
 	}
-	if err := p.EnsureBuiltTool("gitlab.com/gorib/waffle/cmd/waffle", "gitlab.com/gorib/waffle"); err != nil {
+	if err := p.EnsureBuiltTool("github.com/ribora/waffle/cmd/waffle", "github.com/ribora/waffle"); err != nil {
 		return err
 	}
 	_, err = p.Run("make", ".tidy", "generate")

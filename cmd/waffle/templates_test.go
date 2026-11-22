@@ -14,7 +14,7 @@ import (
 	"testing"
 	"text/template"
 
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
+	"github.com/ribora/waffle/cmd/waffle/internal/pkg/command"
 )
 
 // Nothing compiles or parses the scaffolder's templates, so a broken one is

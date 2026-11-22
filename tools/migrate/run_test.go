@@ -12,7 +12,7 @@ import (
 
 	"github.com/pressly/goose/v3"
 
-	"gitlab.com/gorib/sql"
+	"github.com/ribora/sql"
 )
 
 func createTable(name string) string {

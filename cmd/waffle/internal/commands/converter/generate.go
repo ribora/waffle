@@ -6,7 +6,7 @@ import (
 	"embed"
 	"path/filepath"
 
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
+	"github.com/ribora/waffle/cmd/waffle/internal/pkg/command"
 )
 
 //go:embed templates/*
@@ -27,5 +27,5 @@ func Generate(p *command.Project, targetDir string) error {
 	if err := p.Write(templates, sources, params); err != nil {
 		return err
 	}
-	return p.EnsureTool("gitlab.com/gorib/convert/cmd/goverter")
+	return p.EnsureTool("github.com/ribora/convert/cmd/goverter")
 }

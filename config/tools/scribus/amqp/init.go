@@ -3,11 +3,11 @@ package amqp
 import (
 	"time"
 
-	"gitlab.com/gorib/amqp"
-	"gitlab.com/gorib/amqp/interceptor"
-	"gitlab.com/gorib/di"
-	"gitlab.com/gorib/env"
-	"gitlab.com/gorib/waffle/tools/scribus"
+	"github.com/ribora/amqp"
+	"github.com/ribora/amqp/interceptor"
+	"github.com/ribora/diogen/di"
+	"github.com/ribora/env"
+	"github.com/ribora/waffle/tools/scribus"
 )
 
 func InitScribusAmqp() {

@@ -55,7 +55,7 @@ A thin wrapper that delegates to the diogen package:
 package config
 
 import (
-    "gitlab.com/gorib/waffle/app"
+    "github.com/ribora/waffle/app"
     "mymodule/config/diogen"
 )
 
@@ -68,15 +68,15 @@ func Init() (app.App, error) {
 
 DI configuration lives in two files inside `config/di/`:
 
-**`config/di/modules.go`** — the set of waffle modules this service composes. Contains **only** blank imports, no other code. `_ "gitlab.com/gorib/waffle/config/app"` must always be present — it registers the application root that collects all `Command` tags.
+**`config/di/modules.go`** — the set of waffle modules this service composes. Contains **only** blank imports, no other code. `_ "github.com/ribora/waffle/config/app"` must always be present — it registers the application root that collects all `Command` tags.
 
 ```go
 // Composition of waffle modules used by this service.
 package di
 
 import (
-    _ "gitlab.com/gorib/waffle/config/app"
-    _ "gitlab.com/gorib/waffle/config/service/pry"
+    _ "github.com/ribora/waffle/config/app"
+    _ "github.com/ribora/waffle/config/service/pry"
     // ... other modules ...
 )
 ```
@@ -87,7 +87,7 @@ import (
 //go:generate go tool diogen -output config/diogen/di_gen.go $GOFILE
 package di
 
-// import "gitlab.com/gorib/di" // uncomment when adding di.Wire / di.Define calls below
+// import "github.com/ribora/diogen/di" // uncomment when adding di.Wire / di.Define calls below
 
 func InitDi() {
 	// service-specific di.Wire / di.Define calls go here
@@ -124,7 +124,7 @@ Hand-written adapter between the generated container and the application. Calls 
 ```go
 package diogen
 
-import "gitlab.com/gorib/waffle/app"
+import "github.com/ribora/waffle/app"
 
 func InitDi() (app.App, error) {
     di, err := InitApp()
@@ -170,7 +170,7 @@ as much as configuration. Keys in
 
 **`.env`**
 
-Local environment variable overrides for development. Loaded automatically by `gitlab.com/gorib/env` on startup. Not committed to git.
+Local environment variable overrides for development. Loaded automatically by `github.com/ribora/env` on startup. Not committed to git.
 
 It starts nearly empty on purpose: a variable arrives with the module that reads
 it, and a module arrives with the scaffolding command that needs it. `init:service`
@@ -217,8 +217,8 @@ builds, not that the domain boundaries are clean.
 After writing all files, `init:service` runs:
 
 ```sh
-go get -tool gitlab.com/gorib/di/cmd/diogen@<di version waffle was built with>
-go get -tool gitlab.com/gorib/waffle/cmd/waffle@<its own version>
+go get -tool github.com/ribora/diogen/cmd/diogen@<di version waffle was built with>
+go get -tool github.com/ribora/waffle/cmd/waffle@<its own version>
 make .tidy generate
 ```
 
@@ -231,7 +231,7 @@ This installs the DI code generator, puts `waffle` behind the scaffolded `./waff
 
 ## Keeping waffle.md in sync
 
-After every waffle upgrade (`go get gitlab.com/gorib/waffle@latest`) run:
+After every waffle upgrade (`go get github.com/ribora/waffle@latest`) run:
 
 ```sh
 ./waffle agents

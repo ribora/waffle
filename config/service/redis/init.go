@@ -1,9 +1,9 @@
 package redis
 
 import (
-	"gitlab.com/gorib/di"
-	"gitlab.com/gorib/env"
-	"gitlab.com/gorib/redis"
+	"github.com/ribora/diogen/di"
+	"github.com/ribora/env"
+	"github.com/ribora/redis"
 )
 
 func InitRedis() {

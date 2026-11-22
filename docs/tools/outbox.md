@@ -40,7 +40,7 @@ waffle make:outbox --driver amqp
 
 The module itself names no broker: it holds the rows, the relay and the command,
 and takes delivery from a driver beside it. The one that ships is
-`config/tools/outbox/amqp`, over `gitlab.com/gorib/amqp`. The driver is a required
+`config/tools/outbox/amqp`, over `github.com/ribora/amqp`. The driver is a required
 flag, not a default, for the same reason `make:domain:scribus` takes one — picking
 a broker is the question the split exists to leave open. It refuses before writing
 anything if `config/di/modules.go` has no line for the driver named.
@@ -50,7 +50,7 @@ registers it with `migrate.MigrationsTag`, and uncomments the driver:
 
 ```go
 // config/di/modules.go
-_ "gitlab.com/gorib/waffle/config/tools/outbox/amqp"
+_ "github.com/ribora/waffle/config/tools/outbox/amqp"
 ```
 
 One line, because the driver blank-imports the module it drives. Enable the module
@@ -100,7 +100,7 @@ back a string and the scan fails. Its `current_timestamp` also ticks once a
 second, so entries enqueued in the same second share a `created_at`; delivery
 order is unaffected, because the relay orders by `id` and that is a UUIDv7.
 
-This needs a `gitlab.com/gorib/sql` new enough not to render a `RETURNING` clause
+This needs a `github.com/ribora/sql` new enough not to render a `RETURNING` clause
 for a driver that has none — before that, every `Insert` and `Update` through
 `sql.Repository` is rejected by MySQL.
 

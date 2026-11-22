@@ -3,7 +3,7 @@ package di
 import (
     "{{ .Project }}/domain/{{ .Domain }}/service"
 
-    "gitlab.com/gorib/di"
+    "github.com/ribora/diogen/di"
 )
 
 var {{ camel .Domain }}ManagementInstance di.Handle

@@ -1,10 +1,10 @@
 package elastic
 
 import (
-	"gitlab.com/gorib/di"
-	"gitlab.com/gorib/elastic"
-	"gitlab.com/gorib/env"
-	"gitlab.com/gorib/pry"
+	"github.com/ribora/diogen/di"
+	"github.com/ribora/elastic"
+	"github.com/ribora/env"
+	"github.com/ribora/pry"
 )
 
 func InitElastic() {

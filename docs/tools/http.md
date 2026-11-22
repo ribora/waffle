@@ -2,7 +2,7 @@
 
 [Docs](../README.md) · Tools
 
-The HTTP tool wraps `gitlab.com/gorib/http/server` into a waffle `Command`. Blank-import its config package to register the `http` command.
+The HTTP tool wraps `github.com/ribora/http/server` into a waffle `Command`. Blank-import its config package to register the `http` command.
 
 ## Setup
 
@@ -13,7 +13,7 @@ Add a single blank import to `config/di/modules.go`:
 package di
 
 import (
-    _ "gitlab.com/gorib/waffle/config/tools/http"
+    _ "github.com/ribora/waffle/config/tools/http"
     // ... other modules ...
 )
 ```
@@ -43,7 +43,7 @@ Implement `server.Router` — a single `Setup(mux server.Mux)` method. The scaff
 package http
 
 import (
-    "gitlab.com/gorib/http/server"
+    "github.com/ribora/http/server"
 )
 
 type router struct {
@@ -58,7 +58,7 @@ func (r *router) Setup(mux server.Mux) {
 
 The `mux` a router is handed is its own: a `mux.Use` here covers the routes below it and no neighbour's.
 
-Route patterns use chi syntax — `{id}`, `{id:[0-9]+}`, trailing `/*` wildcard. Matching is on the decoded path, so a path parameter always arrives decoded and a `%2F` in one is a separator: a value that can carry a slash goes in a query parameter or the body, not in a segment. The [path matching section](https://gitlab.com/gorib/http#path-matching) of the `http` README has the why.
+Route patterns use chi syntax — `{id}`, `{id:[0-9]+}`, trailing `/*` wildcard. Matching is on the decoded path, so a path parameter always arrives decoded and a `%2F` in one is a separator: a value that can carry a slash goes in a query parameter or the body, not in a segment. The [path matching section](https://github.com/ribora/http#path-matching) of the `http` README has the why.
 
 Register the router under `RouterTag`:
 
@@ -272,7 +272,7 @@ The command is an `io.Closer`, so the container's `Shutdown` closes it. On `SIGI
 
 ## Testing
 
-`waffleHttp.Serve` (`gitlab.com/gorib/waffle/tools/http`) puts the routes on an `httptest` server. It calls the same `Setup` as the daemon, with the container's own mux, global chain and routers, so a test checks the routes and the middleware that ship:
+`waffleHttp.Serve` (`github.com/ribora/waffle/tools/http`) puts the routes on an `httptest` server. It calls the same `Setup` as the daemon, with the container's own mux, global chain and routers, so a test checks the routes and the middleware that ship:
 
 ```go
 srv, err := waffleHttp.Serve(

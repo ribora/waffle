@@ -4,7 +4,7 @@ import (
 	"{{ .Project }}/domain/{{ .Domain }}/adapter/postgres"
 	"{{ .Project }}/domain/{{ .Domain }}/service"
 
-	"gitlab.com/gorib/di"
+	"github.com/ribora/diogen/di"
 )
 
 func Init{{ title .Domain }}{{ title .Entity }}Repository() {

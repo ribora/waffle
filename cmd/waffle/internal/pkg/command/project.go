@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gitlab.com/gorib/waffle/internal/gomod"
+	"github.com/ribora/waffle/internal/gomod"
 )
 
 // Every path a Project takes or reports is relative to the module root, not to

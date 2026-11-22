@@ -2,7 +2,7 @@ package scribus
 
 import "errors"
 
-const driverPrefix = "gitlab.com/gorib/waffle/config/tools/scribus/"
+const driverPrefix = "github.com/ribora/waffle/config/tools/scribus/"
 
 // The mode is a flag with a default, the driver is not: a scaffolder that picked
 // a broker would answer the one question this tool was rebuilt not to answer.

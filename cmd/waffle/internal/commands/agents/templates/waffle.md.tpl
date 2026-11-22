@@ -6,7 +6,7 @@ The framework's conventions for this service, and what the service is made of.
 
 **`make generate` rewrites it**, so the service context below — domains, active
 modules, env vars — is as current as the container. After a waffle upgrade
-(`go get gitlab.com/gorib/waffle@latest`) run it again for the conventions too:
+(`go get github.com/ribora/waffle@latest`) run it again for the conventions too:
 they change between versions, and a stale copy steers you toward patterns that
 are gone.
 
@@ -20,7 +20,7 @@ what you would write, and do not write it.
 ## This service
 
 - Module: `{{ .ModulePath }}`
-- Framework: [gorib](https://gitlab.com/gorib) + [waffle](https://gitlab.com/gorib/waffle){{ if .WaffleVersion }} `{{ .WaffleVersion }}`{{ end }}{{ if .Domains }}
+- Framework: [ribora](https://github.com/ribora) + [waffle](https://github.com/ribora/waffle){{ if .WaffleVersion }} `{{ .WaffleVersion }}`{{ end }}{{ if .Domains }}
 - Domains: {{ range $i, $d := .Domains }}{{ if $i }}, {{ end }}`{{ $d }}`{{ end }}{{ end }}{{ if .Modules }}
 - Active waffle modules: {{ range $i, $m := .Modules }}{{ if $i }}, {{ end }}`{{ $m }}`{{ end }}{{ end }}{{ if .EnvVars }}
 - Env vars: {{ range $i, $e := .EnvVars }}{{ if $i }}, {{ end }}`{{ $e }}`{{ end }}{{ end }}
@@ -76,21 +76,20 @@ hardcoded paths. See `docs/cli/overview.md` in waffle.
 After any change (yours or human's), run **in this order**:
 
 ```sh
-make generate    # diogen, goverter, whisk, etc. — recompiles all codegen
-make audit       # golangci-lint
-make             # .tidy, generate, build
+make          # .tidy, generate (diogen, goverter, whisk, etc.), build
+make audit    # golangci-lint
 ```
 
-Never commit between steps. If any of the three fails, fix before proceeding.
+Never commit between steps. If either fails, fix before proceeding.
 
 **And `make test` before you hand anything over** — once, not after every edit.
 It is out of `make` on purpose: the component suite boots the real container
 over real infrastructure, which is too slow for a loop that runs after every
-change. It is also where `boundaries.Check()` lives, so the three commands above
+change. It is also where `boundaries.Check()` lives, so the two commands above
 passing does **not** mean the boundaries are clean. Run it, and paste what it
 said.
 
-`make generate` is mandatory — diogen reads the entire DI graph and may emit
+`make`, not `go build` in its place — diogen reads the entire DI graph and may emit
 errors that surface only at generation time (missing dependency, circular,
 duplicate alias). Skipping it leaves the service in a broken state.
 
@@ -156,7 +155,7 @@ is `service`, as the scaffolds import it.
 Behaviour crosses through the interface; types cross directly and stop at
 `toDomain`. Past that line the neighbour's model does not appear.
 
-`boundaries.Check()` runs in `make test`, not in the three commands of Rule #2.
+`boundaries.Check()` runs in `make test`, not in the two commands of Rule #2.
 There is no exceptions file: a crossing that would need one is a design
 question for the platform engineer, not a line of configuration.
 
@@ -164,7 +163,7 @@ question for the platform engineer, not a line of configuration.
 
 These deviate from Go style guide but are project-wide. Don't "fix" them.
 
-- `Db` not `DB`, `Dsn` not `DSN`, `Id` not `ID` (across all gorib + waffle + services)
+- `Db` not `DB`, `Dsn` not `DSN`, `Id` not `ID` (across all ribora + waffle + services)
 - **Constructors return the unexported struct, and the interface is on the
   registration.** `func NewUserRepository(...) *userRepository`, wired as
   `di.Wire[service.UserRepository](postgres.NewUserRepository)`, is what the
@@ -301,7 +300,7 @@ already exists as `_count` aggregate — don't add `db.client.operations` counte
 Only tasks a command does not finish on its own — where the order, or what the
 scaffold leaves for you, is the part that is not obvious. A task that is one
 command is in Rule #1's table and not repeated here. Each of these ends with
-Rule #2 — `make generate && make audit && make`.
+Rule #2 — `make && make audit`.
 
 | task | order |
 |---|---|
@@ -314,7 +313,7 @@ Rule #2 — `make generate && make audit && make`.
 
 - ❌ `protoc` directly — proto generation is driven by the project's proto step (in-module: `go generate ./api/...`; monorepo with `proto_dir` outside the module: a central step such as `make -C <api-dir>`)
 - ❌ Manual `go mod tidy` after every edit — `make .tidy` does it consistently
-- ❌ A `replace` in `go.mod` whose target is outside this repository — a local checkout of gorib or of anything else builds only on the machine it was written on. Release the module and bump the version instead; a `replace` onto another module of the same repository is fine
+- ❌ A `replace` in `go.mod` whose target is outside this repository — a local checkout of ribora or of anything else builds only on the machine it was written on. Release the module and bump the version instead; a `replace` onto another module of the same repository is fine
 - ❌ Touch `di_gen.go`, `*_goverter_gen.go`, `*_whisk_gen.go`, `stored_*_gen.go` — they're generated
 - ❌ Wrap stdlib types in custom abstractions inside `domain/<x>/model/` — model stays pure Go types
 - ❌ Reach another domain other than through `adapter/`, or import `domain/<x>/cmd/**` from outside `cmd/` (Rule #12)
@@ -326,9 +325,9 @@ Rule #2 — `make generate && make audit && make`.
 Read the copy this service depends on, not the one on `main` — conventions
 change between versions.
 
-{{ if .WaffleVersion }}- Waffle docs: `$(go env GOMODCACHE)/gitlab.com/gorib/waffle@{{ .WaffleVersion }}/docs/`
-{{ else }}- Waffle docs: `gitlab.com/gorib/waffle/-/blob/main/docs/`
+{{ if .WaffleVersion }}- Waffle docs: `$(go env GOMODCACHE)/github.com/ribora/waffle@{{ .WaffleVersion }}/docs/`
+{{ else }}- Waffle docs: `github.com/ribora/waffle/-/blob/main/docs/`
 {{ end }}
-- Any other gorib module — diogen (`gitlab.com/gorib/di`), whisk, the core libs:
-  `README.md` in the directory `go list -m -f '{{"{{"}}.Dir{{"}}"}}' gitlab.com/gorib/<module>` prints
+- Any other ribora module — diogen (`github.com/ribora/diogen/di`), whisk, the core libs:
+  `README.md` in the directory `go list -m -f '{{"{{"}}.Dir{{"}}"}}' github.com/ribora/<module>` prints
 

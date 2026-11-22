@@ -15,9 +15,9 @@ import (
 	"sort"
 	"strings"
 
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
-	"gitlab.com/gorib/waffle/container"
-	"gitlab.com/gorib/waffle/internal/gomod"
+	"github.com/ribora/waffle/cmd/waffle/internal/pkg/command"
+	"github.com/ribora/waffle/container"
+	"github.com/ribora/waffle/internal/gomod"
 )
 
 //go:embed templates/*
@@ -125,7 +125,7 @@ func scanDomains(p *command.Project) []string {
 }
 
 const (
-	wafflePath   = "gitlab.com/gorib/waffle"
+	wafflePath   = "github.com/ribora/waffle"
 	modulePrefix = wafflePath + "/config/"
 )
 

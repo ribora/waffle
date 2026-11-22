@@ -1,11 +1,11 @@
 package pry
 
 import (
-	"gitlab.com/gorib/di"
-	"gitlab.com/gorib/env"
-	"gitlab.com/gorib/pry"
-	"gitlab.com/gorib/pry/channels"
-	pryzerolog "gitlab.com/gorib/pry/zerolog"
+	"github.com/ribora/diogen/di"
+	"github.com/ribora/env"
+	"github.com/ribora/pry"
+	"github.com/ribora/pry/channels"
+	pryzerolog "github.com/ribora/pry/zerolog"
 )
 
 func InitPry() {

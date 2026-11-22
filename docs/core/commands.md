@@ -127,7 +127,7 @@ import (
     "os"
 
     "github.com/pborman/getopt/v2"
-    "gitlab.com/gorib/waffle/app"
+    "github.com/ribora/waffle/app"
 )
 
 func (c *sweepOtpCommand) Usage(ctx context.Context) error {

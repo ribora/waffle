@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/converter"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
+	"github.com/ribora/waffle/cmd/waffle/internal/commands/converter"
+	"github.com/ribora/waffle/cmd/waffle/internal/pkg/command"
 )
 
 //go:embed templates/*
@@ -16,7 +16,7 @@ var templateFiles embed.FS
 
 var templates = command.NewTemplates(templateFiles)
 
-const module = "gitlab.com/gorib/waffle/config/tools/grpc"
+const module = "github.com/ribora/waffle/config/tools/grpc"
 
 func New() *cmd {
 	return &cmd{command.New("make:domain:grpc", "Make grpc connector to the specified domain").

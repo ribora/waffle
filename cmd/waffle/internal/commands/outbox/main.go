@@ -8,8 +8,8 @@ import (
 	"slices"
 	"time"
 
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/migrate"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
+	"github.com/ribora/waffle/cmd/waffle/internal/commands/migrate"
+	"github.com/ribora/waffle/cmd/waffle/internal/pkg/command"
 )
 
 //go:embed templates/*
@@ -20,7 +20,7 @@ var templates = command.NewTemplates(templateFiles)
 const domain = "outbox"
 
 const (
-	module       = "gitlab.com/gorib/waffle/config/tools/outbox"
+	module       = "github.com/ribora/waffle/config/tools/outbox"
 	driverPrefix = module + "/"
 )
 

@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"testing"
 
-	"gitlab.com/gorib/failure"
-	"gitlab.com/gorib/hilton"
-	"gitlab.com/gorib/pry"
+	"github.com/ribora/failure"
+	"github.com/ribora/hilton"
+	"github.com/ribora/pry"
 )
 
 const commandDuration = "cli.command.duration"

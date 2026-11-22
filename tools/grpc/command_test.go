@@ -7,7 +7,7 @@ import (
 )
 
 type drainedService struct {
-	echoService
+	healthService
 	drained chan struct{}
 }
 
@@ -46,7 +46,7 @@ func TestCloseDrainsWhileTheServerWaitsForRunningCalls(t *testing.T) {
 
 func TestCloseDrainsACommandThatNeverServed(t *testing.T) {
 	service := &drainedService{drained: make(chan struct{})}
-	command := NewGrpcCommand([]ServiceHandler{service, &echoService{}}, nil, nil, nil, nil, 0, nil)
+	command := NewGrpcCommand([]ServiceHandler{service, &healthService{}}, nil, nil, nil, nil, 0, nil)
 
 	if err := command.Close(); err != nil {
 		t.Fatalf("close: %v", err)

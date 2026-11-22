@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
 
-	grpc "gitlab.com/gorib/grpc/server"
+	grpc "github.com/ribora/grpc/server"
 )
 
 // The chain comes from UnaryChain, the same function the daemon uses: a harness

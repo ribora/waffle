@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.com/gorib/session"
+	"github.com/ribora/session"
 )
 
 func TestPublisher(t *testing.T) {

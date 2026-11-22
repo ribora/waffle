@@ -1,11 +1,11 @@
 package batch
 
 import (
-	"gitlab.com/gorib/di"
-	"gitlab.com/gorib/waffle/app"
-	"gitlab.com/gorib/waffle/tools/scribus"
+	"github.com/ribora/diogen/di"
+	"github.com/ribora/waffle/app"
+	"github.com/ribora/waffle/tools/scribus"
 
-	_ "gitlab.com/gorib/waffle/config/tools/scribus"
+	_ "github.com/ribora/waffle/config/tools/scribus"
 )
 
 func InitBatch() {

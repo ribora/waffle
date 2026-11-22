@@ -5,9 +5,9 @@ import (
 	"embed"
 	"path/filepath"
 
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/converter"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/whisk"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
+	"github.com/ribora/waffle/cmd/waffle/internal/commands/converter"
+	"github.com/ribora/waffle/cmd/waffle/internal/commands/whisk"
+	"github.com/ribora/waffle/cmd/waffle/internal/pkg/command"
 )
 
 //go:embed templates/*
@@ -15,7 +15,7 @@ var templateFiles embed.FS
 
 var templates = command.NewTemplates(templateFiles)
 
-const module = "gitlab.com/gorib/waffle/config/tools/http"
+const module = "github.com/ribora/waffle/config/tools/http"
 
 func New() *cmd {
 	return &cmd{command.New("make:domain:http", "Make HTTP router for the specified domain").

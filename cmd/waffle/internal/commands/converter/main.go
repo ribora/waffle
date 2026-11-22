@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
+	"github.com/ribora/waffle/cmd/waffle/internal/pkg/command"
 )
 
 func New() *cmd {

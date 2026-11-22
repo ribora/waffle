@@ -7,29 +7,31 @@ import (
 	"testing"
 
 	baseGrpc "google.golang.org/grpc"
+	"google.golang.org/grpc/health/grpc_health_v1"
 
-	"gitlab.com/gorib/grpc/echo/pb"
-	grpc "gitlab.com/gorib/grpc/server"
+	grpc "github.com/ribora/grpc/server"
 )
 
-type echoService struct {
-	pb.UnimplementedEchoServiceServer
+// The health service stands in for any service at all: these tests are about the
+// interceptor chain and the connection, not about what is being called.
+type healthService struct {
+	grpc_health_v1.UnimplementedHealthServer
 	mu    sync.Mutex
 	calls int
 }
 
-func (s *echoService) Check(context.Context, *pb.EchoRequest) (*pb.EchoResponse, error) {
+func (s *healthService) Check(context.Context, *grpc_health_v1.HealthCheckRequest) (*grpc_health_v1.HealthCheckResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.calls++
-	return &pb.EchoResponse{}, nil
+	return &grpc_health_v1.HealthCheckResponse{}, nil
 }
 
-func (s *echoService) Start(registrar baseGrpc.ServiceRegistrar) {
-	pb.RegisterEchoServiceServer(registrar, s)
+func (s *healthService) Start(registrar baseGrpc.ServiceRegistrar) {
+	grpc_health_v1.RegisterHealthServer(registrar, s)
 }
 
-func (s *echoService) Calls() int {
+func (s *healthService) Calls() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.calls
@@ -65,14 +67,14 @@ func (e *entered) String() string {
 }
 
 func TestServeReachesTheHandlerOverAConnection(t *testing.T) {
-	service := &echoService{}
+	service := &healthService{}
 	server, err := Serve([]ServiceHandler{service}, nil, nil)
 	if err != nil {
 		t.Fatalf("serve: %v", err)
 	}
 	defer server.Close()
 
-	_, err = pb.NewEchoServiceClient(server.Conn()).Check(t.Context(), &pb.EchoRequest{})
+	_, err = grpc_health_v1.NewHealthClient(server.Conn()).Check(t.Context(), &grpc_health_v1.HealthCheckRequest{})
 
 	if err != nil {
 		t.Fatalf("check: %v", err)
@@ -85,7 +87,7 @@ func TestServeReachesTheHandlerOverAConnection(t *testing.T) {
 func TestServeRunsTheInterceptorsInTheOrderGiven(t *testing.T) {
 	log := &entered{}
 	server, err := Serve(
-		[]ServiceHandler{&echoService{}},
+		[]ServiceHandler{&healthService{}},
 		grpc.Interceptors{
 			tag{name: "outer", log: log},
 			tag{name: "middle", log: log},
@@ -98,7 +100,7 @@ func TestServeRunsTheInterceptorsInTheOrderGiven(t *testing.T) {
 	}
 	defer server.Close()
 
-	if _, err = pb.NewEchoServiceClient(server.Conn()).Check(t.Context(), &pb.EchoRequest{}); err != nil {
+	if _, err = grpc_health_v1.NewHealthClient(server.Conn()).Check(t.Context(), &grpc_health_v1.HealthCheckRequest{}); err != nil {
 		t.Fatalf("check: %v", err)
 	}
 
@@ -126,14 +128,14 @@ func TestUnaryChainKeepsTheOrderGiven(t *testing.T) {
 }
 
 func TestCloseIsSafeAfterServe(t *testing.T) {
-	server, err := Serve([]ServiceHandler{&echoService{}}, nil, nil)
+	server, err := Serve([]ServiceHandler{&healthService{}}, nil, nil)
 	if err != nil {
 		t.Fatalf("serve: %v", err)
 	}
 
 	server.Close()
 
-	if _, err = pb.NewEchoServiceClient(server.Conn()).Check(t.Context(), &pb.EchoRequest{}); err == nil {
+	if _, err = grpc_health_v1.NewHealthClient(server.Conn()).Check(t.Context(), &grpc_health_v1.HealthCheckRequest{}); err == nil {
 		t.Fatal("the connection still answers after Close")
 	}
 }

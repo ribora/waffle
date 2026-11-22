@@ -10,19 +10,19 @@ import (
 
 	"github.com/fatih/color"
 
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/agents"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/cmdcommand"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/converter"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/domain"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/grpc"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/http"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/migrate"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/migration"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/outbox"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/repository"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/scribus"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/service"
-	cmdpkg "gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
+	"github.com/ribora/waffle/cmd/waffle/internal/commands/agents"
+	"github.com/ribora/waffle/cmd/waffle/internal/commands/cmdcommand"
+	"github.com/ribora/waffle/cmd/waffle/internal/commands/converter"
+	"github.com/ribora/waffle/cmd/waffle/internal/commands/domain"
+	"github.com/ribora/waffle/cmd/waffle/internal/commands/grpc"
+	"github.com/ribora/waffle/cmd/waffle/internal/commands/http"
+	"github.com/ribora/waffle/cmd/waffle/internal/commands/migrate"
+	"github.com/ribora/waffle/cmd/waffle/internal/commands/migration"
+	"github.com/ribora/waffle/cmd/waffle/internal/commands/outbox"
+	"github.com/ribora/waffle/cmd/waffle/internal/commands/repository"
+	"github.com/ribora/waffle/cmd/waffle/internal/commands/scribus"
+	"github.com/ribora/waffle/cmd/waffle/internal/commands/service"
+	cmdpkg "github.com/ribora/waffle/cmd/waffle/internal/pkg/command"
 )
 
 type Command interface {

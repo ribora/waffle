@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command/commandtest"
+	"github.com/ribora/waffle/cmd/waffle/internal/pkg/command"
+	"github.com/ribora/waffle/cmd/waffle/internal/pkg/command/commandtest"
 )
 
 const project = "example.com/svc"

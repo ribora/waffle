@@ -6,10 +6,10 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.com/gorib/failure"
-	"gitlab.com/gorib/hilton"
-	"gitlab.com/gorib/pry"
-	"gitlab.com/gorib/session"
+	"github.com/ribora/failure"
+	"github.com/ribora/hilton"
+	"github.com/ribora/pry"
+	"github.com/ribora/session"
 )
 
 // The first pause after an idle pass; it doubles up to the poll interval.
@@ -164,7 +164,7 @@ func (r *relay) deliver(ctx context.Context) bool {
 	// The bookkeeping does not take the caller's cancellation: an entry the broker
 	// has already accepted has to be marked whatever happened to ctx, or the next
 	// pass sends it a second time. Its own deadline, because dropping the caller's
-	// leaves none — gorib/sql sets no timeout on a query.
+	// leaves none — ribora/sql sets no timeout on a query.
 	book, cancel := context.WithTimeout(context.WithoutCancel(ctx), bookkeepingTimeout)
 	defer cancel()
 

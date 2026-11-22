@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/migrate"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
+	"github.com/ribora/waffle/cmd/waffle/internal/commands/migrate"
+	"github.com/ribora/waffle/cmd/waffle/internal/pkg/command"
 )
 
 const defaultStorage = "sql"

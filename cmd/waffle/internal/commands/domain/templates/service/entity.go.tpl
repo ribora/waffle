@@ -4,7 +4,7 @@ import (
 {{- if .WithRepository }}
 	"context"
 
-	"gitlab.com/gorib/criteria"
+	"github.com/ribora/criteria"
 {{- end }}
 
 	"{{ .Project }}/domain/{{ .Domain }}/model"

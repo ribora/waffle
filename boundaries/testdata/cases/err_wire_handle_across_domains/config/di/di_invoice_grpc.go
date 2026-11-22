@@ -3,7 +3,7 @@ package di
 import (
 	invoiceGrpc "example.test/domain/invoice/cmd/grpc"
 
-	"gitlab.com/gorib/di"
+	"github.com/ribora/diogen/di"
 )
 
 // The handle comes from the file next door, and this stays inside invoice.

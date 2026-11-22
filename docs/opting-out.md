@@ -144,7 +144,7 @@ where it is and becomes ordinary source you edit by hand: nothing regenerates it
 nothing validates it, no build step looks for it.
 
 For containers the break is total — **no generated container imports
-`gitlab.com/gorib/di`**. Every non-standard import in `di_gen.go` is a package
+`github.com/ribora/diogen/di`**. Every non-standard import in `di_gen.go` is a package
 whose constructors it calls, yours and the framework's, so what remains after
 deleting the directive has no link back to the tool that wrote it.
 

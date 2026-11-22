@@ -336,7 +336,7 @@ func registered(cmds commands) []string {
 var (
 	needValue    = regexp.MustCompile(`env\.NeedValue(?:\[[^\]]+\])?\(\s*"([A-Z0-9_]+)"`)
 	optValue     = regexp.MustCompile(`env\.Value(?:\[[^\]]+\])?\(\s*"([A-Z0-9_]+)"`)
-	configImport = regexp.MustCompile(`_ "gitlab\.com/gorib/waffle/(config/[a-z0-9/]+)"`)
+	configImport = regexp.MustCompile(`_ "github\.com/ribora/waffle/(config/[a-z0-9/]+)"`)
 	parenthesis  = regexp.MustCompile(`\([^)]*\)`)
 	backticked   = regexp.MustCompile("`([A-Z][A-Z0-9_]*)`")
 	docModule    = regexp.MustCompile("`(config/[a-z0-9/]+)`")
@@ -480,8 +480,8 @@ const (
 )
 
 var (
-	activeImport    = regexp.MustCompile(`(?m)^\s*_ "gitlab\.com/gorib/waffle/(config/[a-z0-9/]+)"`)
-	commentedImport = regexp.MustCompile(`(?m)^\s*// _ "gitlab\.com/gorib/waffle/(config/[a-z0-9/]+)"`)
+	activeImport    = regexp.MustCompile(`(?m)^\s*_ "github\.com/ribora/waffle/(config/[a-z0-9/]+)"`)
+	commentedImport = regexp.MustCompile(`(?m)^\s*// _ "github\.com/ribora/waffle/(config/[a-z0-9/]+)"`)
 	envKey          = regexp.MustCompile(`(?m)^([A-Z][A-Z0-9_]*)=`)
 )
 

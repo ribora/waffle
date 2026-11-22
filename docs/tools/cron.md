@@ -13,7 +13,7 @@ Add a single blank import to `config/di/modules.go`:
 package di
 
 import (
-    _ "gitlab.com/gorib/waffle/config/tools/cron"
+    _ "github.com/ribora/waffle/config/tools/cron"
     // ... other modules ...
 )
 ```
@@ -22,10 +22,10 @@ This pulls in the registrations from [`config/tools/cron/init.go`](../../config/
 
 ```go
 import (
-    "gitlab.com/gorib/di"
-    "gitlab.com/gorib/env"
-    "gitlab.com/gorib/waffle/app"
-    "gitlab.com/gorib/waffle/tools/cron"
+    "github.com/ribora/diogen/di"
+    "github.com/ribora/env"
+    "github.com/ribora/waffle/app"
+    "github.com/ribora/waffle/tools/cron"
 )
 
 di.Wire[app.BaseCommand](

@@ -5,10 +5,10 @@ import (
 	"strings"
 	"testing"
 
-	"gitlab.com/gorib/hilton"
-	"gitlab.com/gorib/pry"
-	"gitlab.com/gorib/waffle/app"
-	"gitlab.com/gorib/whisk/scan"
+	"github.com/ribora/hilton"
+	"github.com/ribora/pry"
+	"github.com/ribora/waffle/app"
+	"github.com/ribora/whisk/scan"
 )
 
 var _ Consumer = Recorder()

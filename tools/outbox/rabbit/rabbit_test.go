@@ -3,8 +3,8 @@ package rabbit
 import (
 	"testing"
 
-	"gitlab.com/gorib/amqp"
-	"gitlab.com/gorib/waffle/tools/outbox"
+	"github.com/ribora/amqp"
+	"github.com/ribora/waffle/tools/outbox"
 )
 
 // New takes an amqp.Publisher, and outbox.Publisher has a Publish of the same

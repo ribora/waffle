@@ -8,7 +8,7 @@ import (
 	"time"
 	"uuid"
 
-	"gitlab.com/gorib/waffle/tools/outbox"
+	"github.com/ribora/waffle/tools/outbox"
 )
 
 // A stale-after of zero puts the cutoff at this instant, so a claim taken a moment

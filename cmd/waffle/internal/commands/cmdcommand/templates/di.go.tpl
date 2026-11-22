@@ -3,8 +3,8 @@ package di
 import (
 	cmd{{ .Command.Upper }} "{{ .Project }}/domain/{{ .Domain }}/cmd/{{ .Command.Raw }}"
 
-	"gitlab.com/gorib/di"
-	"gitlab.com/gorib/waffle/app"
+	"github.com/ribora/diogen/di"
+	"github.com/ribora/waffle/app"
 )
 
 func Init{{ title .Domain }}{{ .Command.Upper }}() {

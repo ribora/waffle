@@ -1,9 +1,9 @@
 package scribus
 
 import (
-	"gitlab.com/gorib/di"
-	"gitlab.com/gorib/waffle/app"
-	"gitlab.com/gorib/waffle/tools/scribus"
+	"github.com/ribora/diogen/di"
+	"github.com/ribora/waffle/app"
+	"github.com/ribora/waffle/tools/scribus"
 )
 
 func InitScribus() {

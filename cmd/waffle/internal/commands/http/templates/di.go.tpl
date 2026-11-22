@@ -3,8 +3,8 @@ package di
 import (
 	http{{ title .Domain }} "{{ .Project }}/domain/{{ .Domain }}/cmd/http"
 
-	"gitlab.com/gorib/di"
-	httpCommand "gitlab.com/gorib/waffle/tools/http"
+	"github.com/ribora/diogen/di"
+	httpCommand "github.com/ribora/waffle/tools/http"
 )
 
 func Init{{ title .Domain }}Http() {

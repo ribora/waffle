@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.com/gorib/whisk/scan"
+	"github.com/ribora/whisk/scan"
 
-	"gitlab.com/gorib/waffle/tools/tap"
+	"github.com/ribora/waffle/tools/tap"
 )
 
 // No Reset: clearing the wiring would drop the handler the container installed.

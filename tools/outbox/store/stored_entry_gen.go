@@ -4,7 +4,7 @@
 package store
 
 import (
-	outbox "gitlab.com/gorib/waffle/tools/outbox"
+	outbox "github.com/ribora/waffle/tools/outbox"
 )
 
 var storedEntryMappings = map[string]string{

@@ -5,7 +5,7 @@ package di
 // modules is declared separately in modules.go via blank imports — diogen
 // scans both files when generating the container.
 
-// import "gitlab.com/gorib/di" // uncomment when adding di.Wire / di.Define calls below
+// import "github.com/ribora/diogen/di" // uncomment when adding di.Wire / di.Define calls below
 
 func InitDi() {
 	// service-specific di.Wire / di.Define calls go here

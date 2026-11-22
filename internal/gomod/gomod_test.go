@@ -17,15 +17,15 @@ func TestRequires(t *testing.T) {
 			mod: `module svc
 
 require (
-	gitlab.com/gorib/http v1.12.0
-	gitlab.com/gorib/waffle v1.11.2
+	github.com/ribora/http v1.12.0
+	github.com/ribora/waffle v1.11.2
 )
 `,
 			want: "v1.11.2",
 		},
 		{
 			name: "on its own line",
-			mod:  "module svc\n\nrequire gitlab.com/gorib/waffle v1.11.2\n",
+			mod:  "module svc\n\nrequire github.com/ribora/waffle v1.11.2\n",
 			want: "v1.11.2",
 		},
 		{
@@ -33,15 +33,15 @@ require (
 			name: "replaced",
 			mod: `module svc
 
-require gitlab.com/gorib/waffle v1.11.2
+require github.com/ribora/waffle v1.11.2
 
-replace gitlab.com/gorib/waffle => ../waffle
+replace github.com/ribora/waffle => ../waffle
 `,
 			want: "",
 		},
 		{
 			name: "absent",
-			mod:  "module svc\n\nrequire gitlab.com/gorib/http v1.12.0\n",
+			mod:  "module svc\n\nrequire github.com/ribora/http v1.12.0\n",
 			want: "",
 		},
 		{
@@ -55,7 +55,7 @@ replace gitlab.com/gorib/waffle => ../waffle
 			if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(c.mod), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			if got := Requires(dir, "gitlab.com/gorib/waffle"); got != c.want {
+			if got := Requires(dir, "github.com/ribora/waffle"); got != c.want {
 				t.Errorf("version = %q, want %q", got, c.want)
 			}
 		})
@@ -63,7 +63,7 @@ replace gitlab.com/gorib/waffle => ../waffle
 }
 
 func TestRequiresWithoutAGoMod(t *testing.T) {
-	if got := Requires(t.TempDir(), "gitlab.com/gorib/waffle"); got != "" {
+	if got := Requires(t.TempDir(), "github.com/ribora/waffle"); got != "" {
 		t.Errorf("version = %q, want empty", got)
 	}
 }

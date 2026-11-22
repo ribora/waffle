@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-const scribusDriver = "gitlab.com/gorib/waffle/config/tools/scribus/amqp"
+const scribusDriver = "github.com/ribora/waffle/config/tools/scribus/amqp"
 
 func withModules(t *testing.T, modules string) *Project {
 	t.Helper()
@@ -27,19 +27,19 @@ func TestEnableModuleAddsEnvKeys(t *testing.T) {
 	p := withModules(t, `package di
 
 import (
-	_ "gitlab.com/gorib/waffle/config/app"
-	// _ "gitlab.com/gorib/waffle/config/tools/http"
-	// _ "gitlab.com/gorib/waffle/config/service/sql"
+	_ "github.com/ribora/waffle/config/app"
+	// _ "github.com/ribora/waffle/config/tools/http"
+	// _ "github.com/ribora/waffle/config/service/sql"
 )
 `)
 	if err := os.WriteFile(".env", []byte("SERVICE=demo\nDAEMON_PORT=9999\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := p.EnableModule("gitlab.com/gorib/waffle/config/tools/http"); err != nil {
+	if err := p.EnableModule("github.com/ribora/waffle/config/tools/http"); err != nil {
 		t.Fatal(err)
 	}
-	if err := p.EnableModule("gitlab.com/gorib/waffle/config/service/sql"); err != nil {
+	if err := p.EnableModule("github.com/ribora/waffle/config/service/sql"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -63,7 +63,7 @@ import (
 
 	// running it again must change nothing
 	before := body
-	if err := p.EnableModule("gitlab.com/gorib/waffle/config/tools/http"); err != nil {
+	if err := p.EnableModule("github.com/ribora/waffle/config/tools/http"); err != nil {
 		t.Fatal(err)
 	}
 	after, err := os.ReadFile(".env")
@@ -82,11 +82,11 @@ func TestHandEnabledModuleStillGetsItsEnv(t *testing.T) {
 	p := withModules(t, `package di
 
 import (
-	_ "gitlab.com/gorib/waffle/config/service/sql"
+	_ "github.com/ribora/waffle/config/service/sql"
 )
 `)
 
-	if err := p.EnableModule("gitlab.com/gorib/waffle/config/service/sql"); err != nil {
+	if err := p.EnableModule("github.com/ribora/waffle/config/service/sql"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -107,14 +107,14 @@ func TestSharedEnvKeysAreWrittenOnce(t *testing.T) {
 	p := withModules(t, `package di
 
 import (
-	// _ "gitlab.com/gorib/waffle/config/tools/http"
-	// _ "gitlab.com/gorib/waffle/config/tools/grpc"
+	// _ "github.com/ribora/waffle/config/tools/http"
+	// _ "github.com/ribora/waffle/config/tools/grpc"
 )
 `)
 
 	for _, module := range []string{
-		"gitlab.com/gorib/waffle/config/tools/http",
-		"gitlab.com/gorib/waffle/config/tools/grpc",
+		"github.com/ribora/waffle/config/tools/http",
+		"github.com/ribora/waffle/config/tools/grpc",
 	} {
 		if err := p.EnableModule(module); err != nil {
 			t.Fatal(err)
@@ -143,15 +143,15 @@ func TestEnablingAModuleWithoutALineIsAnError(t *testing.T) {
 	p := withModules(t, `package di
 
 import (
-	_ "gitlab.com/gorib/waffle/config/app"
+	_ "github.com/ribora/waffle/config/app"
 )
 `)
 
-	err := p.EnableModule("gitlab.com/gorib/waffle/config/tools/http")
+	err := p.EnableModule("github.com/ribora/waffle/config/tools/http")
 	if err == nil {
 		t.Fatal("a module with no line in modules.go was reported enabled")
 	}
-	if !strings.Contains(err.Error(), `_ "gitlab.com/gorib/waffle/config/tools/http"`) {
+	if !strings.Contains(err.Error(), `_ "github.com/ribora/waffle/config/tools/http"`) {
 		t.Errorf("the error does not name the line to add: %v", err)
 	}
 }
@@ -170,8 +170,8 @@ func assignments(env, key string) int {
 // service leaves it commented, every one after it finds it already enabled.
 func TestACommentedOrActiveLineIsAccepted(t *testing.T) {
 	for _, line := range []string{
-		`	// _ "gitlab.com/gorib/waffle/config/tools/scribus/amqp"`,
-		`	_ "gitlab.com/gorib/waffle/config/tools/scribus/amqp"`,
+		`	// _ "github.com/ribora/waffle/config/tools/scribus/amqp"`,
+		`	_ "github.com/ribora/waffle/config/tools/scribus/amqp"`,
 	} {
 		p := withModules(t, "package di\n\nimport (\n"+line+"\n)\n")
 
@@ -187,12 +187,12 @@ func TestTheRefusalNamesEveryLineToAdd(t *testing.T) {
 	p := withModules(t, `package di
 
 import (
-	_ "gitlab.com/gorib/waffle/config/app"
-	_ "gitlab.com/gorib/waffle/config/tools/scribus/single"
+	_ "github.com/ribora/waffle/config/app"
+	_ "github.com/ribora/waffle/config/tools/scribus/single"
 )
 `)
 
-	err := p.RequireModules(scribusDriver, "gitlab.com/gorib/waffle/config/tools/scribus/single", MigrationModules[0])
+	err := p.RequireModules(scribusDriver, "github.com/ribora/waffle/config/tools/scribus/single", MigrationModules[0])
 
 	if err == nil {
 		t.Fatal("a project with no driver line was accepted")
@@ -230,9 +230,9 @@ func TestActiveModulesSkipsCommentedLines(t *testing.T) {
 	p := withModules(t, `package di
 
 import (
-	_ "gitlab.com/gorib/waffle/config/app"
-	// _ "gitlab.com/gorib/waffle/config/tools/scribus/batch"
-	_ "gitlab.com/gorib/waffle/config/tools/scribus/single" // the mode
+	_ "github.com/ribora/waffle/config/app"
+	// _ "github.com/ribora/waffle/config/tools/scribus/batch"
+	_ "github.com/ribora/waffle/config/tools/scribus/single" // the mode
 )
 `)
 
@@ -240,7 +240,7 @@ import (
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"gitlab.com/gorib/waffle/config/app", "gitlab.com/gorib/waffle/config/tools/scribus/single"}
+	want := []string{"github.com/ribora/waffle/config/app", "github.com/ribora/waffle/config/tools/scribus/single"}
 	if !slices.Equal(active, want) {
 		t.Errorf("active = %v, want %v", active, want)
 	}

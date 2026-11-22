@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"gitlab.com/gorib/amqp"
+	"github.com/ribora/amqp"
 )
 
 // Nothing to add around the publisher: it already carries session and trace out

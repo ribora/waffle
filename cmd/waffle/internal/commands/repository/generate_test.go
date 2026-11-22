@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command/commandtest"
+	"github.com/ribora/waffle/cmd/waffle/internal/pkg/command"
+	"github.com/ribora/waffle/cmd/waffle/internal/pkg/command/commandtest"
 )
 
 const project = "example.com/svc"
@@ -153,7 +153,7 @@ func TestTheInterfaceLandsInServiceGo(t *testing.T) {
 	}
 	// It needs context and criteria, which a domain without a repository had not
 	// imported — goimports is what supplies them.
-	for _, want := range []string{`"context"`, "gorib/criteria"} {
+	for _, want := range []string{`"context"`, "ribora/criteria"} {
 		if !strings.Contains(string(body), want) {
 			t.Errorf("service.go is missing import %s:\n%s", want, body)
 		}

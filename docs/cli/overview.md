@@ -7,7 +7,7 @@ The `waffle` CLI is a standalone scaffolding tool. It generates the boilerplate 
 ## Install
 
 ```sh
-go install gitlab.com/gorib/waffle/cmd/waffle@latest
+go install github.com/ribora/waffle/cmd/waffle@latest
 ```
 
 ## Commands
@@ -159,7 +159,7 @@ Project-level conventions live in `waffle.yaml`, next to `go.mod`. `init:service
 
 A missing `waffle.yaml`, an empty one, one holding only comments, or one missing some keys, behaves exactly like a file containing only the defaults above — they are indistinguishable to every command. An unknown key (e.g. a typo) or an invalid `mapper` value (anything other than `dto` or `goverter`) is a hard error in the commands that read the file — `make:domain:http`, `make:domain:grpc` and `make:domain:scribus`; the others never open it.
 
-The whisk generator keeps its own `whisk.yaml` beside it, on the same missing-is-defaults rule. `make:domain:http` and `make:domain:scribus` write it the first time they pull whisk in, and never overwrite one you have edited; the keys are documented in [whisk's README](https://gitlab.com/gorib/whisk#whiskyaml).
+The whisk generator keeps its own `whisk.yaml` beside it, on the same missing-is-defaults rule. `make:domain:http` and `make:domain:scribus` write it the first time they pull whisk in, and never overwrite one you have edited; the keys are documented in [whisk's README](https://github.com/ribora/whisk#whiskyaml).
 
 ## Detailed pages
 

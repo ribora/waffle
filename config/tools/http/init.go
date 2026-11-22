@@ -4,12 +4,12 @@ import (
 	"net"
 	"strconv"
 
-	"gitlab.com/gorib/di"
-	"gitlab.com/gorib/env"
-	"gitlab.com/gorib/http/server"
-	"gitlab.com/gorib/http/server/middleware"
-	"gitlab.com/gorib/waffle/app"
-	"gitlab.com/gorib/waffle/tools/http"
+	"github.com/ribora/diogen/di"
+	"github.com/ribora/env"
+	"github.com/ribora/http/server"
+	"github.com/ribora/http/server/middleware"
+	"github.com/ribora/waffle/app"
+	"github.com/ribora/waffle/tools/http"
 )
 
 func InitHttp() {

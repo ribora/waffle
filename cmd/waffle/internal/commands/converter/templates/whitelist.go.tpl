@@ -5,9 +5,9 @@
 package goverter
 
 import (
-	"gitlab.com/gorib/convert/numeric"
-	"gitlab.com/gorib/convert/proto"
-	"gitlab.com/gorib/convert/temporal"
+	"github.com/ribora/convert/numeric"
+	"github.com/ribora/convert/proto"
+	"github.com/ribora/convert/temporal"
 )
 
 // Temporal — project default is RFC3339 (no nanoseconds).

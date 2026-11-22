@@ -7,7 +7,7 @@ import (
 
 	"github.com/pborman/getopt/v2"
 
-	"gitlab.com/gorib/waffle/app"
+	"github.com/ribora/waffle/app"
 )
 
 type {{ title .Domain }}Management interface {

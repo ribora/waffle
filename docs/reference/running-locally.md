@@ -58,14 +58,14 @@ database:
 
 ```go
 import (
-    _ "gitlab.com/gorib/waffle/config/app"
-    _ "gitlab.com/gorib/waffle/config/service/hilton/otel"
-    _ "gitlab.com/gorib/waffle/config/service/pry"
-    _ "gitlab.com/gorib/waffle/config/service/sql"
-    _ "gitlab.com/gorib/waffle/config/tools/http"
-    _ "gitlab.com/gorib/waffle/config/tools/migrate"
-    _ "gitlab.com/gorib/waffle/config/tools/scribus/amqp"
-    _ "gitlab.com/gorib/waffle/config/tools/scribus/single"
+    _ "github.com/ribora/waffle/config/app"
+    _ "github.com/ribora/waffle/config/service/hilton/otel"
+    _ "github.com/ribora/waffle/config/service/pry"
+    _ "github.com/ribora/waffle/config/service/sql"
+    _ "github.com/ribora/waffle/config/tools/http"
+    _ "github.com/ribora/waffle/config/tools/migrate"
+    _ "github.com/ribora/waffle/config/tools/scribus/amqp"
+    _ "github.com/ribora/waffle/config/tools/scribus/single"
 )
 ```
 

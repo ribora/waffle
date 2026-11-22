@@ -1,8 +1,8 @@
 package http
 
 import (
-	httpServer "gitlab.com/gorib/http/server"
-	"gitlab.com/gorib/pry"
+	httpServer "github.com/ribora/http/server"
+	"github.com/ribora/pry"
 )
 
 type {{ title .Domain }}Management interface {

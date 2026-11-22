@@ -3,15 +3,36 @@ package repository
 import (
 	"bytes"
 	"fmt"
+	"go/parser"
+	"go/printer"
+	"go/token"
 	"os"
 	"path/filepath"
 
+	"golang.org/x/tools/go/ast/astutil"
 	"golang.org/x/tools/imports"
 
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
+	"github.com/ribora/waffle/cmd/waffle/internal/pkg/command"
 )
 
-const serviceFile = "service.go"
+const (
+	serviceFile    = "service.go"
+	criteriaImport = "github.com/ribora/criteria"
+)
+
+func addImport(path string, src []byte, importPath string) ([]byte, error) {
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, path, src, parser.ParseComments)
+	if err != nil {
+		return nil, err
+	}
+	astutil.AddImport(fset, file, importPath)
+	var out bytes.Buffer
+	if err := printer.Fprint(&out, fset, file); err != nil {
+		return nil, err
+	}
+	return out.Bytes(), nil
+}
 
 // appendInterface puts the entity's repository interface where a domain keeps
 // them: in service.go, above the management that takes them.
@@ -40,8 +61,14 @@ func appendInterface(p *command.Project, domain, entity string, params map[strin
 	}
 
 	merged := insertBeforeFirstFunc(body, block)
-	// The block needs context, criteria and the domain model, and which of them
-	// the file already has depends on how it was scaffolded.
+	// goimports resolves a bare package name by scanning, and two modules provide one
+	// called criteria while services are still moving off gitlab — so name this one.
+	merged, err = addImport(p.Path(target), merged, criteriaImport)
+	if err != nil {
+		return fmt.Errorf("adding %s to %s: %w", declared, target, err)
+	}
+	// The block also needs context and the domain model, and which of them the file
+	// already has depends on how it was scaffolded.
 	formatted, err := imports.Process(p.Path(target), merged, nil)
 	if err != nil {
 		return fmt.Errorf("adding %s to %s: %w", declared, target, err)

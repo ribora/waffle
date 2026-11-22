@@ -3,8 +3,8 @@ package app
 import (
 	"io"
 
-	"gitlab.com/gorib/di"
-	"gitlab.com/gorib/waffle/app"
+	"github.com/ribora/diogen/di"
+	"github.com/ribora/waffle/app"
 )
 
 func InitApp() {

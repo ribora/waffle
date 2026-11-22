@@ -33,7 +33,7 @@ domain/<x>/
             convert_goverter_gen.go
 ```
 
-The framework helpers (`gitlab.com/gorib/convert/temporal`, `numeric`, `proto`)
+The framework helpers (`github.com/ribora/convert/temporal`, `numeric`, `proto`)
 provide ~40 conversion functions used across all services. Listing them as
 `goverter:extend` in every `convert.go` (a) duplicates 30+ lines per file and
 (b) hides project-level choices (e.g. "we use RFC3339, not RFC3339Nano").
@@ -51,9 +51,9 @@ helpers your project blesses, then reference it from every domain
 package goverter
 
 import (
-    "gitlab.com/gorib/convert/numeric"
-    "gitlab.com/gorib/convert/proto"
-    "gitlab.com/gorib/convert/temporal"
+    "github.com/ribora/convert/numeric"
+    "github.com/ribora/convert/proto"
+    "github.com/ribora/convert/temporal"
 )
 
 // Temporal — project default is RFC3339 (no nanoseconds).
@@ -128,7 +128,7 @@ order and "last registered wins" when signatures overlap:
 
 ```go
 // goverter:extend mymodule/pkg/goverter:.*
-// goverter:extend gitlab.com/gorib/convert/temporal:TimeToStringNano
+// goverter:extend github.com/ribora/convert/temporal:TimeToStringNano
 type Convert interface {
     // every time.Time → string in this Convert uses Nano
 }
@@ -136,7 +136,7 @@ type Convert interface {
 
 ### Per-field
 
-`map [SOURCE] TARGET | [PACKAGE:]FUNC` is stock goverter, not a gorib addition —
+`map [SOURCE] TARGET | [PACKAGE:]FUNC` is stock goverter, not a ribora addition —
 see [the `map` reference](https://goverter.jmattheis.de/reference/map). The
 package and the function are separated by a **colon**; a dotted selector
 (`temporal.TimeToStringNano`) is not resolved and fails with
@@ -145,7 +145,7 @@ name a function declared in the converter's own package.
 
 ```go
 type Convert interface {
-    // goverter:map CreatedAt CreatedAt | gitlab.com/gorib/convert/temporal:TimeToStringNano
+    // goverter:map CreatedAt CreatedAt | github.com/ribora/convert/temporal:TimeToStringNano
     Foo(*X) *Y
 }
 ```
@@ -154,7 +154,7 @@ This overrides conversion for a single field without changing the whitelist.
 
 ## Proto enums
 
-The `goverter` the scaffolds install is `gitlab.com/gorib/convert/cmd/goverter`:
+The `goverter` the scaffolds install is `github.com/ribora/convert/cmd/goverter`:
 upstream plus one transformer on every method, so a proto enum and a string
 enum map by value — one declared method per pair. The one annotation is for a
 zero value with no domain counterpart, which `goverter:enum:unknown` answers:
@@ -169,7 +169,7 @@ type Convert interface {
 
 The proto value name is what reaches HTTP clients, so it must be the domain
 string exactly — the naming rules are in the
-[convert README](https://gitlab.com/gorib/convert#proto-enums). A service still
+[convert README](https://github.com/ribora/convert#proto-enums). A service still
 on upstream goverter has to drop it by hand before scaffolding: two tools named
 `goverter` leave `go tool goverter` refusing to run.
 

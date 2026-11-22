@@ -2,7 +2,7 @@
 
 [Docs](../README.md) · Dependency injection
 
-Waffle uses `gitlab.com/gorib/di` for dependency injection. All wiring is resolved at compile time — there is no reflection, no container lookup at runtime, and no magic. The DI container is a generated Go file that is re-created every time you run `make generate`.
+Waffle uses `github.com/ribora/diogen/di` for dependency injection. All wiring is resolved at compile time — there is no reflection, no container lookup at runtime, and no magic. The DI container is a generated Go file that is re-created every time you run `make generate`.
 
 ## API
 
@@ -94,10 +94,10 @@ The convention is to keep all module includes in a dedicated `modules.go` file (
 package di
 
 import (
-    _ "gitlab.com/gorib/waffle/config/app"
-    _ "gitlab.com/gorib/waffle/config/tools/http"
-    _ "gitlab.com/gorib/waffle/config/tools/grpc"
-    _ "gitlab.com/gorib/waffle/config/tools/migrate"
+    _ "github.com/ribora/waffle/config/app"
+    _ "github.com/ribora/waffle/config/tools/http"
+    _ "github.com/ribora/waffle/config/tools/grpc"
+    _ "github.com/ribora/waffle/config/tools/migrate"
 )
 ```
 
@@ -152,9 +152,9 @@ To use the HTTP tool, blank-import its config package from `config/di/modules.go
 package di
 
 import (
-    _ "gitlab.com/gorib/waffle/config/app"
-    _ "gitlab.com/gorib/waffle/config/tools/http"
-    _ "gitlab.com/gorib/waffle/config/tools/grpc"
+    _ "github.com/ribora/waffle/config/app"
+    _ "github.com/ribora/waffle/config/tools/http"
+    _ "github.com/ribora/waffle/config/tools/grpc"
     // ... other tool modules ...
 )
 ```
@@ -200,12 +200,12 @@ Declares which waffle modules this service is composed of. Contains **only** bla
 package di
 
 import (
-    _ "gitlab.com/gorib/waffle/config/app"
-    _ "gitlab.com/gorib/waffle/config/service/pry"
-    _ "gitlab.com/gorib/waffle/config/service/hilton/otel"
-    _ "gitlab.com/gorib/waffle/config/tools/http"
-    _ "gitlab.com/gorib/waffle/config/tools/grpc"
-    _ "gitlab.com/gorib/waffle/config/tools/migrate"
+    _ "github.com/ribora/waffle/config/app"
+    _ "github.com/ribora/waffle/config/service/pry"
+    _ "github.com/ribora/waffle/config/service/hilton/otel"
+    _ "github.com/ribora/waffle/config/tools/http"
+    _ "github.com/ribora/waffle/config/tools/grpc"
+    _ "github.com/ribora/waffle/config/tools/migrate"
 )
 ```
 
@@ -221,11 +221,11 @@ Holds the `//go:generate` directive and the `InitDi()` function with service-spe
 package di
 
 import (
-    "gitlab.com/gorib/di"
-    "gitlab.com/gorib/env"
-    "gitlab.com/gorib/pry"
-    pryzerolog "gitlab.com/gorib/pry/zerolog"
-    "gitlab.com/gorib/sql"
+    "github.com/ribora/diogen/di"
+    "github.com/ribora/env"
+    "github.com/ribora/pry"
+    pryzerolog "github.com/ribora/pry/zerolog"
+    "github.com/ribora/sql"
 )
 
 func InitDi() {
@@ -255,7 +255,7 @@ A hand-written adapter that calls the generated `InitApp()` and wires the closer
 ```go
 package diogen
 
-import "gitlab.com/gorib/waffle/app"
+import "github.com/ribora/waffle/app"
 
 func InitDi() (app.App, error) {
     di, err := InitApp()
@@ -324,7 +324,7 @@ func InitAppWith(replacements Replacements) (*Application, error)
 
 The hand-written `config/diogen/di.go` calls `InitApp()` and exposes a clean `InitDi() (app.App, error)`.
 
-A parameter of a markup function — the initialization context, configuration fetched before the container exists — becomes a parameter of both, ahead of `replacements`: `InitApp(ctx context.Context, cfg *config.Config)`. The waffle modules declare none, so `InitApp()` stays bare until a service adds one; `di.go` then passes it, and so does a test that calls `InitAppWith`. See [Parameters](https://gitlab.com/gorib/di/-/blob/main/README.md#parameters) in the diogen README.
+A parameter of a markup function — the initialization context, configuration fetched before the container exists — becomes a parameter of both, ahead of `replacements`: `InitApp(ctx context.Context, cfg *config.Config)`. The waffle modules declare none, so `InitApp()` stays bare until a service adds one; `di.go` then passes it, and so does a test that calls `InitAppWith`. See [Parameters](https://github.com/ribora/diogen/blob/main/README.md#parameters) in the diogen README.
 
 ### Automatic resource cleanup
 
@@ -340,7 +340,7 @@ func (s *Store) Close() error { return s.db.Close() }
 
 - A concrete type without a `Close` method is not closed. One whose `Close` has another signature is a generation error: say how to close it with `di.Close[I]()` on its registration.
 - A value wired as an interface that does not declare `Close` is checked when it is built, and closed if it has the method.
-- A service replaces the policy with a `di.DefaultCloser` of its own — see [Closing](https://gitlab.com/gorib/di/-/blob/main/docs/reference.md#closing) in the diogen reference.
+- A service replaces the policy with a `di.DefaultCloser` of its own — see [Closing](https://github.com/ribora/diogen/blob/main/docs/reference.md#closing) in the diogen reference.
 
 A failed `InitApp()` closes them itself, in the same order: it returns no container, so nothing else could. A `Close()` that fails on the way out is joined onto the error that stopped the build rather than replacing it.
 
@@ -377,13 +377,13 @@ The connection under a replaced client is not built: a replacement prunes what o
 
 | | |
 |---|---|
-| [`sql/sqltest`](https://gitlab.com/gorib/sql) | a real postgres: provisions, migrates and resets it |
-| [`redis/redistest`](https://gitlab.com/gorib/redis) | the same for redis |
-| [`elastic/elastictest`](https://gitlab.com/gorib/elastic) | the same for elasticsearch |
-| [`pry.Recorder()`](https://gitlab.com/gorib/pry#testing) | a logger that keeps its records, under the code production runs |
-| [`hilton.Recorder()`](https://gitlab.com/gorib/hilton#testing) | a provider that keeps spans and measurements |
+| [`sql/sqltest`](https://github.com/ribora/sql) | a real postgres: provisions, migrates and resets it |
+| [`redis/redistest`](https://github.com/ribora/redis) | the same for redis |
+| [`elastic/elastictest`](https://github.com/ribora/elastic) | the same for elasticsearch |
+| [`pry.Recorder()`](https://github.com/ribora/pry#testing) | a logger that keeps its records, under the code production runs |
+| [`hilton.Recorder()`](https://github.com/ribora/hilton#testing) | a provider that keeps spans and measurements |
 | [`scribus.Recorder()`](../tools/scribus.md#testing) | replaces the consumer; `Deliver` runs the handler the command installed |
-| [`amqp.NewPublisherRecorder()`](https://gitlab.com/gorib/amqp#testing) | replaces the publisher and keeps what was published |
+| [`amqp.NewPublisherRecorder()`](https://github.com/ribora/amqp#testing) | replaces the publisher and keeps what was published |
 | [`outbox.Recorder()`](../tools/outbox.md#testing) | replaces the `Sender`, so `Enqueue` still writes a row |
 | [`grpcClient.Dead`](../tools/grpc.md#testing) | fills the connection under a client left real |
 
@@ -400,7 +400,7 @@ Note that `InitDi()` in `config/diogen/di.go` calls `InitApp()`, which passes no
 
 Registrations that write the same container field — the two branches of an `if`/`else` over an env var, for instance — share a single entry, because which of them wins is decided at run time. Supplying it skips both branches.
 
-See the [diogen reference](https://gitlab.com/gorib/di/-/blob/main/docs/reference.md#replacements) for the full rules.
+See the [diogen reference](https://github.com/ribora/diogen/blob/main/docs/reference.md#replacements) for the full rules.
 
 ## What generation refuses, and what it would have been
 
@@ -429,7 +429,7 @@ That is the line the generator draws: output that does not compile is the
 compiler's problem, output that compiles and is wrong is the generator's.
 
 The full list of generator errors, each with the registrations that produce it,
-is in the [diogen reference](https://gitlab.com/gorib/di/-/blob/main/docs/reference.md#error-catalogue).
+is in the [diogen reference](https://github.com/ribora/diogen/blob/main/docs/reference.md#error-catalogue).
 For the other two generators on the path see
 [input parsing](../conventions/input-parsing.md#troubleshooting-generation) (whisk)
 and [make:domain](../cli/make-domain.md#troubleshooting-store) (store).

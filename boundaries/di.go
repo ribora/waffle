@@ -13,7 +13,7 @@ import (
 	"strings"
 )
 
-const diPackage = "gitlab.com/gorib/di"
+const diPackage = "github.com/ribora/diogen/di"
 
 func wires(fset *token.FileSet, root, module string) ([]Crossing, error) {
 	found, err := collect(fset, root, module)

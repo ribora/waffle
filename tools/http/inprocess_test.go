@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.com/gorib/http/server"
+	"github.com/ribora/http/server"
 
-	"gitlab.com/gorib/waffle/tools/tap"
+	"github.com/ribora/waffle/tools/tap"
 )
 
 // Answers with a value of its own: probeReq.Parse is a stub here, so anything

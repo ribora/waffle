@@ -3,7 +3,7 @@ package grpc
 import (
 	"google.golang.org/grpc/codes"
 
-	"gitlab.com/gorib/grpc/server"
+	"github.com/ribora/grpc/server"
 )
 
 func NewErrorMap(mappers []server.ErrorMapper) server.ErrorMapper {

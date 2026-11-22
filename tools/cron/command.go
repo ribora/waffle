@@ -11,10 +11,10 @@ import (
 	"github.com/go-co-op/gocron/v2"
 	"github.com/pborman/getopt/v2"
 
-	"gitlab.com/gorib/failure"
-	"gitlab.com/gorib/pry"
-	"gitlab.com/gorib/session"
-	"gitlab.com/gorib/waffle/app"
+	"github.com/ribora/failure"
+	"github.com/ribora/pry"
+	"github.com/ribora/session"
+	"github.com/ribora/waffle/app"
 )
 
 type CronCommand interface {

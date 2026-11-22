@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-const envPath = "gitlab.com/gorib/env"
+const envPath = "github.com/ribora/env"
 
 // Every reader takes the key first, so the list is the package's, not a selection.
 var readers = map[string]bool{
@@ -19,7 +19,7 @@ var readers = map[string]bool{
 	"MustValue": true, "MustArray": true, "MustJson": true,
 }
 
-// EnvRead is one call of a reader of gitlab.com/gorib/env whose key is a literal.
+// EnvRead is one call of a reader of github.com/ribora/env whose key is a literal.
 type EnvRead struct {
 	Reader  string // Value, NeedArray, MustJson…
 	Key     string

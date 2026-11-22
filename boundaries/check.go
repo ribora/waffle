@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"gitlab.com/gorib/waffle/internal/gomod"
+	"github.com/ribora/waffle/internal/gomod"
 )
 
 func Check(opts ...Option) error {

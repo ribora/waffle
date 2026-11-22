@@ -3,7 +3,7 @@ package diogen_test
 import (
 	"testing"
 
-	"gitlab.com/gorib/waffle/boundaries"
+	"github.com/ribora/waffle/boundaries"
 )
 
 // What this refuses is a design question, not a test to delete.

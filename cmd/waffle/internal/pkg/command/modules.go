@@ -15,8 +15,8 @@ import (
 const ModulesFile = "config/di/modules.go"
 
 var MigrationModules = []string{
-	"gitlab.com/gorib/waffle/config/service/sql",
-	"gitlab.com/gorib/waffle/config/tools/migrate",
+	"github.com/ribora/waffle/config/service/sql",
+	"github.com/ribora/waffle/config/tools/migrate",
 }
 
 // Called before the first write with every module the command will enable:
@@ -45,7 +45,7 @@ func (p *Project) RequireModules(modules ...string) error {
 // adapter needs a sql.Db, so a command that writes one and stops here leaves a
 // project that does not build.
 func (p *Project) EnableStorage() error {
-	if err := p.EnsureTool("gitlab.com/gorib/sql/cmd/store"); err != nil {
+	if err := p.EnsureTool("github.com/ribora/sql/cmd/store"); err != nil {
 		return err
 	}
 	return p.EnableMigrations()
@@ -137,7 +137,7 @@ func ModuleEnv(name string) []string {
 // stops at startup naming one of them. Only missing keys are added — an existing
 // value is never touched, so this is safe to run again.
 func (p *Project) appendEnv(modulePath string) error {
-	name := strings.TrimPrefix(modulePath, "gitlab.com/gorib/waffle/")
+	name := strings.TrimPrefix(modulePath, "github.com/ribora/waffle/")
 	fragment, err := envFragments.ReadFile(filepath.Join("env", name+".env"))
 	if err != nil {
 		return nil // the module reads no variables

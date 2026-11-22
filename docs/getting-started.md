@@ -9,12 +9,12 @@ to be running — no database, no broker, no docker.
 
 - Go 1.27 or later
 - `make` and `curl`
-- Access to the gorib module proxy / repository
+- Access to the ribora module proxy / repository
 
 ## Install the CLI
 
 ```sh
-go install gitlab.com/gorib/waffle/cmd/waffle@latest
+go install github.com/ribora/waffle/cmd/waffle@latest
 ```
 
 Run it with no arguments to see what it can do:
@@ -68,8 +68,8 @@ $ waffle init:service
   + AGENTS.md
   + CLAUDE.md → AGENTS.md
   + .cursorrules → AGENTS.md
-  + added tool gitlab.com/gorib/di/cmd/diogen
-  + added tool gitlab.com/gorib/waffle/cmd/waffle
+  + added tool github.com/ribora/diogen/cmd/diogen
+  + added tool github.com/ribora/waffle/cmd/waffle
 ```
 
 The command then runs `make .tidy generate`, which writes
@@ -157,15 +157,15 @@ waffle make:domain:http product
   + domain/product/cmd/http/main.go
   + domain/product/cmd/http/convert/convert.go
   + pkg/goverter/convert.go
-  + added tool gitlab.com/gorib/convert/cmd/goverter
-  + enabled module gitlab.com/gorib/waffle/config/tools/http
+  + added tool github.com/ribora/convert/cmd/goverter
+  + enabled module github.com/ribora/waffle/config/tools/http
   + added to .env: DAEMON_HOST, DAEMON_PORT, HEALTH_PATH
-  + added tool gitlab.com/gorib/whisk/cmd/whisk
+  + added tool github.com/ribora/whisk/cmd/whisk
 whisk: + /path/to/catalog/whisk.yaml
 ```
 
 Four of those lines are not files. The command uncommented
-`_ "gitlab.com/gorib/waffle/config/tools/http"` in `config/di/modules.go`,
+`_ "github.com/ribora/waffle/config/tools/http"` in `config/di/modules.go`,
 appended that module's variables to `.env`, and pulled in the generators the
 layer uses. `init:service` writes no `DAEMON_HOST` of its own: variables arrive
 with the module that reads them, and the module arrives with the command that
@@ -261,7 +261,7 @@ package http
 import (
 	"strconv"
 
-	httpServer "gitlab.com/gorib/http/server"
+	httpServer "github.com/ribora/http/server"
 )
 
 type Routes interface {
@@ -311,8 +311,8 @@ package http
 import (
 	"context"
 
-	httpServer "gitlab.com/gorib/http/server"
-	"gitlab.com/gorib/pry"
+	httpServer "github.com/ribora/http/server"
+	"github.com/ribora/pry"
 
 	"catalog/domain/product/model"
 )
@@ -427,8 +427,8 @@ and [the handler pattern](tools/http-handler.md).
 When you bump waffle to a newer version, refresh the AI-agent instructions:
 
 ```sh
-go get gitlab.com/gorib/waffle@latest
-go get -tool gitlab.com/gorib/waffle/cmd/waffle@latest
+go get github.com/ribora/waffle@latest
+go get -tool github.com/ribora/waffle/cmd/waffle@latest
 waffle agents                  # refresh waffle.md with new conventions
 go mod tidy
 make generate

@@ -11,11 +11,11 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"gitlab.com/gorib/sql"
-	"gitlab.com/gorib/sql/sqltest"
-	"gitlab.com/gorib/waffle/tools/migrate"
-	"gitlab.com/gorib/waffle/tools/outbox"
-	"gitlab.com/gorib/waffle/tools/outbox/outboxtest"
+	"github.com/ribora/sql"
+	"github.com/ribora/sql/sqltest"
+	"github.com/ribora/waffle/tools/migrate"
+	"github.com/ribora/waffle/tools/outbox"
+	"github.com/ribora/waffle/tools/outbox/outboxtest"
 )
 
 // Embedded from a test file on purpose: the schema belongs to the service, which

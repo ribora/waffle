@@ -1,4 +1,4 @@
-module gitlab.com/gorib/waffle
+module github.com/ribora/waffle
 
 go 1.27.0
 
@@ -9,20 +9,20 @@ require (
 	github.com/go-sql-driver/mysql v1.10.1
 	github.com/pborman/getopt/v2 v2.2.0
 	github.com/pressly/goose/v3 v3.29.0
-	gitlab.com/gorib/amqp v1.9.4
-	gitlab.com/gorib/criteria v1.1.1
-	gitlab.com/gorib/di v1.14.5
-	gitlab.com/gorib/elastic v1.6.1
-	gitlab.com/gorib/env v1.0.3
-	gitlab.com/gorib/failure v1.4.1
-	gitlab.com/gorib/grpc v1.7.2
-	gitlab.com/gorib/hilton v1.2.5
-	gitlab.com/gorib/http v1.15.1
-	gitlab.com/gorib/pry v1.4.3
-	gitlab.com/gorib/redis v1.4.1
-	gitlab.com/gorib/session v1.2.1
-	gitlab.com/gorib/sql v1.16.1
-	gitlab.com/gorib/whisk v1.4.1
+	github.com/ribora/amqp v1.10.0
+	github.com/ribora/criteria v1.2.0
+	github.com/ribora/diogen v1.15.0
+	github.com/ribora/elastic v1.7.0
+	github.com/ribora/env v1.1.0
+	github.com/ribora/failure v1.5.0
+	github.com/ribora/grpc v1.8.0
+	github.com/ribora/hilton v1.3.0
+	github.com/ribora/http v1.16.0
+	github.com/ribora/pry v1.5.0
+	github.com/ribora/redis v1.5.0
+	github.com/ribora/session v1.3.0
+	github.com/ribora/sql v1.17.0
+	github.com/ribora/whisk v1.5.0
 	golang.org/x/mod v0.42.0
 	golang.org/x/tools v0.52.0
 	google.golang.org/grpc v1.84.0
@@ -91,7 +91,7 @@ require (
 
 tool (
 	github.com/jmattheis/goverter/cmd/goverter
-	gitlab.com/gorib/di/cmd/diogen
-	gitlab.com/gorib/sql/cmd/store
-	gitlab.com/gorib/whisk/cmd/whisk
+	github.com/ribora/diogen/cmd/diogen
+	github.com/ribora/sql/cmd/store
+	github.com/ribora/whisk/cmd/whisk
 )

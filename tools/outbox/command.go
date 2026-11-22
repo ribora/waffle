@@ -8,8 +8,8 @@ import (
 
 	"github.com/pborman/getopt/v2"
 
-	"gitlab.com/gorib/failure"
-	"gitlab.com/gorib/waffle/app"
+	"github.com/ribora/failure"
+	"github.com/ribora/waffle/app"
 )
 
 type OutboxCommand interface {

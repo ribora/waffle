@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.com/gorib/hilton"
-	"gitlab.com/gorib/pry"
+	"github.com/ribora/hilton"
+	"github.com/ribora/pry"
 )
 
 const parentTrace = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"

@@ -3,7 +3,7 @@ package cmdcommand
 import (
 	"path/filepath"
 
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
+	"github.com/ribora/waffle/cmd/waffle/internal/pkg/command"
 )
 
 // Generate writes the command's package and its DI registration. Separate from

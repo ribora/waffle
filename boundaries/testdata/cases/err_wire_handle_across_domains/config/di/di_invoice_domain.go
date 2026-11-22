@@ -5,7 +5,7 @@ package di
 import (
 	invoiceService "example.test/domain/invoice/service"
 
-	"gitlab.com/gorib/di"
+	"github.com/ribora/diogen/di"
 )
 
 var invoiceManagementInstance any

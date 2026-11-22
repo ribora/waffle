@@ -2,7 +2,7 @@
 
 [Docs](../README.md) · Reference
 
-All environment variables are read using `gitlab.com/gorib/env`, which loads a `.env` file from the working directory at startup. A variable already set in the process environment wins over `.env`.
+All environment variables are read using `github.com/ribora/env`, which loads a `.env` file from the working directory at startup. A variable already set in the process environment wins over `.env`.
 
 A variable is only read if the module that reads it is enabled — every one below comes from a blank import in `config/di/modules.go`. `NeedValue` panics at startup when the variable is missing, so a misconfigured service fails immediately rather than at the first request; `Value` takes a fallback.
 
@@ -19,7 +19,7 @@ A variable is only read if the module that reads it is enabled — every one bel
 
 `postgres`, `pgx` and `pgsql` all select the native pgx pool — the scaffolded
 `.env` says `pgx`. `mysql`, `sqlite` and `sqlite3` go through `database/sql`, over
-drivers `gitlab.com/gorib/sql` links itself. Anything else fails at startup with
+drivers `github.com/ribora/sql` links itself. Anything else fails at startup with
 `unsupported driver`.
 
 ### `config/service/redis`
@@ -186,4 +186,4 @@ Two rules follow, and they are the reason there is no central config object:
 - **A variable arrives with the thing that reads it**, so it goes into `.env`
   in the same change — the convention every scaffolding command follows.
 
-See the [env package documentation](https://gitlab.com/gorib/env) for the full API reference.
+See the [env package documentation](https://github.com/ribora/env) for the full API reference.

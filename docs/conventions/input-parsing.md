@@ -2,7 +2,7 @@
 
 [Docs](../README.md) · Conventions
 
-Every entry point reads structured input from somewhere — an HTTP request, an AMQP delivery, a file on disk. `gitlab.com/gorib/whisk` generates the parsing and validation code for all of them from struct tags: `Parse(scan.Source) error` to populate the struct, `Validate() error` to check it. No runtime reflection, and no transport baked into the DTO.
+Every entry point reads structured input from somewhere — an HTTP request, an AMQP delivery, a file on disk. `github.com/ribora/whisk` generates the parsing and validation code for all of them from struct tags: `Parse(scan.Source) error` to populate the struct, `Validate() error` to check it. No runtime reflection, and no transport baked into the DTO.
 
 ## The Source contract
 
@@ -19,8 +19,8 @@ A **scope** is an opaque string. whisk never hardcodes one — it emits `src.Loo
 
 | Adapter | Scopes | of those, `,repeated` |
 |---|---|---|
-| `gorib/http/server` | `path`, `query`, `header`, `cookie`, `form`, `request=method` | `query`, `header`, `form` |
-| `gorib/amqp` | `header`, `routing-key`, `exchange` | all three, but each holds one value, so a slice gets at most one element |
+| `ribora/http/server` | `path`, `query`, `header`, `cookie`, `form`, `request=method` | `query`, `header`, `form` |
+| `ribora/amqp` | `header`, `routing-key`, `exchange` | all three, but each holds one value, so a slice gets at most one element |
 | `scan.FromBytes` | none — body only, for files, fixtures, anything already in memory | — |
 
 The same DTO therefore works behind any of them: a struct whose fields all come from the body needs no scope at all, and one that reads `header` reads it from an HTTP request and an AMQP delivery alike.
@@ -215,7 +215,7 @@ mymodule/domain/order/cmd/http: order.go:14:9: undefined: model.Currency
 | `unique=G: anonymous struct in slice "F" has no field "G"` | typo in the field name | match the element's field |
 | `wrong comparison for field F` | an ordering comparison, or a value other than `true`/`false`, on a bool field | `validate:"equal=true"` |
 | `eq doesn't make sense for time field "F", an instant is bounded with gte/lte rather than matched` | equality against a `time.Time` | bound it with `gte`/`lte` |
-| `T.parse must take gitlab.com/gorib/whisk/scan.Source` / `T.validate must return error` | hook signature | `func (s *T) parse(src scan.Source) error`, `func (s T) validate() error` |
+| `T.parse must take github.com/ribora/whisk/scan.Source` / `T.validate must return error` | hook signature | `func (s *T) parse(src scan.Source) error`, `func (s T) validate() error` |
 | `unknown format "yaml": no built-in preset, and no func UnmarshalYaml in pkg/scan (…)` | `-format=yaml` with nothing behind it | add the function, or drop the flag |
 
 ### Silent outcomes
@@ -248,4 +248,4 @@ it can shadow the outer one. Give the field a name.
 |---|---|
 | HTTP handlers and request DTOs | [tools/http-handler.md](../tools/http-handler.md) |
 | Queue consumers | [tools/scribus.md](../tools/scribus.md) |
-| The full tag reference — every `scan` and `validate` rule, `dive`, `embed`, error shapes | the `README.md` of `gitlab.com/gorib/whisk` |
+| The full tag reference — every `scan` and `validate` rule, `dive`, `embed`, error shapes | the `README.md` of `github.com/ribora/whisk` |

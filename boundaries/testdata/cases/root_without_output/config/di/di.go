@@ -5,7 +5,7 @@ package di
 import (
 	rentService "example.test/domain/rent/service"
 
-	"gitlab.com/gorib/di"
+	"github.com/ribora/diogen/di"
 )
 
 // No -output, so diogen falls back to di_gen.go at the module root.

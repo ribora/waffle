@@ -13,7 +13,7 @@ Add a single blank import to `config/di/modules.go`:
 package di
 
 import (
-    _ "gitlab.com/gorib/waffle/config/tools/migrate"
+    _ "github.com/ribora/waffle/config/tools/migrate"
     // ... other modules ...
 )
 ```
@@ -22,9 +22,9 @@ This pulls in the registrations from [`config/tools/migrate/init.go`](../../conf
 
 ```go
 import (
-    "gitlab.com/gorib/di"
-    "gitlab.com/gorib/waffle/app"
-    "gitlab.com/gorib/waffle/tools/migrate"
+    "github.com/ribora/diogen/di"
+    "github.com/ribora/waffle/app"
+    "github.com/ribora/waffle/tools/migrate"
 )
 
 // Inside InitDi():

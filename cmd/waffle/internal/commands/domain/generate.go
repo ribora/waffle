@@ -3,9 +3,9 @@ package domain
 import (
 	"path/filepath"
 
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/migrate"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/repository"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
+	"github.com/ribora/waffle/cmd/waffle/internal/commands/migrate"
+	"github.com/ribora/waffle/cmd/waffle/internal/commands/repository"
+	"github.com/ribora/waffle/cmd/waffle/internal/pkg/command"
 )
 
 // Generate writes every file a domain and its own entity get. Separate from Run

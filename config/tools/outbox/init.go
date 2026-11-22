@@ -3,17 +3,17 @@ package outbox
 import (
 	"time"
 
-	"gitlab.com/gorib/di"
-	"gitlab.com/gorib/env"
-	"gitlab.com/gorib/waffle/app"
-	"gitlab.com/gorib/waffle/tools/outbox"
-	"gitlab.com/gorib/waffle/tools/outbox/store"
+	"github.com/ribora/diogen/di"
+	"github.com/ribora/env"
+	"github.com/ribora/waffle/app"
+	"github.com/ribora/waffle/tools/outbox"
+	"github.com/ribora/waffle/tools/outbox/store"
 
 	// Not decoration: diogen follows a blank import for the registrations it brings.
 	// The scaffolder does not follow it for .env, so each fragment repeats what it
 	// needs.
-	_ "gitlab.com/gorib/waffle/config/service/sql"
-	_ "gitlab.com/gorib/waffle/config/tools/migrate"
+	_ "github.com/ribora/waffle/config/service/sql"
+	_ "github.com/ribora/waffle/config/tools/migrate"
 )
 
 // Nothing here names a broker. A driver module supplies the outbox.Sender, and

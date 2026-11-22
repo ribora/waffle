@@ -4,12 +4,12 @@ import (
 	"net"
 	"strconv"
 
-	"gitlab.com/gorib/di"
-	"gitlab.com/gorib/env"
-	"gitlab.com/gorib/grpc/server"
-	"gitlab.com/gorib/grpc/server/interceptor"
-	"gitlab.com/gorib/waffle/app"
-	"gitlab.com/gorib/waffle/tools/grpc"
+	"github.com/ribora/diogen/di"
+	"github.com/ribora/env"
+	"github.com/ribora/grpc/server"
+	"github.com/ribora/grpc/server/interceptor"
+	"github.com/ribora/waffle/app"
+	"github.com/ribora/waffle/tools/grpc"
 )
 
 func InitGrpc() {

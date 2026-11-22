@@ -7,9 +7,9 @@ import (
 	"unicode/utf8"
 	"uuid"
 
-	"gitlab.com/gorib/criteria"
-	"gitlab.com/gorib/sql"
-	"gitlab.com/gorib/waffle/tools/outbox"
+	"github.com/ribora/criteria"
+	"github.com/ribora/sql"
+	"github.com/ribora/waffle/tools/outbox"
 )
 
 // A name, not a package-level sql.Table the way a generated repository holds one:

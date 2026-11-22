@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"gitlab.com/gorib/http/server"
+	"github.com/ribora/http/server"
 )
 
 var ErrNoRouters = errors.New("http: no server.Router is registered; register one with di.Define(NewRouter, di.Tag(http.RouterTag))")

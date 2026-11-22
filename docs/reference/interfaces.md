@@ -3,7 +3,7 @@
 [Docs](../README.md) · Reference
 
 The interfaces a service implements or a tool hands it — waffle's own, plus the
-gorib ones a transport and the logger bring. The import path is in a comment
+ribora ones a transport and the logger bring. The import path is in a comment
 wherever it is not waffle's. A client a service wires as a dependency, such as
 `hilton.Provider`, `sql.Db`, `redis.Db`, `elastic.Client` or `amqp.Publisher`, is
 documented with its package.
@@ -100,7 +100,7 @@ Marker interface for the HTTP server command. Registered under `app.CommandTag`.
 ### Router
 
 ```go
-// gitlab.com/gorib/http/server
+// github.com/ribora/http/server
 type Router interface {
     Setup(mux Mux)
 }
@@ -111,7 +111,7 @@ The one interface a service implements for every domain that serves HTTP, scaffo
 ### Global
 
 ```go
-// gitlab.com/gorib/waffle/tools/http
+// github.com/ribora/waffle/tools/http
 type Global []server.Middleware
 ```
 
@@ -120,7 +120,7 @@ The chain that runs around every request, put on the mux once before any router 
 ### Mux
 
 ```go
-// gitlab.com/gorib/http/server
+// github.com/ribora/http/server
 type Mux interface {
     http.Handler
 
@@ -143,7 +143,7 @@ What `Setup` receives. chi-backed, so patterns are `{id}`, `{id:[0-9]+}` and a t
 ### Handler and Layer
 
 ```go
-// gitlab.com/gorib/http/server
+// github.com/ribora/http/server
 type Handler func(src Source) (Renderer, error)
 type Layer   = func(next Handler) Handler
 ```
@@ -157,7 +157,7 @@ Not interfaces, but the two shapes everything else composes around. A handler re
 ### Source
 
 ```go
-// gitlab.com/gorib/http/server
+// github.com/ribora/http/server
 type Source interface {
     scan.Source // Lookup, LookupAll, Body, Context
 
@@ -182,7 +182,7 @@ The request, as an interface. You are handed one rather than implementing it. Th
 ### Renderer
 
 ```go
-// gitlab.com/gorib/http/server
+// github.com/ribora/http/server
 type Renderer interface {
     Render(w http.ResponseWriter) error
     WriteBody(w io.Writer) error
@@ -244,7 +244,7 @@ The listening half of the command, as the command sees it. `grpcCommand.Run` bui
 ### Interceptor
 
 ```go
-// gitlab.com/gorib/grpc/server
+// github.com/ribora/grpc/server
 type Interceptor interface {
     Run() grpc.UnaryServerInterceptor
 }
@@ -255,7 +255,7 @@ A unary gRPC interceptor. Chained in the order `server.Interceptors` lists them,
 ### StreamInterceptor
 
 ```go
-// gitlab.com/gorib/grpc/server
+// github.com/ribora/grpc/server
 type StreamInterceptor interface {
     Run() grpc.StreamServerInterceptor
 }
@@ -266,7 +266,7 @@ A stream gRPC interceptor. Listed under `server.StreamInterceptors`, the same wa
 ### ErrorMapper
 
 ```go
-// gitlab.com/gorib/grpc/server
+// github.com/ribora/grpc/server
 type ErrorMapper interface {
     Errors() map[error]codes.Code
 }
@@ -386,7 +386,7 @@ type Consumer interface {
 }
 ```
 
-The consumer the driver supplies — `gitlab.com/gorib/amqp` for RabbitMQ. The command's constructor calls `Bind` once per subject a handler declares and installs the handler; `scribusCommand.Run` applies the flags and starts it. Paging, flushing and reconnection are here because every broker has them; connecting is behind `Transport` because none of them spell it the same way. In production you do not implement this — it comes from the registrations in `config/tools/scribus/amqp/init.go` (see [Scribus Tool](../tools/scribus.md) for setup). A component test replaces it with `scribus.Recorder()`, which keeps that wiring and delivers through the handler the command installed (see [Testing](../tools/scribus.md#testing)).
+The consumer the driver supplies — `github.com/ribora/amqp` for RabbitMQ. The command's constructor calls `Bind` once per subject a handler declares and installs the handler; `scribusCommand.Run` applies the flags and starts it. Paging, flushing and reconnection are here because every broker has them; connecting is behind `Transport` because none of them spell it the same way. In production you do not implement this — it comes from the registrations in `config/tools/scribus/amqp/init.go` (see [Scribus Tool](../tools/scribus.md) for setup). A component test replaces it with `scribus.Recorder()`, which keeps that wiring and delivers through the handler the command installed (see [Testing](../tools/scribus.md#testing)).
 
 ---
 
@@ -411,7 +411,7 @@ type Sender interface {
 }
 ```
 
-The broker half, from a driver — `tools/outbox/rabbit` over `gitlab.com/gorib/amqp`. `Send` must return an error when the broker has not confirmed: the relay marks the row sent on its word, so a transport that reports success for a message the broker never took loses events silently. `Encode` is here rather than on the publisher because the payload is stored in whatever shape the driver will send, and encoded once. A component test replaces it with `outbox.Recorder()`.
+The broker half, from a driver — `tools/outbox/rabbit` over `github.com/ribora/amqp`. `Send` must return an error when the broker has not confirmed: the relay marks the row sent on its word, so a transport that reports success for a message the broker never took loses events silently. `Encode` is here rather than on the publisher because the payload is stored in whatever shape the driver will send, and encoded once. A component test replaces it with `outbox.Recorder()`.
 
 ### Store
 
@@ -427,7 +427,7 @@ type Store interface {
 }
 ```
 
-The rows. `store.NewStore` over `gitlab.com/gorib/sql` is the one that ships. The requirement the signatures cannot express is that `Add` joins the transaction the context already carries — that is the whole mechanism, so a replacement runs [`outboxtest.Suite`](../../tools/outbox/outboxtest), whose first case catches an implementation that does not. `Claim` returns `nil, nil` when there is nothing to claim.
+The rows. `store.NewStore` over `github.com/ribora/sql` is the one that ships. The requirement the signatures cannot express is that `Add` joins the transaction the context already carries — that is the whole mechanism, so a replacement runs [`outboxtest.Suite`](../../tools/outbox/outboxtest), whose first case catches an implementation that does not. `Claim` returns `nil, nil` when there is nothing to claim.
 
 ### Publisher
 
@@ -458,7 +458,7 @@ Drains the outbox. Replace it to change how draining is paced; `outbox.NewRelay`
 ### Logger
 
 ```go
-// gitlab.com/gorib/pry
+// github.com/ribora/pry
 type Logger interface {
     Trace(message any, opts ...Option)
     Debug(message any, opts ...Option)
@@ -473,7 +473,7 @@ What the framework hands every component, and what a handler or service takes as
 ### Driver
 
 ```go
-// gitlab.com/gorib/pry
+// github.com/ribora/pry
 type Driver interface {
     Log(Record)
 }
@@ -486,7 +486,7 @@ Renders a record. `pry/zerolog` is the default and `pry/slog` the alternative; o
 ### Sink
 
 ```go
-// gitlab.com/gorib/pry
+// github.com/ribora/pry
 type Sink interface {
     Write(Record)
     Close() error
@@ -500,7 +500,7 @@ A side channel receiving every record the logger emits, off the calling goroutin
 Not an interface, but the value both of the above receive:
 
 ```go
-// gitlab.com/gorib/pry
+// github.com/ribora/pry
 type Record struct {
     Level   Level
     Message string

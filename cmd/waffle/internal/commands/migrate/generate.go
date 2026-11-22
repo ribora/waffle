@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/plural"
+	"github.com/ribora/waffle/cmd/waffle/internal/pkg/command"
+	"github.com/ribora/waffle/cmd/waffle/internal/pkg/plural"
 )
 
 // Generate writes the migration runner (cmd/migrate/main.go) and the DI

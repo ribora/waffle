@@ -2,7 +2,7 @@
 
 [Docs](../README.md) · Tools
 
-This page describes how to implement HTTP handlers in a waffle service using `gitlab.com/gorib/http/server`.
+This page describes how to implement HTTP handlers in a waffle service using `github.com/ribora/http/server`.
 
 ## Handler signature
 
@@ -188,8 +188,8 @@ import (
     "context"
     "strconv"
 
-    "gitlab.com/gorib/http/server"
-    "gitlab.com/gorib/whisk/scan"
+    "github.com/ribora/http/server"
+    "github.com/ribora/whisk/scan"
 
     "mymodule/domain/user/model"
 )

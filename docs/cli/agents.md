@@ -25,7 +25,7 @@ only when a waffle upgrade or a new domain actually changes something.
 ## What is in the file
 
 Eleven numbered rules, one per area of the framework: the CLI as the first resort
-(#1), `make generate && make audit && make` after every edit (#2), the boundary
+(#1), `make && make audit` after every edit (#2), the boundary
 rule (#12), naming (#3), diogen (#4), whisk (#5), conversions (#6), errors (#7),
 observability (#8), the order of steps per task (#9) and the anti-patterns (#10).
 Each is the short form of a page under `docs/`, written for someone acting on it
@@ -43,7 +43,7 @@ says so in its own `AGENTS.md`, beside the line that brings `waffle.md` in.
 | Situation | Action |
 |---|---|
 | `waffle init:service` runs it automatically | nothing to do — file is fresh |
-| **You bumped waffle to a new version** (`go get gitlab.com/gorib/waffle@latest`) | **run `./waffle agents`** — conventions may have changed |
+| **You bumped waffle to a new version** (`go get github.com/ribora/waffle@latest`) | **run `./waffle agents`** — conventions may have changed |
 | You added a new domain / waffle module / env var and want waffle.md to reflect it | run `make generate`, which rewrites it; `make:domain` does too |
 | You changed business logic only | not required (auto-detected context unchanged) |
 
@@ -58,7 +58,7 @@ lints. Each waffle release ships a fresh `waffle.md` content. A stale one teache
 your AI agents outdated patterns — they will write code that compiles but breaks
 `make audit`, or miss new commands that would have saved time.
 
-After every `go get gitlab.com/gorib/waffle@latest`, run `./waffle agents` and
+After every `go get github.com/ribora/waffle@latest`, run `./waffle agents` and
 commit the diff. It's part of the upgrade workflow, not a separate task. `./waffle`
 is the version in `go.mod`; a `waffle` on `PATH` writes its own version's
 conventions.
@@ -70,7 +70,7 @@ conventions.
 | Module path | `go.mod` |
 | Domains | directories under `domain/` |
 | Waffle modules | blank imports in `config/di/modules.go` |
-| Env vars | every `gitlab.com/gorib/env` reader called with a literal key across `config/`, `domain/`, `cmd/`, plus the variables waffle appends to `.env` for each active module |
+| Env vars | every `github.com/ribora/env` reader called with a literal key across `config/`, `domain/`, `cmd/`, plus the variables waffle appends to `.env` for each active module |
 
 Everything else (conventions, cookbooks, anti-patterns) is identical across
 services — comes from the waffle template.

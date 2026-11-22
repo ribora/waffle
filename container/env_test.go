@@ -35,7 +35,7 @@ func keys(reads []EnvRead) []string {
 func TestEveryReaderIsFoundInBothGenericShapes(t *testing.T) {
 	root := tree(t, map[string]string{"config/init.go": `package config
 
-import "gitlab.com/gorib/env"
+import "github.com/ribora/env"
 
 func Init() {
 	_ = env.Value("PLAIN", "")
@@ -73,8 +73,8 @@ func TestTheImportIsFollowedUnderEveryAlias(t *testing.T) {
 	root := tree(t, map[string]string{"config/init.go": `package config
 
 import (
-	environment "gitlab.com/gorib/env"
-	settings "gitlab.com/gorib/env"
+	environment "github.com/ribora/env"
+	settings "github.com/ribora/env"
 )
 
 type fake struct{}
@@ -97,7 +97,7 @@ func Init() {
 
 func TestOnlyTheServicesOwnSourceUnderTheRootIsRead(t *testing.T) {
 	read := func(key string) string {
-		return "package p\n\nimport \"gitlab.com/gorib/env\"\n\nvar _ = env.NeedValue[string](\"" + key + "\")\n"
+		return "package p\n\nimport \"github.com/ribora/env\"\n\nvar _ = env.NeedValue[string](\"" + key + "\")\n"
 	}
 	root := tree(t, map[string]string{
 		"cmd/main.go":               read("CMD"),
@@ -116,7 +116,7 @@ func TestOnlyTheServicesOwnSourceUnderTheRootIsRead(t *testing.T) {
 }
 
 func TestAReadCarriesItsCallSiteAndItsFilesImports(t *testing.T) {
-	root := tree(t, map[string]string{"domain/shop/shop.go": "package shop\n\nimport \"gitlab.com/gorib/env\"\n\n" +
+	root := tree(t, map[string]string{"domain/shop/shop.go": "package shop\n\nimport \"github.com/ribora/env\"\n\n" +
 		"var _ = env.NeedValue[string](\"SHOP_KEY\")\n"})
 
 	reads := EnvReads(root)
@@ -130,7 +130,7 @@ func TestAReadCarriesItsCallSiteAndItsFilesImports(t *testing.T) {
 	if got := reads[0].Pos.Line; got != 5 {
 		t.Errorf("line %d, want 5", got)
 	}
-	if got := reads[0].Imports["env"]; got != "gitlab.com/gorib/env" {
+	if got := reads[0].Imports["env"]; got != "github.com/ribora/env" {
 		t.Errorf("env imports %q", got)
 	}
 }

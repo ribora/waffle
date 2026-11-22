@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"testing"
 
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/commands/repository"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command/commandtest"
+	"github.com/ribora/waffle/cmd/waffle/internal/commands/repository"
+	"github.com/ribora/waffle/cmd/waffle/internal/pkg/command/commandtest"
 )
 
 // Parsed rather than built: a build installs store and diogen, which the short suite cannot.

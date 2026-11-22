@@ -6,10 +6,10 @@ import (
 
 	"github.com/samber/lo"
 
-	"gitlab.com/gorib/criteria"
-	"gitlab.com/gorib/failure"
-	"gitlab.com/gorib/pry"
-	"gitlab.com/gorib/sql"
+	"github.com/ribora/criteria"
+	"github.com/ribora/failure"
+	"github.com/ribora/pry"
+	"github.com/ribora/sql"
 
 	"{{ .Project }}/domain/{{ .Domain }}/model"
 )

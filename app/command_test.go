@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"gitlab.com/gorib/hilton"
+	"github.com/ribora/hilton"
 )
 
 func TestArgsOnAContextThatHasNone(t *testing.T) {

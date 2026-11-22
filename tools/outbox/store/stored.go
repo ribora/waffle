@@ -5,7 +5,7 @@ package store
 import (
 	"time"
 
-	"gitlab.com/gorib/waffle/tools/outbox"
+	"github.com/ribora/waffle/tools/outbox"
 )
 
 // Id is not readonly: it is a UUIDv7 generated before the insert and goes in with

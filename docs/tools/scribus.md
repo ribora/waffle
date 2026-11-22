@@ -4,7 +4,7 @@
 
 The scribus tool turns a message consumer into a waffle `Command`. It supports two modes: **single mode**, where each subject is handled by a dedicated `Handler`, and **batch mode**, where a single `BatchHandler` processes all messages together.
 
-The tool itself names no broker: a handler receives a `whisk/scan.Source`, and the routing semantics come from a driver. The one that ships is `config/tools/scribus/amqp`, over `gitlab.com/gorib/amqp`.
+The tool itself names no broker: a handler receives a `whisk/scan.Source`, and the routing semantics come from a driver. The one that ships is `config/tools/scribus/amqp`, over `github.com/ribora/amqp`.
 
 ## Setup
 
@@ -24,8 +24,8 @@ A service includes **one driver** and **one mode**. The driver brings the consum
 package di
 
 import (
-    _ "gitlab.com/gorib/waffle/config/tools/scribus/amqp"
-    _ "gitlab.com/gorib/waffle/config/tools/scribus/single"
+    _ "github.com/ribora/waffle/config/tools/scribus/amqp"
+    _ "github.com/ribora/waffle/config/tools/scribus/single"
     // ... other modules ...
 )
 ```
@@ -69,8 +69,8 @@ di.Wire[wscribus.ScribusCommand](wscribus.NewScribusCommand, di.Tag(app.CommandT
 ```go
 // config/di/modules.go
 import (
-    _ "gitlab.com/gorib/waffle/config/tools/scribus/amqp"
-    _ "gitlab.com/gorib/waffle/config/tools/scribus/batch"
+    _ "github.com/ribora/waffle/config/tools/scribus/amqp"
+    _ "github.com/ribora/waffle/config/tools/scribus/batch"
 )
 
 // config/di/di.go — register your own BatchHandler:
@@ -194,8 +194,8 @@ import (
 
     scribusModel "mymodule/domain/order/cmd/scribus/model"
     "mymodule/domain/order/model"
-    "gitlab.com/gorib/pry"
-    "gitlab.com/gorib/whisk/scan"
+    "github.com/ribora/pry"
+    "github.com/ribora/whisk/scan"
 )
 
 func NewOrderCreatedHandler(management OrderManagement, logger pry.Logger) *orderCreatedHandler {

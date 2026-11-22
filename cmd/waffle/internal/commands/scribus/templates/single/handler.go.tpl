@@ -3,8 +3,8 @@ package scribus
 import (
 	scribusModel "{{ .Project }}/domain/{{ .Domain }}/cmd/scribus/model"
 
-	"gitlab.com/gorib/pry"
-	"gitlab.com/gorib/whisk/scan"
+	"github.com/ribora/pry"
+	"github.com/ribora/whisk/scan"
 )
 
 func New{{ title .Event }}Command(

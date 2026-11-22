@@ -1,7 +1,7 @@
 package config
 
 import (
-	"gitlab.com/gorib/waffle/app"
+	"github.com/ribora/waffle/app"
 	"{{ .Project }}/config/diogen"
 )
 

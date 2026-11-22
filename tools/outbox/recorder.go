@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"sync"
 
-	"gitlab.com/gorib/session"
+	"github.com/ribora/session"
 )
 
 // Replace the Sender and not the Store, or Enqueue stops writing the row the

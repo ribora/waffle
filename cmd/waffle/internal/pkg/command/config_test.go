@@ -12,8 +12,8 @@ import (
 // the list of replacements and the areas are not waffle's keys.
 func TestProjectConfigRejectsAKeyItDoesNotRead(t *testing.T) {
 	cases := map[string]string{
-		"unknown key":  "mocks:\n  generate:\n    gitlab.com/gorib/sql: [Db]\n",
-		"replacements": "replacements:\n  allow:\n    gitlab.com/gorib/sql: [Db]\n",
+		"unknown key":  "mocks:\n  generate:\n    github.com/ribora/sql: [Db]\n",
+		"replacements": "replacements:\n  allow:\n    github.com/ribora/sql: [Db]\n",
 		"agents":       "agents:\n  areas:\n    events:\n      paths: [../events/]\n",
 	}
 

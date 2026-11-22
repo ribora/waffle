@@ -6,7 +6,7 @@ import (
 	contractRepository "example.test/domain/rent/adapter/postgres"
 	rentService "example.test/domain/rent/service"
 
-	"gitlab.com/gorib/di"
+	"github.com/ribora/diogen/di"
 )
 
 // The domain registers itself, so the root sits inside it and names both sides

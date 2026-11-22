@@ -1,9 +1,9 @@
 package sql
 
 import (
-	"gitlab.com/gorib/di"
-	"gitlab.com/gorib/env"
-	"gitlab.com/gorib/sql"
+	"github.com/ribora/diogen/di"
+	"github.com/ribora/env"
+	"github.com/ribora/sql"
 )
 
 func InitDb() {

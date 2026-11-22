@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"gitlab.com/gorib/hilton"
-	"gitlab.com/gorib/pry"
-	"gitlab.com/gorib/waffle/app"
+	"github.com/ribora/hilton"
+	"github.com/ribora/pry"
+	"github.com/ribora/waffle/app"
 )
 
 func run(t *testing.T, store Store, args ...string) error {

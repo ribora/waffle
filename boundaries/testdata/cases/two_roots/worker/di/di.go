@@ -5,7 +5,7 @@ package di
 import (
 	rentService "example.test/domain/rent/service"
 
-	"gitlab.com/gorib/di"
+	"github.com/ribora/diogen/di"
 )
 
 // A second binary's root, and it does not sit under config/.

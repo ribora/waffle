@@ -126,8 +126,8 @@ package di
 import (
     userMigration "mymodule/domain/user/cmd/migrate"
 
-    "gitlab.com/gorib/di"
-    "gitlab.com/gorib/waffle/tools/migrate"
+    "github.com/ribora/diogen/di"
+    "github.com/ribora/waffle/tools/migrate"
 )
 
 func InitUserMigrate() {

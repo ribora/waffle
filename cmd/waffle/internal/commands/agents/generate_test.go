@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command"
-	"gitlab.com/gorib/waffle/cmd/waffle/internal/pkg/command/commandtest"
+	"github.com/ribora/waffle/cmd/waffle/internal/pkg/command"
+	"github.com/ribora/waffle/cmd/waffle/internal/pkg/command/commandtest"
 )
 
 // make generate runs this on every build, so a second run must report nothing.
@@ -67,20 +67,20 @@ func TestScanModulesSkipsCommentedImports(t *testing.T) {
 	p := inModule(t, `package di
 
 import (
-	_ "gitlab.com/gorib/waffle/config/app"
+	_ "github.com/ribora/waffle/config/app"
 
 	// logger
-	_ "gitlab.com/gorib/waffle/config/service/pry"
+	_ "github.com/ribora/waffle/config/service/pry"
 
 	// uncomment if your service uses redis
-	// _ "gitlab.com/gorib/waffle/config/service/redis"
+	// _ "github.com/ribora/waffle/config/service/redis"
 
-	_ "gitlab.com/gorib/waffle/config/tools/grpc"
+	_ "github.com/ribora/waffle/config/tools/grpc"
 	// uncomment if your service uses http server
-	// _ "gitlab.com/gorib/waffle/config/tools/http"
+	// _ "github.com/ribora/waffle/config/tools/http"
 	// CHOOSE ONLY ONE VARIANT
-	// _ "gitlab.com/gorib/waffle/config/tools/scribus/batch"
-	// _ "gitlab.com/gorib/waffle/config/tools/scribus/single"
+	// _ "github.com/ribora/waffle/config/tools/scribus/batch"
+	// _ "github.com/ribora/waffle/config/tools/scribus/single"
 )
 `)
 
@@ -96,8 +96,8 @@ func TestScanModulesTakesOnlyBlankWaffleImports(t *testing.T) {
 import (
 	"fmt"
 
-	di "gitlab.com/gorib/waffle/config/app"
-	_ "gitlab.com/gorib/waffle/tools/http"
+	di "github.com/ribora/waffle/config/app"
+	_ "github.com/ribora/waffle/tools/http"
 	_ "example.com/other/config/tools/grpc"
 )
 
@@ -120,7 +120,7 @@ func TestScanModulesWithoutTheFile(t *testing.T) {
 func TestScanEnvVarsReadsEveryCallShape(t *testing.T) {
 	inConfig(t, `package config
 
-import "gitlab.com/gorib/env"
+import "github.com/ribora/env"
 
 func Init() {
 	_ = env.Value("PLAIN", "")
@@ -142,7 +142,7 @@ func Init() {
 func TestScanEnvVarsFollowsTheImport(t *testing.T) {
 	inConfig(t, `package config
 
-import environment "gitlab.com/gorib/env"
+import environment "github.com/ribora/env"
 
 type fake struct{}
 
@@ -165,7 +165,7 @@ func Init() {
 func TestScanEnvVarsTakesWhatTheModulesRead(t *testing.T) {
 	inConfig(t, `package config
 
-import "gitlab.com/gorib/env"
+import "github.com/ribora/env"
 
 func Init() { _ = env.Value("OWN", "") }
 `)
